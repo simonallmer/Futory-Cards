@@ -1,7 +1,7 @@
 // --- Database Logic (Global Scope) ---
 const cardData = [
-    { number: '001', name: 'Pandorama', cost: 'AA', rarity: '3', type: 'Landmark', set: 'Unity' },
-    { number: '002', name: 'Fountain of Youth', cost: 'GL', rarity: '3', type: 'Landmark', set: 'Unity' },
+    { number: '001', name: 'Pandorama', cost: 'AA', rarity: '3', type: 'Landmark', set: 'Unity', location: 'L1', description: 'Your Card Limit is increased by 2.', lore: 'Those who reach the Pandorama shall behold the world anew.', image: 'images/pandorama.jpg' },
+    { number: '002', name: 'Fountain of Youth', cost: 'GL', rarity: '3', type: 'Landmark', set: 'Unity', location: 'L2', description: 'Gain 1 Time Point whenever you draw 3 Cards in your End Phase.', lore: 'The blood of the innocent soaks the ground beneath.', image: 'images/fountain_of_youth.jpg' },
     { number: '003', name: "Dragura's Wasteland", cost: 'FFF', rarity: '3', type: 'Landmark', set: 'Unity' },
     { number: '004', name: 'Planetarium', cost: 'FGL', rarity: '3', type: 'Landmark', set: 'Unity' },
     { number: '005', name: 'Laser Catalyst', cost: '', rarity: '3', type: 'Landmark', set: 'Unity' },
@@ -119,6 +119,7 @@ document.addEventListener('DOMContentLoaded', () => {
         game: document.getElementById('game-screen'),
         database: document.getElementById('database-screen'),
         events: document.getElementById('events-screen'),
+        rules: document.getElementById('rules-screen'),
         construction: document.getElementById('construction-screen')
     };
 
@@ -154,13 +155,20 @@ document.addEventListener('DOMContentLoaded', () => {
     // Home Screen Buttons
     document.getElementById('btn-local-play').addEventListener('click', () => showScreen('localMode'));
     document.getElementById('btn-online-play').addEventListener('click', () => showScreen('construction'));
-    document.getElementById('btn-rules').addEventListener('click', () => showScreen('construction'));
+    document.getElementById('btn-rules').addEventListener('click', () => showScreen('rules'));
     document.getElementById('btn-dev-mode').addEventListener('click', () => {
         startGame();
     });
     document.getElementById('btn-back-sa').addEventListener('click', () => {
         window.location.href = 'https://simonallmer.com';
     });
+
+    // Title click to go home
+    const gameTitle = document.querySelector('.game-title');
+    if (gameTitle) {
+        gameTitle.style.cursor = 'pointer';
+        gameTitle.addEventListener('click', () => showScreen('home'));
+    }
 
     // Database & Events Buttons
     const menuButtons = document.querySelectorAll('.main-menu .menu-btn');
@@ -195,6 +203,8 @@ document.addEventListener('DOMContentLoaded', () => {
             } else if (screens.database.classList.contains('active')) {
                 showScreen('home');
             } else if (screens.events.classList.contains('active')) {
+                showScreen('home');
+            } else if (screens.rules.classList.contains('active')) {
                 showScreen('home');
             } else if (screens.construction.classList.contains('active')) {
                 showScreen('home');
@@ -232,6 +242,77 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     } else {
         console.error("Start Game button not found!");
+    }
+
+    // --- Rules Page Logic ---
+    // Tab switching
+    const tabGeneralRules = document.getElementById('tab-general-rules');
+    const tabKeywords = document.getElementById('tab-keywords');
+    const generalRulesContent = document.getElementById('general-rules-content');
+    const keywordsContent = document.getElementById('keywords-content');
+
+    if (tabGeneralRules && tabKeywords) {
+        tabGeneralRules.addEventListener('click', () => {
+            tabGeneralRules.classList.add('active');
+            tabKeywords.classList.remove('active');
+            generalRulesContent.classList.add('active');
+            generalRulesContent.classList.remove('hidden');
+            keywordsContent.classList.remove('active');
+            keywordsContent.classList.add('hidden');
+        });
+
+        tabKeywords.addEventListener('click', () => {
+            tabKeywords.classList.add('active');
+            tabGeneralRules.classList.remove('active');
+            keywordsContent.classList.add('active');
+            keywordsContent.classList.remove('hidden');
+            generalRulesContent.classList.remove('active');
+            generalRulesContent.classList.add('hidden');
+        });
+    }
+
+    // Keyword accordion functionality
+    document.querySelectorAll('.keyword-header').forEach(header => {
+        header.addEventListener('click', () => {
+            const keywordItem = header.closest('.keyword-item');
+            const description = keywordItem.querySelector('.keyword-description');
+
+            // Toggle expanded state
+            keywordItem.classList.toggle('expanded');
+            description.classList.toggle('hidden');
+        });
+    });
+
+    // Keyword info panel functionality (for modal)
+    const keywordInfoPanelModal = document.getElementById('keyword-info-panel-modal');
+    const keywordInfoTitleModal = document.getElementById('keyword-info-title-modal');
+    const keywordInfoContentModal = document.getElementById('keyword-info-content-modal');
+    const closeKeywordInfoModal = document.getElementById('close-keyword-info-modal');
+
+    // Function to show keyword info in modal side panel
+    window.navigateToKeyword = function (keywordId) {
+        // Don't close the modal - keep the card open!
+
+        // Get keyword data from the Rules page
+        const keywordItem = document.querySelector(`[data-keyword="${keywordId}"]`);
+        if (keywordItem) {
+            const keywordName = keywordItem.querySelector('.keyword-name').textContent;
+            const keywordDesc = keywordItem.querySelector('.keyword-description p').textContent;
+
+            // Update modal panel content
+            keywordInfoTitleModal.textContent = keywordName;
+            keywordInfoContentModal.innerHTML = `<p>${keywordDesc}</p>`;
+
+            // Show modal panel
+            keywordInfoPanelModal.classList.remove('hidden');
+        }
+    };
+
+    // Close keyword info modal panel
+    if (closeKeywordInfoModal) {
+        closeKeywordInfoModal.addEventListener('click', () => {
+            keywordInfoPanelModal.classList.add('hidden');
+        });
     }
 
     // --- Game Logic ---
@@ -388,6 +469,28 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
+    // Search functionality for database
+    const searchInput = document.getElementById('database-search');
+    if (searchInput) {
+        searchInput.addEventListener('input', (e) => {
+            const searchTerm = e.target.value.toLowerCase().trim();
+            const tbody = document.getElementById('database-body');
+            const rows = tbody.querySelectorAll('tr');
+
+            rows.forEach(row => {
+                const nameCell = row.querySelector('td:nth-child(2)');
+                if (nameCell) {
+                    const cardName = nameCell.textContent.toLowerCase();
+                    if (cardName.includes(searchTerm)) {
+                        row.style.display = '';
+                    } else {
+                        row.style.display = 'none';
+                    }
+                }
+            });
+        });
+    }
+
     // --- Modal Logic ---
     const modalOverlay = document.getElementById('modal-overlay');
     const modals = {
@@ -400,13 +503,53 @@ document.addEventListener('DOMContentLoaded', () => {
     function showCardPopup(card) {
         document.getElementById('popup-card-name').textContent = card.name;
         document.getElementById('popup-card-type').textContent = card.type;
-        document.getElementById('popup-card-cost').textContent = '';
+        document.getElementById('popup-card-cost').textContent = card.cost || '-';
         document.getElementById('popup-card-rarity').textContent = card.rarity;
         document.getElementById('popup-card-set').textContent = card.set;
         document.getElementById('popup-card-number').textContent = card.number;
-        document.getElementById('popup-card-location').textContent = '';
-        document.getElementById('popup-card-desc').textContent = '';
-        document.getElementById('popup-card-lore').textContent = '';
+        document.getElementById('popup-card-location').textContent = card.location || '-';
+
+        // Handle description with keyword links
+        const descElement = document.getElementById('popup-card-desc');
+        if (card.description) {
+            let description = card.description;
+
+            // Define keywords to link
+            const keywords = {
+                'Time Point': 'time-points',
+                'Time Points': 'time-points',
+                'End Phase': 'end-phase',
+                'Health Points': 'health-points',
+                'Steam Phase': 'steam-phase',
+                'Construction Phase': 'construction-phase',
+                'Creature Phase': 'creature-phase'
+            };
+
+            // Replace keywords with clickable links
+            Object.keys(keywords).forEach(keyword => {
+                const regex = new RegExp(`\\b${keyword}\\b`, 'gi');
+                description = description.replace(regex, match => {
+                    return `<span class="keyword-link" onclick="navigateToKeyword('${keywords[keyword]}')">${match}</span>`;
+                });
+            });
+
+            descElement.innerHTML = description;
+        } else {
+            descElement.textContent = '-';
+        }
+
+        document.getElementById('popup-card-lore').textContent = card.lore || '-';
+
+        // Handle card image
+        const imageContainer = document.getElementById('popup-card-image-container');
+        const imageElement = document.getElementById('popup-card-image');
+
+        if (card.image) {
+            imageElement.src = card.image;
+            imageContainer.classList.remove('hidden');
+        } else {
+            imageContainer.classList.add('hidden');
+        }
 
         openModal('cardPopup');
     }

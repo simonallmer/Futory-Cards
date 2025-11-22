@@ -627,14 +627,140 @@ body {
 }
 
 /* --- Database Screen --- */
-.database-container {
+.search-container {
+    position: relative;
     width: 100%;
+    margin-bottom: 1rem;
+}
+
+.search-input {
+    width: 100%;
+    padding: 0.8rem 2.5rem 0.8rem 1rem;
+    background: rgba(0, 0, 0, 0.3);
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    border-radius: 8px;
+    color: var(--color-text);
+    font-family: var(--font-body);
+    font-size: 1rem;
+    outline: none;
+    transition: all 0.3s ease;
+}
+
+.search-input::placeholder {
+    color: var(--color-text-dim);
+    opacity: 0.6;
+}
+
+.search-input:focus {
+    border-color: var(--color-primary);
+    box-shadow: 0 0 15px rgba(0, 243, 255, 0.2);
+    background: rgba(0, 0, 0, 0.5);
+}
+
+.search-icon {
+    position: absolute;
+    right: 1rem;
+    top: 50%;
+    transform: translateY(-50%);
+    font-size: 1.2rem;
+    opacity: 0.5;
+    pointer-events: none;
+}
+
+.database-layout {
+    display: flex;
+    gap: 1rem;
+    width: 100%;
+    position: relative;
+}
+
+.database-container {
+    flex: 1;
     max-height: 60vh;
     overflow-y: auto;
     background: rgba(0, 0, 0, 0.3);
     border: 1px solid rgba(255, 255, 255, 0.1);
     border-radius: 8px;
     padding: 1rem;
+    transition: all 0.4s ease;
+}
+
+.database-layout.panel-open .database-container {
+    flex: 0.6;
+}
+
+/* Keyword Info Panel */
+.keyword-info-panel {
+    flex: 0;
+    max-height: 60vh;
+    background: rgba(0, 0, 0, 0.4);
+    border: 1px solid var(--color-primary);
+    border-radius: 8px;
+    overflow: hidden;
+    transition: all 0.4s ease;
+    opacity: 0;
+    box-shadow: 0 0 20px rgba(0, 243, 255, 0.2);
+}
+
+.keyword-info-panel.hidden {
+    flex: 0;
+    opacity: 0;
+    pointer-events: none;
+}
+
+.keyword-info-panel:not(.hidden) {
+    flex: 0.4;
+    opacity: 1;
+}
+
+.keyword-info-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 1rem;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+    background: rgba(0, 243, 255, 0.05);
+}
+
+.keyword-info-header h3 {
+    font-family: var(--font-heading);
+    color: var(--color-primary);
+    font-size: 1.2rem;
+    margin: 0;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+}
+
+.close-keyword-btn {
+    background: none;
+    border: none;
+    color: var(--color-text-dim);
+    font-size: 1.5rem;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    width: 30px;
+    height: 30px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 4px;
+}
+
+.close-keyword-btn:hover {
+    color: var(--color-text);
+    background: rgba(255, 255, 255, 0.1);
+}
+
+.keyword-info-content {
+    padding: 1.5rem;
+    color: var(--color-text-dim);
+    line-height: 1.6;
+    overflow-y: auto;
+    max-height: calc(60vh - 60px);
+}
+
+.keyword-info-content p {
+    margin: 0;
 }
 
 .database-table {
@@ -760,6 +886,26 @@ body {
 }
 
 /* --- Card Popup Details --- */
+.card-image-container {
+    width: 100%;
+    margin-bottom: 1rem;
+    border-radius: 8px;
+    overflow: hidden;
+    border: 2px solid var(--color-primary);
+    box-shadow: 0 0 15px rgba(0, 243, 255, 0.3);
+}
+
+.card-image-container.hidden {
+    display: none;
+}
+
+.card-image {
+    width: 100%;
+    height: auto;
+    display: block;
+    object-fit: cover;
+}
+
 .card-details {
     display: flex;
     flex-direction: column;
@@ -797,6 +943,217 @@ body {
     .mode-selection {
         flex-direction: column;
     }
+}
+
+/* --- Rules Screen --- */
+.rules-tabs {
+    display: flex;
+    gap: 1rem;
+    width: 100%;
+    margin-bottom: 1.5rem;
+}
+
+.rules-tab {
+    flex: 1;
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    color: var(--color-text-dim);
+    padding: 0.8rem 1.5rem;
+    font-family: var(--font-heading);
+    font-size: 1rem;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    border-radius: 4px;
+}
+
+.rules-tab:hover {
+    background: rgba(255, 255, 255, 0.1);
+}
+
+.rules-tab.active {
+    background: rgba(0, 243, 255, 0.2);
+    border-color: var(--color-primary);
+    color: var(--color-primary);
+    box-shadow: 0 0 10px rgba(0, 243, 255, 0.2);
+}
+
+.rules-content {
+    width: 100%;
+    max-height: 60vh;
+    overflow-y: auto;
+    background: rgba(0, 0, 0, 0.3);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 8px;
+    padding: 1.5rem;
+    display: none;
+}
+
+.rules-content.active {
+    display: block;
+}
+
+.rules-section {
+    margin-bottom: 2rem;
+}
+
+.rules-section h3 {
+    font-family: var(--font-heading);
+    color: var(--color-secondary);
+    font-size: 1.2rem;
+    margin-bottom: 0.8rem;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+}
+
+.rules-section p {
+    color: var(--color-text-dim);
+    line-height: 1.6;
+    font-size: 1rem;
+}
+
+/* Keywords List */
+.keywords-list {
+    display: flex;
+    flex-direction: column;
+    gap: 0.8rem;
+}
+
+.keyword-item {
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 6px;
+    overflow: hidden;
+    transition: all 0.3s ease;
+}
+
+.keyword-item:hover {
+    border-color: rgba(0, 243, 255, 0.3);
+}
+
+.keyword-header {
+    width: 100%;
+    background: transparent;
+    border: none;
+    color: var(--color-text);
+    padding: 1rem;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    cursor: pointer;
+    font-family: var(--font-heading);
+    font-size: 1rem;
+    text-align: left;
+    transition: all 0.2s ease;
+}
+
+.keyword-header:hover {
+    background: rgba(0, 243, 255, 0.05);
+}
+
+.keyword-name {
+    color: var(--color-primary);
+    font-weight: 600;
+    letter-spacing: 0.5px;
+}
+
+.keyword-arrow {
+    color: var(--color-text-dim);
+    font-size: 0.8rem;
+    transition: transform 0.3s ease;
+}
+
+.keyword-item.expanded .keyword-arrow {
+    transform: rotate(180deg);
+}
+
+.keyword-description {
+    padding: 0 1rem 1rem 1rem;
+    color: var(--color-text-dim);
+    line-height: 1.6;
+    max-height: 0;
+    overflow: hidden;
+    transition: max-height 0.3s ease, padding 0.3s ease;
+}
+
+.keyword-description:not(.hidden) {
+    max-height: 500px;
+    padding: 0 1rem 1rem 1rem;
+}
+
+.keyword-description.hidden {
+    padding: 0 1rem;
+}
+
+.keyword-description p {
+    margin: 0;
+}
+
+/* Keyword links in card descriptions */
+.keyword-link {
+    color: var(--color-primary);
+    text-decoration: underline;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.keyword-link:hover {
+    color: #fff;
+    text-shadow: 0 0 8px var(--color-primary);
+}
+
+/* Keyword Info Panel in Modal */
+.keyword-info-panel-modal {
+    position: fixed;
+    right: 2rem;
+    top: 50%;
+    transform: translateY(-50%) translateX(120%);
+    width: 350px;
+    max-height: 80vh;
+    background: rgba(0, 0, 0, 0.95);
+    border: 2px solid var(--color-primary);
+    border-radius: 12px;
+    overflow: hidden;
+    transition: transform 0.4s ease, opacity 0.4s ease;
+    opacity: 0;
+    z-index: 250;
+    box-shadow: 0 0 30px rgba(0, 243, 255, 0.3);
+}
+
+.keyword-info-panel-modal:not(.hidden) {
+    transform: translateY(-50%) translateX(0);
+    opacity: 1;
+}
+
+.keyword-info-panel-modal .keyword-info-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 1rem;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+    background: rgba(0, 243, 255, 0.1);
+}
+
+.keyword-info-panel-modal .keyword-info-header h3 {
+    font-family: var(--font-heading);
+    color: var(--color-primary);
+    font-size: 1.2rem;
+    margin: 0;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+}
+
+.keyword-info-panel-modal .keyword-info-content {
+    padding: 1.5rem;
+    color: var(--color-text-dim);
+    line-height: 1.6;
+    overflow-y: auto;
+    max-height: calc(80vh - 60px);
+}
+
+.keyword-info-panel-modal .keyword-info-content p {
+    margin: 0;
 }
 
 /* --- Construction Screen --- */

@@ -206,22 +206,37 @@
 
         <section id="database-screen" class="screen hidden">
             <h2 class="screen-title">Database</h2>
-            <div class="database-container">
-                <table class="database-table">
-                    <thead>
-                        <tr>
-                            <th>Number</th>
-                            <th>Name</th>
-                            <th>Cost</th>
-                            <th>Rarity</th>
-                            <th>Type</th>
-                            <th>Set</th>
-                        </tr>
-                    </thead>
-                    <tbody id="database-body">
-                        <!-- Populated by JS -->
-                    </tbody>
-                </table>
+            <div class="search-container">
+                <input type="text" id="database-search" class="search-input" placeholder="Search cards by name...">
+                <span class="search-icon">🔍</span>
+            </div>
+            <div class="database-layout">
+                <div class="database-container">
+                    <table class="database-table">
+                        <thead>
+                            <tr>
+                                <th>Number</th>
+                                <th>Name</th>
+                                <th>Cost</th>
+                                <th>Rarity</th>
+                                <th>Type</th>
+                                <th>Set</th>
+                            </tr>
+                        </thead>
+                        <tbody id="database-body">
+                            <!-- Populated by JS -->
+                        </tbody>
+                    </table>
+                </div>
+                <div id="keyword-info-panel" class="keyword-info-panel hidden">
+                    <div class="keyword-info-header">
+                        <h3 id="keyword-info-title">Keyword</h3>
+                        <button id="close-keyword-info" class="close-keyword-btn">×</button>
+                    </div>
+                    <div id="keyword-info-content" class="keyword-info-content">
+                        <p>Select a keyword to view its definition.</p>
+                    </div>
+                </div>
             </div>
             <button class="back-btn">Back</button>
         </section>
@@ -254,6 +269,135 @@
                     </div>
                 </div>
             </div>
+            <button class="back-btn">Back</button>
+        </section>
+
+        <section id="rules-screen" class="screen hidden">
+            <h2 class="screen-title">Rules</h2>
+
+            <div class="rules-tabs">
+                <button id="tab-general-rules" class="rules-tab active">General Rules</button>
+                <button id="tab-keywords" class="rules-tab">Keywords</button>
+            </div>
+
+            <div id="general-rules-content" class="rules-content active">
+                <div class="rules-section">
+                    <h3>Game Overview</h3>
+                    <p>Text will appear here soon.</p>
+                </div>
+                <div class="rules-section">
+                    <h3>Setup</h3>
+                    <p>Text will appear here soon.</p>
+                </div>
+                <div class="rules-section">
+                    <h3>How to Win</h3>
+                    <p>Text will appear here soon.</p>
+                </div>
+            </div>
+
+            <div id="keywords-content" class="rules-content hidden">
+                <div class="keywords-list">
+                    <!-- Construction Phase -->
+                    <div class="keyword-item">
+                        <button class="keyword-header">
+                            <span class="keyword-name">Construction Phase</span>
+                            <span class="keyword-arrow">▼</span>
+                        </button>
+                        <div class="keyword-description hidden">
+                            <p>Text will appear here soon.</p>
+                        </div>
+                    </div>
+
+                    <!-- Creature Phase -->
+                    <div class="keyword-item">
+                        <button class="keyword-header">
+                            <span class="keyword-name">Creature Phase</span>
+                            <span class="keyword-arrow">▼</span>
+                        </button>
+                        <div class="keyword-description hidden">
+                            <p>Text will appear here soon.</p>
+                        </div>
+                    </div>
+
+                    <!-- Dice -->
+                    <div class="keyword-item">
+                        <button class="keyword-header">
+                            <span class="keyword-name">Dice</span>
+                            <span class="keyword-arrow">▼</span>
+                        </button>
+                        <div class="keyword-description hidden">
+                            <p>Text will appear here soon.</p>
+                        </div>
+                    </div>
+
+                    <!-- End Phase -->
+                    <div class="keyword-item" data-keyword="end-phase">
+                        <button class="keyword-header">
+                            <span class="keyword-name">End Phase</span>
+                            <span class="keyword-arrow">▼</span>
+                        </button>
+                        <div class="keyword-description hidden">
+                            <p>Text will appear here soon.</p>
+                        </div>
+                    </div>
+
+                    <!-- Futory Die -->
+                    <div class="keyword-item">
+                        <button class="keyword-header">
+                            <span class="keyword-name">Futory Die</span>
+                            <span class="keyword-arrow">▼</span>
+                        </button>
+                        <div class="keyword-description hidden">
+                            <p>Text will appear here soon.</p>
+                        </div>
+                    </div>
+
+                    <!-- Health Points -->
+                    <div class="keyword-item">
+                        <button class="keyword-header">
+                            <span class="keyword-name">Health Points</span>
+                            <span class="keyword-arrow">▼</span>
+                        </button>
+                        <div class="keyword-description hidden">
+                            <p>Text will appear here soon.</p>
+                        </div>
+                    </div>
+
+                    <!-- Steam Phase -->
+                    <div class="keyword-item">
+                        <button class="keyword-header">
+                            <span class="keyword-name">Steam Phase</span>
+                            <span class="keyword-arrow">▼</span>
+                        </button>
+                        <div class="keyword-description hidden">
+                            <p>Text will appear here soon.</p>
+                        </div>
+                    </div>
+
+                    <!-- Time Die -->
+                    <div class="keyword-item">
+                        <button class="keyword-header">
+                            <span class="keyword-name">Time Die</span>
+                            <span class="keyword-arrow">▼</span>
+                        </button>
+                        <div class="keyword-description hidden">
+                            <p>Text will appear here soon.</p>
+                        </div>
+                    </div>
+
+                    <!-- Time Points -->
+                    <div class="keyword-item" data-keyword="time-points">
+                        <button class="keyword-header">
+                            <span class="keyword-name">Time Points</span>
+                            <span class="keyword-arrow">▼</span>
+                        </button>
+                        <div class="keyword-description hidden">
+                            <p>Text will appear here soon.</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
             <button class="back-btn">Back</button>
         </section>
 
@@ -350,6 +494,9 @@
                     <button class="close-modal">×</button>
                 </div>
                 <div class="modal-content card-details">
+                    <div id="popup-card-image-container" class="card-image-container hidden">
+                        <img id="popup-card-image" class="card-image" src="" alt="Card artwork">
+                    </div>
                     <div class="detail-row">
                         <span class="detail-label">Type:</span>
                         <span id="popup-card-type" class="detail-value"></span>
@@ -382,6 +529,17 @@
                         <span class="detail-label">Lore:</span>
                         <span id="popup-card-lore" class="detail-value"></span>
                     </div>
+                </div>
+            </div>
+
+            <!-- Keyword Info Panel (in modal overlay) -->
+            <div id="keyword-info-panel-modal" class="keyword-info-panel-modal hidden">
+                <div class="keyword-info-header">
+                    <h3 id="keyword-info-title-modal">Keyword</h3>
+                    <button id="close-keyword-info-modal" class="close-keyword-btn">×</button>
+                </div>
+                <div id="keyword-info-content-modal" class="keyword-info-content">
+                    <p>Select a keyword to view its definition.</p>
                 </div>
             </div>
         </div>
