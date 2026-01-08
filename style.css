@@ -37,42 +37,9 @@ body {
     left: 0;
     width: 100%;
     height: 100%;
-    z-index: -1;
-    background: radial-gradient(ellipse at bottom, #1b2735 0%, #090a0f 100%);
+    z-index: -2;
+    background: url('images/main_bg.png') no-repeat center center/cover;
     overflow: hidden;
-}
-
-.stars {
-    position: absolute;
-    top: 0;
-    left: 0;
-    width: 100%;
-    height: 100%;
-    background: transparent url('https://s3-us-west-2.amazonaws.com/s.cdpn.io/1231630/stars.png') repeat top center;
-    z-index: 0;
-    animation: move-twink-back 200s linear infinite;
-}
-
-.twinkling {
-    position: absolute;
-    top: 0;
-    left: 0;
-    width: 100%;
-    height: 100%;
-    background: transparent url('https://s3-us-west-2.amazonaws.com/s.cdpn.io/1231630/twinkling.png') repeat top center;
-    z-index: 1;
-    animation: move-twink-back 100s linear infinite;
-    opacity: 0.5;
-}
-
-@keyframes move-twink-back {
-    from {
-        background-position: 0 0;
-    }
-
-    to {
-        background-position: -10000px 5000px;
-    }
 }
 
 /* --- Layout --- */
@@ -102,32 +69,22 @@ body {
     }
 }
 
+/* --- Effects Layers Removed --- */
+
 /* --- Header --- */
 .game-header {
-    margin-bottom: 1rem;
+    margin-bottom: 2rem;
     transition: opacity 0.3s ease, height 0.3s ease, margin 0.3s ease;
-    overflow: hidden;
+    text-align: center;
+    position: relative;
+    z-index: 20;
 }
 
-.game-header.hidden {
-    opacity: 0;
-    height: 0;
-    margin: 0;
-    pointer-events: none;
-}
-
-.game-title {
-    font-family: var(--font-heading);
-    font-size: 4rem;
-    font-weight: 900;
-    text-transform: uppercase;
-    letter-spacing: 4px;
-    background: linear-gradient(to right, var(--color-primary), #fff, var(--color-secondary));
-    -webkit-background-clip: text;
-    background-clip: text;
-    color: transparent;
-    text-shadow: 0 0 20px rgba(0, 243, 255, 0.3);
-    margin-bottom: 0.5rem;
+.game-logo {
+    max-width: 90%;
+    width: 600px;
+    height: auto;
+    /* Shadow removed as requested */
 }
 
 /* --- Top Controls --- */

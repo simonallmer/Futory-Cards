@@ -18,11 +18,7 @@
 </head>
 
 <body>
-    <div class="background-container">
-        <div class="stars"></div>
-        <div class="twinkling"></div>
-        <div class="nebula"></div>
-    </div>
+    <div class="background-container"></div>
 
     <div class="top-controls">
         <button id="btn-profile" class="icon-btn" title="Profile">👤</button>
@@ -32,17 +28,19 @@
 
     <main class="app-container">
         <header id="main-header" class="game-header">
-            <h1 class="game-title">Futory Cards</h1>
+            <img src="images/title_logo.png" alt="Futory Cards" class="game-logo">
+            <p
+                style="text-align: center; font-family: 'Rajdhani', sans-serif; color: #fff; text-shadow: 0 0 10px #bc13fe; opacity: 0.9; margin-top: -10px; font-weight: bold; letter-spacing: 2px;">
+                Beta: Accessible to Playtesters only</p>
         </header>
+
+        <!-- Effects Layers Removed -->
 
 
 
         <section id="home-screen" class="screen active">
             <nav class="main-menu">
-                <button id="btn-dev-mode" class="menu-btn" style="border-color: #ff00ff; color: #ff00ff;">Developer
-                    Mode</button>
-                <button id="btn-local-play" class="menu-btn">Local Play</button>
-                <button id="btn-online-play" class="menu-btn">Online Play</button>
+                <button id="btn-play" class="menu-btn" style="border-color: #ff00ff; color: #ff00ff;">Play</button>
                 <button id="btn-rules" class="menu-btn">Rules</button>
                 <button class="menu-btn disabled" data-tooltip="Coming Soon">Database</button>
                 <button class="menu-btn disabled" data-tooltip="Coming Soon">Events</button>
@@ -428,6 +426,23 @@
                         <span class="stat-label">Games Played</span>
                         <span class="stat-value">0</span>
                     </div>
+                </div>
+            </div>
+
+            <!-- Password Modal -->
+            <div id="modal-password" class="modal hidden" style="max-width: 350px;">
+                <div class="modal-header">
+                    <h2>Authentication</h2>
+                    <button class="close-modal">×</button>
+                </div>
+                <div class="modal-content" style="text-align: center;">
+                    <p style="margin-bottom: 1.5rem; color: var(--color-text-dim);">Enter access code to proceed.</p>
+                    <input type="password" id="password-input" class="search-input" placeholder="Enter code..."
+                        style="margin-bottom: 1.5rem; text-align: center; letter-spacing: 4px; font-family: var(--font-heading);">
+                    <button id="btn-submit-password" class="action-btn" style="width: 100%;">Access</button>
+                    <p id="password-error"
+                        style="color: #ff4d4d; font-size: 0.9rem; margin-top: 1rem; opacity: 0; transition: opacity 0.3s; font-weight: bold;">
+                        Access Denied</p>
                 </div>
             </div>
 
