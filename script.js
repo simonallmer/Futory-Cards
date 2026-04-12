@@ -687,6 +687,42 @@ document.addEventListener('DOMContentLoaded', () => {
         highlightValidZones(card);
     }
 
+    function updateCreatureStatBadge(slot, card) {
+        // Remove existing
+        slot.querySelectorAll('.health-badge, .strength-badge').forEach(e => e.remove());
+        
+        if (!card || card.type !== 'Creature') return;
+
+        // Strength Badge (Displays effectively current health/strength)
+        const baseStr = getBaseStrength(card);
+        const permMod = card.permanentStrMod || 0;
+        const isAttacker = slot.closest('.player-zone') && slot.closest('.player-zone').id === `player-${currentPlayer}`;
+        const tempMod = isAttacker ? -activeStrDebuff : 0;
+        const damage = card.damageTaken || 0;
+        
+        // Final value: (Base + Buffs - Debuffs) - Damage
+        const finalVal = Math.max(0, (baseStr + permMod + tempMod) - damage);
+        
+        const sb = document.createElement('div');
+        sb.className = 'strength-badge tech-font';
+        sb.textContent = finalVal;
+        
+        // Use baseStr + permMod as comparison point for context
+        if (finalVal < (baseStr + permMod)) sb.classList.add('negative');
+        else if (finalVal > (baseStr + permMod)) sb.classList.add('positive');
+        
+        slot.appendChild(sb);
+    }
+
+    function getBaseStrength(card) {
+        let str = parseInt(card.cost) || 0;
+        if (card.description && card.description.includes("Strength")) {
+            const match = card.description.match(/Strength (\d+)/);
+            if (match) str = parseInt(match[1]);
+        }
+        return str;
+    }
+
     function updateHeldGhost() {
         if (heldGhost) heldGhost.remove();
         if (heldCards.length === 0) return;
@@ -1893,7 +1929,7 @@ document.addEventListener('DOMContentLoaded', () => {
             const card = JSON.parse(slot.dataset.cardData);
             if (card.type !== 'Creature') return;
 
-            slot.querySelectorAll('.creature-stat-badge').forEach(b => b.remove());
+            slot.querySelectorAll('.creature-stat-badge, .health-badge, .str-marker').forEach(b => b.remove());
             
             // Calculate special buffs (e.g., Meridia)
             let bonus = 0;
@@ -2152,10 +2188,9 @@ document.addEventListener('DOMContentLoaded', () => {
             finishSingleCardPlacement(blockerHistory, blockerData);
         }
 
-        // Cleanup Attacker
+        // Cleanup Attacker - ALWAYS move to history regardless of outcome
         clearSlot(attackerSlot);
         finishSingleCardPlacement(attackerHistory, attacker);
-        // initAllActiveBoards() was a huge mistake here - it resets the game. Removed.
     }
 
     function resolveDamageDirectly(damage, playerNum) {
@@ -2192,12 +2227,13 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
 
-    function passDevice(toPlayer, callback) {
+    function passDevice(toPlayer, callback, customBtnText = "START TURN") {
         const overlay = document.getElementById('pass-device-overlay');
         const hint = document.getElementById('next-player-hint');
         const btn = document.getElementById('start-turn-btn');
         
         hint.textContent = `PLAYER ${toPlayer}`;
+        btn.textContent = customBtnText;
         overlay.classList.remove('hidden');
         
         btn.onclick = () => {
@@ -2208,51 +2244,96 @@ document.addEventListener('DOMContentLoaded', () => {
 
     function selectArtifactToPlay(attacker, attackerSlot, defenderNum, handSlots) {
         passDevice(defenderNum, () => {
-            alert(`Player ${defenderNum}: Select Artifacts to play, then click "Continue"`);
+            // Switch View to Defender
+            document.querySelectorAll('.player-zone').forEach(z => z.classList.remove('active-player'));
+            document.getElementById(`player-${defenderNum}`).classList.add('active-player');
+            const gameField = document.getElementById('game-field');
+            const originalClass = gameField.className;
+            gameField.className = `players-${activePlayerCount} turn-p${defenderNum}`;
             
+            document.body.classList.add('artifact-selection-active');
+            let selectedSlots = [];
+
             // Temporary Continue button
             const followUp = document.createElement('button');
             followUp.className = 'menu-btn combat-btn sticky-confirm';
-            followUp.textContent = 'CONTINUE';
+            followUp.textContent = 'CONFIRM SELECTION';
             followUp.style.position = 'fixed';
             followUp.style.bottom = '40px';
             followUp.style.left = '50%';
             followUp.style.transform = 'translateX(-50%)';
-            followUp.style.width = '200px';
+            followUp.style.width = '240px';
             followUp.style.zIndex = '6000';
             document.body.appendChild(followUp);
 
             handSlots.forEach(slot => {
                 slot.classList.add('valid-block-target');
-                slot.onclick = (e) => {
+                // Use capturing listener to override the default grab behavior
+                const listener = (e) => {
+                    e.stopImmediatePropagation();
                     e.stopPropagation();
+                    if (slot.classList.contains('selected')) {
+                        slot.classList.remove('selected');
+                        selectedSlots = selectedSlots.filter(s => s !== slot);
+                    } else {
+                        slot.classList.add('selected');
+                        selectedSlots.push(slot);
+                    }
+                };
+                slot.addEventListener('click', listener, true);
+                slot._selectionListener = listener; // Store for removal
+            });
+
+            followUp.onclick = () => {
+                // Process Multi-Selection
+                let smokesPlayed = 0;
+                selectedSlots.forEach(slot => {
                     const artifactData = JSON.parse(slot.dataset.cardData);
                     const history = slot.closest('.player-zone').querySelector('.history-pile');
                     clearSlot(slot);
                     finishSingleCardPlacement(history, artifactData);
                     
-                    // CARD EFFECT: SMOKE
+                    // CARD EFFECT: SMOKE (Stackable)
                     if (artifactData.name === "Smoke") {
                         activeStrDebuff += 1;
-                        alert("Smoke deployed! All attackers this turn have -1 Strength.");
+                        smokesPlayed++;
                     }
-                    alert(`Played ${artifactData.name}`);
-                };
-            });
-
-            followUp.onclick = () => {
-                followUp.remove();
-                handSlots.forEach(s => {
-                    s.classList.remove('valid-block-target');
-                    // Reset click listeners is tricky since createSlot uses them. 
-                    // Better to just refresh the board or re-bind.
                 });
-                // initAllActiveBoards() replaced with specific hand maintenance
-                board.querySelectorAll('.hand-slot').forEach(s => s.classList.remove('valid-block-target'));
-                // Return to defense choice (Pass back is implied or just stay for resolution)
+
+                // Update all attackers visually to show the new debuff
+                document.querySelectorAll(`.p${currentPlayer} .creature-zone-main .card:not(.slot-empty)`).forEach(s => {
+                    const data = JSON.parse(s.dataset.cardData);
+                    updateCreatureStatBadge(s, data);
+                });
+
+                followUp.remove();
+                document.body.classList.remove('artifact-selection-active');
+                handSlots.forEach(s => {
+                    s.classList.remove('valid-block-target', 'selected');
+                    if (s._selectionListener) {
+                        s.removeEventListener('click', s._selectionListener, true);
+                        delete s._selectionListener;
+                    }
+                });
+                
+                // Refresh combat feedback to show the debuff if any smokes played
+                if (smokesPlayed > 0) {
+                     const feedback = document.getElementById('combat-feedback');
+                     feedback.textContent = `Smoke deployed! Attackers -${smokesPlayed} Strength this turn.`;
+                     feedback.classList.add('combat-feedback-vital');
+                }
+                
+                // Switch View back to Attacker
+                document.querySelectorAll('.player-zone').forEach(z => z.classList.remove('active-player'));
+                document.getElementById(`player-${currentPlayer}`).classList.add('active-player');
+                gameField.className = originalClass;
+
+                // Return to defense overlay
+                const defenseOverlay = document.getElementById('defense-overlay');
+                defenseOverlay.classList.remove('hidden');
                 initiateDefense(attacker, attackerSlot, defenderNum);
             };
-        });
+        }, "SELECT ARTIFACT");
     }
 
     function showCardDetails(card, showBazaarStack = false) {
