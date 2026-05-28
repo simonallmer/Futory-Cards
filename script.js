@@ -239,6 +239,162 @@ document.addEventListener('DOMContentLoaded', () => {
 
     const implementedCards = ["Pandorama", "Fountain of Youth", "Ichor", "Vulcanem", "Cravus", "Rampadon", "Smoke"];
 
+    // --- Intent Classification ---
+    // auto: fires on its own when condition is met
+    // contextual: fires when player performs the trigger action (if no ambiguity); falls back to active if conflict
+    // active: player must explicitly click the card and confirm "Use Effect"
+    const intentMap = {
+        'Pandorama': 'auto',
+        'Fountain of Youth': 'auto',
+        "Dragura's Wasteland": 'active',
+        'Planetarium': 'contextual',
+        'Laser Catalyst': 'active',
+        "Lethargo's Temple": 'active',
+        'Clone Factory': 'active',
+        'Aetherlab': 'active',
+        'Ichor': 'auto',
+        'Cravus': 'auto',
+        'Entrophy': 'auto',
+        'Meridius': 'auto',
+        'Meridia': 'auto',
+        'Time Thief': 'auto',
+        'Rampadon': 'auto',
+        'Vulcanem': 'auto',
+        'Smoke': 'contextual',
+        'Dark Matter': 'active',
+        'Reflector': 'active',
+        'Talisman': 'active',
+        'Reversal': 'active',
+        'Faith': 'active',
+        'Threat': 'active',
+        'Confiscation': 'active',
+    };
+
+    // --- Simulation Presets ---
+    // Each entry describes the board state to load for quick effect testing.
+    // hand/p2hand: card names; landmarks/p2landmarks: card names; p1creatures/p2creatures: {name, damageTaken}
+    // p1history: card names to put in Player 1's History Pile
+    const simulationMap = {
+        'Pandorama': {
+            phase: 0,
+            desc: "Pandorama active. Hand limit should be 7 instead of 5.",
+            landmarks: ['Pandorama'],
+        },
+        'Fountain of Youth': {
+            phase: 0,
+            desc: "Fountain of Youth active. Press Skip Turn — should gain +1 TP.",
+            landmarks: ['Fountain of Youth'],
+        },
+        "Dragura's Wasteland": {
+            phase: 1,
+            desc: "Vulcanem has taken 2 damage (shows as 4). FireSteam in hand. Use Wasteland to heal all damage.",
+            hand: ['FireSteam'],
+            landmarks: ["Dragura's Wasteland"],
+            p1creatures: [{ name: 'Vulcanem', damageTaken: 2 }],
+        },
+        'Laser Catalyst': {
+            phase: 3,
+            desc: "Laser Catalyst in Landmark Zone, 2 LaserSteams in hand. End Phase — activate to deal 2 damage.",
+            hand: ['LaserSteam', 'LaserSteam'],
+            landmarks: ['Laser Catalyst'],
+        },
+        "Lethargo's Temple": {
+            phase: 1,
+            day: 10,
+            desc: "Lethargo's Temple active, 10 TP. Bazaar should highlight cards affordable by TP (F=1, G=2, L=3).",
+            landmarks: ["Lethargo's Temple"],
+        },
+        'Clone Factory': {
+            phase: 2,
+            desc: "Rampadon in Creature Zone, GoldSteam in hand. Clone Factory should allow attacking twice.",
+            hand: ['GoldSteam'],
+            landmarks: ['Clone Factory'],
+            p1creatures: [{ name: 'Rampadon', damageTaken: 0 }],
+        },
+        'Aetherlab': {
+            phase: 1,
+            desc: "Aetherlab active, FireSteam in hand. Click Aetherlab to trade Fire → Gold.",
+            hand: ['FireSteam'],
+            landmarks: ['Aetherlab'],
+        },
+        'Cravus': {
+            phase: 2,
+            desc: "Cravus summoned this turn (summonedOnTurn = totalTurns). Should still be attackable — no summoning sickness.",
+            p1creatures: [{ name: 'Cravus', damageTaken: 0, forceThisTurn: true }],
+        },
+        'Entrophy': {
+            phase: 2,
+            desc: "Entrophy in Creature Zone. Attack to trigger the die roll — 6 possible outcomes.",
+            p1creatures: [{ name: 'Entrophy', damageTaken: 0 }],
+        },
+        'Meridius': {
+            phase: 2,
+            desc: "Meridius in Creature Zone. Player 2 has 3 Landmarks — Meridius should have +3 Str and be unblockable.",
+            p1creatures: [{ name: 'Meridius', damageTaken: 0 }],
+            p2landmarks: ['Pandorama', 'Clone Factory', 'Aetherlab'],
+        },
+        'Meridia': {
+            phase: 2,
+            desc: "Meridia in Creature Zone, 2 Artifacts in History. HP should show as 2 (0 base + 2 artifact bonus).",
+            p1creatures: [{ name: 'Meridia', damageTaken: 0 }],
+            p1history: ['Smoke', 'Dark Matter'],
+        },
+        'Time Thief': {
+            phase: 2,
+            desc: "Time Thief (3 HP) in Creature Zone. Attack directly — should gain 3 TP.",
+            p1creatures: [{ name: 'Time Thief', damageTaken: 0 }],
+        },
+        'Rampadon': {
+            phase: 2,
+            desc: "Rampadon in Creature Zone. Attack — should be unblockable and instant.",
+            p1creatures: [{ name: 'Rampadon', damageTaken: 0 }],
+        },
+        'Smoke': {
+            phase: 2,
+            desc: "Ichor attacking from Player 1. Smoke in Player 2's hand — use it in defense to reduce attacker Str by 1.",
+            p1creatures: [{ name: 'Ichor', damageTaken: 0 }],
+            p2hand: ['Smoke'],
+        },
+        'Dark Matter': {
+            phase: 1,
+            desc: "Dark Matter in hand with full payment (F+G+L). Play it — draw a card and force opponent choice.",
+            hand: ['FireSteam', 'GoldSteam', 'LaserSteam', 'Dark Matter'],
+        },
+        'Reflector': {
+            phase: 1,
+            desc: "Reflector in hand. Have Player 2 attack Player 1 — play Reflector to redirect.",
+            hand: ['FireSteam', 'Reflector'],
+        },
+        'Talisman': {
+            phase: 1,
+            desc: "Talisman in hand with full payment (F+G+G+G+L). Play when targeted.",
+            hand: ['FireSteam', 'GoldSteam', 'GoldSteam', 'GoldSteam', 'Talisman'],
+        },
+        'Reversal': {
+            phase: 1,
+            desc: "Reversal in hand (F+G+G). Ichor and Smoke in History Pile. Play to take one back.",
+            hand: ['FireSteam', 'GoldSteam', 'GoldSteam', 'Reversal'],
+            p1history: ['Ichor', 'Smoke'],
+        },
+        'Faith': {
+            phase: 1,
+            desc: "Faith in hand with full payment (G+G+G). Play to draw a card and gain 3 TP.",
+            hand: ['GoldSteam', 'GoldSteam', 'GoldSteam', 'Faith'],
+        },
+        'Threat': {
+            phase: 1,
+            desc: "Threat in hand (F+G+L). Player 2 has 2 Landmarks — must pay 4 TP or lose one.",
+            hand: ['FireSteam', 'GoldSteam', 'LaserSteam', 'Threat'],
+            p2landmarks: ['Pandorama', 'Clone Factory'],
+        },
+        'Confiscation': {
+            phase: 1,
+            desc: "Confiscation in hand (G+G+L+L). Player 2 has 3 cards — look at hand, take one.",
+            hand: ['GoldSteam', 'GoldSteam', 'LaserSteam', 'LaserSteam', 'Confiscation'],
+            p2hand: ['Ichor', 'Cravus', 'Smoke'],
+        },
+    };
+
     const devLogData = [
         { date: '2026-04-11', msg: 'Updated combat resolution: Changed automatic timer to a manual "Close" button for better readability of battle results.' },
         { date: '2026-04-11', msg: 'Refined combat UI: Removed redundant buttons, integrated toggle-based blocking, and replaced alerts with in-game feedback.' },
@@ -269,18 +425,181 @@ document.addEventListener('DOMContentLoaded', () => {
         const container = document.querySelector('#devlog-checklist .checklist-grid');
         if (!container) return;
         container.innerHTML = '';
-        
-        // Showing all cards from cardData.js
+
         cardData.forEach(card => {
             const isDone = implementedCards.includes(card.name);
+            const intent = intentMap[card.name];
+            const hasSim = !!simulationMap[card.name];
+
             const item = document.createElement('div');
             item.className = `check-item ${isDone ? 'done' : ''}`;
-            item.innerHTML = `
+
+            const top = document.createElement('div');
+            top.className = 'check-top';
+            top.innerHTML = `
                 <span class="name tech-font">${card.name}</span>
                 <span class="status">${isDone ? '<span class="status-ok">✔</span>' : '<span class="status-x">✘</span>'}</span>
             `;
+
+            const bottom = document.createElement('div');
+            bottom.className = 'check-bottom';
+
+            if (intent) {
+                const badge = document.createElement('span');
+                badge.className = `intent-badge intent-${intent}`;
+                badge.textContent = intent === 'auto' ? 'Auto' : intent === 'contextual' ? 'Contextual' : 'Active';
+                bottom.appendChild(badge);
+            }
+
+            if (hasSim) {
+                const simBtn = document.createElement('button');
+                simBtn.className = 'sim-run-btn tech-font';
+                simBtn.textContent = '▶ Sim';
+                simBtn.title = simulationMap[card.name].desc;
+                simBtn.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    runSimulation(card.name);
+                });
+                bottom.appendChild(simBtn);
+            }
+
+            item.appendChild(top);
+            if (intent || hasSim) item.appendChild(bottom);
             container.appendChild(item);
         });
+    }
+
+    function runSimulation(cardName) {
+        const sim = simulationMap[cardName];
+        if (!sim) return;
+
+        devlogScreen.classList.add('hidden');
+
+        function applyState() {
+            currentPlayer = 1;
+            currentPhase = sim.phase !== undefined ? sim.phase : 1;
+            totalTurns = 10; // High value so summoning sickness checks work normally
+
+            // Sync active player display
+            document.querySelectorAll('.player-zone').forEach(z => z.classList.remove('active-player'));
+            const board1 = document.getElementById('player-1');
+            if (board1) board1.classList.add('active-player');
+            const gf = document.getElementById('game-field');
+            if (gf) gf.className = `players-${activePlayerCount} turn-p1`;
+            const lbl = document.getElementById('active-player-label');
+            if (lbl) lbl.textContent = 'PLAYER 1';
+
+            function setupBoard(pNum, cfg) {
+                const board = document.getElementById(`player-${pNum}`);
+                if (!board) return;
+
+                if (cfg.day !== undefined) { playersState[pNum].day = cfg.day; updatePlayerDieUI(pNum, 'day'); }
+                if (cfg.night !== undefined) { playersState[pNum].night = cfg.night; updatePlayerDieUI(pNum, 'night'); }
+
+                // Hand
+                if (cfg.hand) {
+                    board.querySelectorAll('.hand-slot').forEach(s => {
+                        s.classList.add('slot-empty');
+                        s.style.backgroundImage = '';
+                        s.style.backgroundColor = '';
+                        s.textContent = '';
+                        delete s.dataset.cardData;
+                    });
+                    const hSlots = Array.from(board.querySelectorAll('.hand-slot'));
+                    cfg.hand.forEach((name, i) => {
+                        const found = cardData.find(c => c.name === name);
+                        if (found && hSlots[i]) finishSingleCardPlacement(hSlots[i], { ...found });
+                    });
+                    updateHandLayout(pNum);
+                }
+
+                // Landmarks
+                if (cfg.landmarks) {
+                    board.querySelectorAll('.landmark-zone-main .card').forEach(s => {
+                        s.classList.add('slot-empty');
+                        s.style.backgroundImage = '';
+                        s.style.backgroundColor = '';
+                        s.textContent = '';
+                        delete s.dataset.cardData;
+                    });
+                    const lSlots = Array.from(board.querySelectorAll('.landmark-zone-main .card'));
+                    cfg.landmarks.forEach((name, i) => {
+                        const found = cardData.find(c => c.name === name);
+                        if (found && lSlots[i]) finishSingleCardPlacement(lSlots[i], { ...found });
+                    });
+                }
+
+                // Creatures
+                if (cfg.creatures) {
+                    board.querySelectorAll('.creature-zone-main .card').forEach(s => {
+                        s.classList.add('slot-empty');
+                        s.style.backgroundImage = '';
+                        s.style.backgroundColor = '';
+                        s.textContent = '';
+                        delete s.dataset.cardData;
+                    });
+                    const cSlots = Array.from(board.querySelectorAll('.creature-zone-main .card'));
+                    cfg.creatures.forEach((spec, i) => {
+                        const found = cardData.find(c => c.name === spec.name);
+                        if (found && cSlots[i]) {
+                            const summonTurn = spec.forceThisTurn ? totalTurns : 0;
+                            const c = { ...found, baseHealth: parseInt(found.health) || 1, damageTaken: spec.damageTaken || 0, summonedOnTurn: summonTurn };
+                            finishSingleCardPlacement(cSlots[i], c);
+                            updateCreatureVisuals(cSlots[i]);
+                        }
+                    });
+                }
+
+                // History Pile
+                if (cfg.history) {
+                    const histSlot = board.querySelector('.history-pile');
+                    if (histSlot) {
+                        const items = cfg.history.map(name => cardData.find(c => c.name === name)).filter(Boolean);
+                        histSlot.dataset.cardData = JSON.stringify(items);
+                        histSlot.classList.remove('slot-empty');
+                        updateStackIndicator(histSlot);
+                    }
+                }
+            }
+
+            setupBoard(1, {
+                day: sim.day,
+                night: sim.night,
+                hand: sim.hand,
+                landmarks: sim.landmarks,
+                creatures: sim.p1creatures,
+                history: sim.p1history,
+            });
+
+            if (sim.p2landmarks || sim.p2hand || sim.p2creatures) {
+                setupBoard(2, {
+                    landmarks: sim.p2landmarks,
+                    hand: sim.p2hand,
+                    creatures: sim.p2creatures,
+                });
+            }
+
+            const phaseUI = document.getElementById('game-phase-display');
+            if (phaseUI) phaseUI.classList.remove('hidden');
+            updatePhaseUI();
+            updateBazaarLighting();
+            checkHandLimit();
+
+            // Toast notification
+            const toast = document.createElement('div');
+            toast.className = 'sim-toast tech-font';
+            toast.innerHTML = `<strong>SIM: ${cardName}</strong><br><span>${sim.desc}</span>`;
+            document.body.appendChild(toast);
+            setTimeout(() => toast.classList.add('sim-toast-visible'), 50);
+            setTimeout(() => { toast.classList.remove('sim-toast-visible'); setTimeout(() => toast.remove(), 400); }, 4000);
+        }
+
+        if (!gameStarted) {
+            if (window.handleStartGame) window.handleStartGame();
+            setTimeout(applyState, 800);
+        } else {
+            applyState();
+        }
     }
 
     function initPlayerBoard(pNum) {
@@ -545,12 +864,23 @@ document.addEventListener('DOMContentLoaded', () => {
                 
                 if (isCreatureZone && isMyBoard && currentPhase === 2) {
                     // It's the Creature Phase and my creature - Try to attack
-                    if (cardData.summonedOnTurn < totalTurns || cardData.name.includes("Cravus") || cardData.name.includes("Rampadon")) { 
+                    if (cardData.summonedOnTurn < totalTurns || cardData.name.includes("Cravus") || cardData.name.includes("Rampadon")) {
                          showAttackMenu(cardData, slot);
                     } else {
                          alert("Summoning sickness! This creature can attack next turn.");
                     }
-                    return; 
+                    return;
+                }
+
+                // Aetherlab trade action (Construction Phase only, once per phase)
+                const isLandmarkZone = slot.parentNode && slot.parentNode.classList.contains('landmark-zone-main');
+                if (isLandmarkZone && isMyBoard && currentPhase === 1 && cardData.name === 'Aetherlab') {
+                    if (aetherlabUsedThisPhase) {
+                        alert('Aetherlab can only trade once per Construction Phase.');
+                        return;
+                    }
+                    showAetherlabTradeUI();
+                    return;
                 }
 
                 // If not attacking, lift card (except locked creatures handled by grabCard)
@@ -715,7 +1045,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function getBaseStrength(card) {
-        let str = parseInt(card.cost) || 0;
+        let str = parseInt(card.health) || 0;
         if (card.description && card.description.includes("Strength")) {
             const match = card.description.match(/Strength (\d+)/);
             if (match) str = parseInt(match[1]);
@@ -1048,9 +1378,8 @@ document.addEventListener('DOMContentLoaded', () => {
         } else {
             // Initialize creature-specific stats if placed in creature zone
             if (targetSlot.parentNode && targetSlot.parentNode.classList.contains('creature-zone-main')) {
-                card.summonedOnTurn = totalTurns;
-                card.damageTaken = 0;
-                // Capture base health (strength)
+                if (card.summonedOnTurn === undefined) card.summonedOnTurn = totalTurns;
+                if (card.damageTaken === undefined) card.damageTaken = 0;
                 if (!card.baseHealth) {
                     card.baseHealth = parseInt(card.health) || 1;
                 }
@@ -1241,7 +1570,19 @@ document.addEventListener('DOMContentLoaded', () => {
             let costString = topCard.cost;
             if (topCard.name === 'GoldSteam') costString = 'AAA';
 
-            if (hasLethargos) return true;
+            if (hasLethargos) {
+                // Lethargo's Temple: player may pay with TP (F=1, G=2, L=3) instead of Steam
+                let tpCost = 0;
+                for (const ch of costString) {
+                    if (ch === 'F') tpCost += 1;
+                    else if (ch === 'G') tpCost += 2;
+                    else if (ch === 'L') tpCost += 3;
+                    else if (ch === 'A') tpCost += 1; // minimum cost per AllSteam slot
+                }
+                const playerTP = (playersState[currentPlayer].day + playersState[currentPlayer].night);
+                if (playerTP >= tpCost) return true;
+                // If not enough TP, fall through to normal Steam check
+            }
 
             let costCost = { F: 0, G: 0, L: 0, A: 0 };
             for (let char of costString) {
@@ -1292,7 +1633,6 @@ document.addEventListener('DOMContentLoaded', () => {
                 if (isSteam) isAvailablePhase = true;
             } else if (currentPhase === 1) {
                 if (!isSteam) isAvailablePhase = true;
-                if (isSteam && hasAetherlab) isAvailablePhase = true;
             } else if (currentPhase === 2 || currentPhase === 3) {
                 isAvailablePhase = false; 
             }
@@ -1507,7 +1847,7 @@ document.addEventListener('DOMContentLoaded', () => {
         if (alivePlayers.length === 1) {
             gameWon = true;
             const winnerNum = alivePlayers[0];
-            if (winnerText) winnerText.textContent = `PLAYER ${winnerNum} WON!`;
+            if (winnerTitle) winnerTitle.textContent = `PLAYER ${winnerNum} WON!`;
             gameOverOverlay.classList.remove('hidden');
             
             // Add "Switch View" button for post-game inspection
@@ -1538,7 +1878,7 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         } else if (alivePlayers.length === 0) {
             gameWon = true;
-            if (winnerText) winnerText.textContent = `DRAW!`;
+            if (winnerTitle) winnerTitle.textContent = `DRAW!`;
             gameOverOverlay.classList.remove('hidden');
         }
     }
@@ -1961,6 +2301,79 @@ document.addEventListener('DOMContentLoaded', () => {
         } catch(e) {}
     }
 
+    function showAetherlabTradeUI() {
+        const board = document.getElementById(`player-${currentPlayer}`);
+        const handSlots = Array.from(board.querySelectorAll('.hand-slot:not(.slot-empty)'));
+
+        const fireSlots = handSlots.filter(s => {
+            try { return JSON.parse(s.dataset.cardData).number === 'STM1'; } catch(e) { return false; }
+        });
+        const goldSlots = handSlots.filter(s => {
+            try { return JSON.parse(s.dataset.cardData).number === 'STM2'; } catch(e) { return false; }
+        });
+
+        const options = [];
+        const goldInBazaar = (activeBazaar['ST2'] || []).filter(c => selectedSets.includes(c.set));
+        const laserInBazaar = (activeBazaar['ST3'] || []).filter(c => selectedSets.includes(c.set));
+
+        if (fireSlots.length > 0 && goldInBazaar.length > 0) {
+            options.push({ label: 'Trade FireSteam → GoldSteam', fromSlot: fireSlots[0], fromLoc: 'ST1', toLoc: 'ST2' });
+        }
+        if (goldSlots.length > 0 && laserInBazaar.length > 0) {
+            options.push({ label: 'Trade GoldSteam → LaserSteam', fromSlot: goldSlots[0], fromLoc: 'ST2', toLoc: 'ST3' });
+        }
+
+        if (options.length === 0) {
+            alert('No valid Aetherlab trade available. You need a FireSteam (for Gold) or GoldSteam (for Laser) in hand, and the target Steam must be in the Bazaar.');
+            return;
+        }
+
+        const overlay = document.createElement('div');
+        overlay.className = 'overlay';
+        overlay.style.zIndex = '7000';
+        overlay.innerHTML = `
+            <div class="modal-content glass-panel action-menu">
+                <h3 class="tech-font">AETHERLAB TRADE</h3>
+                <p class="tech-font" style="font-size:11px;opacity:0.7;margin-bottom:10px;">Once per Construction Phase — pay a Steam, receive the next tier.</p>
+                <div class="action-buttons" id="aetherlab-options"></div>
+                <button class="menu-btn secondary-btn" id="aetherlab-cancel" style="margin-top:8px;">CANCEL</button>
+            </div>`;
+        document.body.appendChild(overlay);
+
+        const optContainer = overlay.querySelector('#aetherlab-options');
+        options.forEach(opt => {
+            const btn = document.createElement('button');
+            btn.className = 'menu-btn combat-btn';
+            btn.textContent = opt.label;
+            btn.onclick = () => {
+                // Return traded-in Steam to its Bazaar pile
+                const tradeInCard = JSON.parse(opt.fromSlot.dataset.cardData);
+                activeBazaar[opt.fromLoc] = activeBazaar[opt.fromLoc] || [];
+                activeBazaar[opt.fromLoc].push({ ...tradeInCard });
+
+                // Take upgraded Steam from Bazaar
+                const toPile = activeBazaar[opt.toLoc] || [];
+                const upgradedCard = toPile.pop();
+                activeBazaar[opt.toLoc] = toPile;
+
+                if (!upgradedCard) { overlay.remove(); return; }
+
+                // Replace Steam in hand
+                clearSlot(opt.fromSlot);
+                const emptySlot = Array.from(board.querySelectorAll('.hand-slot.slot-empty'))[0] || opt.fromSlot;
+                finishSingleCardPlacement(emptySlot, upgradedCard);
+
+                aetherlabUsedThisPhase = true;
+                renderBazaar();
+                updateBazaarLighting();
+                overlay.remove();
+            };
+            optContainer.appendChild(btn);
+        });
+
+        overlay.querySelector('#aetherlab-cancel').onclick = () => overlay.remove();
+    }
+
     function showAttackMenu(attackerCard, attackerSlot) {
         currentAttackerCard = attackerCard;
         currentAttackerSlot = attackerSlot;
@@ -2031,7 +2444,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
         let isBlocking = false;
         let isCombatResolved = false;
-        
+        let selectedBlockerSlot = availableCreatures.length > 0 ? availableCreatures[0] : null;
+
         const isRampadon = attacker.name.includes("Rampadon");
         if (isRampadon) {
              btnBlock.disabled = true;
@@ -2063,12 +2477,52 @@ document.addEventListener('DOMContentLoaded', () => {
         btnBlock.onclick = () => {
             if (isCombatResolved || isRampadon) return;
             isBlocking = !isBlocking;
+
+            // Remove any existing creature picker
+            const existingPicker = document.getElementById('blocker-picker');
+            if (existingPicker) existingPicker.remove();
+
             if (isBlocking) {
+                if (availableCreatures.length > 1) {
+                    // Show creature selection UI inside the combat modal
+                    selectedBlockerSlot = availableCreatures[0];
+                    const picker = document.createElement('div');
+                    picker.id = 'blocker-picker';
+                    picker.style.cssText = 'margin-top:10px;text-align:center;';
+                    picker.innerHTML = '<p class="tech-font" style="font-size:10px;opacity:0.7;margin-bottom:6px;">SELECT BLOCKER:</p>';
+                    const row = document.createElement('div');
+                    row.style.cssText = 'display:flex;gap:6px;flex-wrap:wrap;justify-content:center;';
+                    availableCreatures.forEach((cSlot, i) => {
+                        const cData = JSON.parse(cSlot.dataset.cardData);
+                        const btn = document.createElement('button');
+                        btn.className = 'menu-btn secondary-btn' + (i === 0 ? ' active' : '');
+                        btn.style.cssText = 'padding:4px 8px;font-size:10px;min-width:80px;';
+                        btn.textContent = cData.name;
+                        btn.onclick = (ev) => {
+                            ev.stopPropagation();
+                            selectedBlockerSlot = cSlot;
+                            defenderTarget.style.backgroundImage = cSlot.style.backgroundImage;
+                            defenderTarget.textContent = '';
+                            row.querySelectorAll('button').forEach(b => b.classList.remove('active'));
+                            btn.classList.add('active');
+                        };
+                        row.appendChild(btn);
+                    });
+                    picker.appendChild(row);
+                    document.querySelector('.combat-modal').appendChild(picker);
+
+                    // Default to first creature visually
+                    defenderTarget.style.backgroundImage = availableCreatures[0].style.backgroundImage;
+                    defenderTarget.textContent = '';
+                } else {
+                    selectedBlockerSlot = availableCreatures[0];
+                }
                 defenderTarget.classList.remove('faded');
                 defenderTarget.classList.add('active-blocker');
                 btnBlock.classList.add('in-use');
-                feedbackEl.textContent = "Blocking with Creature";
+                feedbackEl.textContent = availableCreatures.length > 1 ? "Select a Blocker" : "Blocking with Creature";
             } else {
+                selectedBlockerSlot = null;
                 defenderTarget.classList.add('faded');
                 defenderTarget.classList.remove('active-blocker');
                 btnBlock.classList.remove('in-use');
@@ -2096,8 +2550,12 @@ document.addEventListener('DOMContentLoaded', () => {
             btnArtifact.classList.add('hidden');
             btnContinue.textContent = "CLOSE";
 
+            // Clean up creature picker if present
+            const pickerEl = document.getElementById('blocker-picker');
+            if (pickerEl) pickerEl.remove();
+
             if (isBlocking) {
-                const blockerSlot = availableCreatures[0];
+                const blockerSlot = selectedBlockerSlot || availableCreatures[0];
                 const blockerData = JSON.parse(blockerSlot.dataset.cardData);
                 
                 feedbackEl.textContent = "Resolving Battle...";
@@ -2658,6 +3116,7 @@ document.addEventListener('DOMContentLoaded', () => {
             } else {
                 btn.textContent = 'Next Phase';
                 endPhaseTriggered = false; // Reset for next cycle
+                if (currentPhase === 1) aetherlabUsedThisPhase = false; // Reset Aetherlab trade
             }
         }
 
@@ -2731,6 +3190,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     let endPhaseTriggered = false; // Prevent multiple triggers in same phase
+    let aetherlabUsedThisPhase = false;
 
     async function animateReshuffle(pNum) {
         const board = document.getElementById(`player-${pNum}`);
@@ -2975,6 +3435,7 @@ document.addEventListener('DOMContentLoaded', () => {
         turnSkipped = false;
         steamBoughtThisTurn = false;
         activeStrDebuff = 0;
+        aetherlabUsedThisPhase = false;
 
         const hint = document.getElementById('next-player-hint');
         if (hint) hint.textContent = `To Player ${currentPlayer}`;
