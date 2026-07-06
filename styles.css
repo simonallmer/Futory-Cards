@@ -350,6 +350,44 @@ body {
   transform: translateY(-2px);
 }
 
+.menu-btn.devmode-active {
+  border-color: #ffcc33;
+  color: #ffcc33;
+  background: rgba(80, 60, 0, 0.55);
+  box-shadow: 0 0 12px rgba(255, 204, 51, 0.9), inset 0 0 8px rgba(255, 204, 51, 0.4);
+  animation: devmode-pulse 1.8s ease-in-out infinite;
+}
+.menu-btn.devmode-active:hover {
+  border-color: #ffdd66;
+  box-shadow: 0 0 16px rgba(255, 204, 51, 1);
+}
+@keyframes devmode-pulse {
+  0%, 100% { box-shadow: 0 0 10px rgba(255, 204, 51, 0.7), inset 0 0 6px rgba(255, 204, 51, 0.3); }
+  50% { box-shadow: 0 0 18px rgba(255, 204, 51, 1), inset 0 0 10px rgba(255, 204, 51, 0.5); }
+}
+
+/* Dev Mode active board indicator */
+body.dev-mode-on::after {
+  content: "DEV MODE";
+  position: fixed;
+  bottom: 12px;
+  left: 50%;
+  transform: translateX(-50%);
+  font-family: 'Rajdhani', sans-serif;
+  font-weight: 700;
+  letter-spacing: 3px;
+  font-size: 13px;
+  color: #ffcc33;
+  padding: 4px 18px;
+  border: 1px solid rgba(255, 204, 51, 0.6);
+  border-radius: 4px;
+  background: rgba(40, 30, 0, 0.6);
+  box-shadow: 0 0 14px rgba(255, 204, 51, 0.7);
+  z-index: 99999;
+  pointer-events: none;
+  animation: devmode-pulse 1.8s ease-in-out infinite;
+}
+
 .menu-btn.desc-btn {
   opacity: 0.6;
   cursor: not-allowed;
@@ -569,6 +607,13 @@ body {
   opacity: 1;
   transform: translateX(-50%) translateY(0);
 }
+
+.info-toast {
+  border-color: #ffaa00;
+  background: rgba(30, 22, 5, 0.95);
+  box-shadow: 0 0 20px rgba(255, 170, 0, 0.3);
+}
+.info-toast strong { color: #ffaa00; }
 
 .log-list {
   display: flex;
@@ -1087,6 +1132,18 @@ body {
   box-shadow: 0 0 20px var(--accent-color);
 }
 
+#next-phase-btn.discard-mode {
+  background: rgba(255, 60, 60, 0.12);
+  border-color: rgba(255, 80, 80, 0.7);
+  color: #ffb0b0;
+  box-shadow: 0 0 12px rgba(255, 60, 60, 0.4);
+}
+#next-phase-btn.discard-mode:hover {
+  background: rgba(255, 60, 60, 0.85);
+  color: #fff;
+  box-shadow: 0 0 20px rgba(255, 60, 60, 0.7);
+}
+
 #skip-turn-btn:hover {
   background: rgba(255, 100, 0, 0.2);
   border-color: #ffaa00;
@@ -1553,6 +1610,7 @@ body {
 .fire-blue { --fire-color: rgba(0, 180, 255, 0.8); }
 .fire-purple { --fire-color: rgba(180, 0, 255, 0.8); }
 .fire-white { --fire-color: rgba(255, 255, 255, 0.8); }
+.fire-gold { --fire-color: rgba(255, 204, 51, 0.9); }
 
 .stack-label {
   font-size: 8px;
@@ -1589,35 +1647,6 @@ body {
   opacity: 0;
   pointer-events: none;
   transform: translateY(20px);
-}
-
-.die-adjusters {
-  display: flex;
-  gap: 15px;
-  margin-bottom: 5px;
-}
-
-.die-btn {
-  background: rgba(255,255,255,0.05);
-  border: 1px solid rgba(255,255,255,0.2);
-  color: #fff;
-  width: 40px; /* Bigger as requested */
-  height: 40px;
-  border-radius: 6px;
-  cursor: pointer;
-  font-size: 20px;
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  transition: all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
-}
-
-.die-btn:hover { 
-  background: var(--accent-color); 
-  border-color: #fff; 
-  color: #000;
-  box-shadow: 0 0 15px var(--accent-color);
-  transform: translateY(-2px);
 }
 
 .circle-counter {
@@ -2380,6 +2409,425 @@ body {
 
 .pulse-update {
   animation: pulse-glow 0.6s ease-out;
+}
+
+/* --- Landmark trigger feedback (shared: Fountain, Catalyst, Wasteland, Planetarium) --- */
+.landmark-triggered {
+  animation: landmark-trigger-glow 0.9s ease-out;
+}
+
+@keyframes landmark-trigger-glow {
+  0%   { box-shadow: 0 0 0 rgba(0, 255, 255, 0); filter: brightness(1); }
+  35%  { box-shadow: 0 0 28px 6px rgba(120, 220, 255, 0.9); filter: brightness(1.5); }
+  100% { box-shadow: 0 0 0 rgba(0, 255, 255, 0); filter: brightness(1); }
+}
+
+/* Contextual "Landmark in Use" window, docked below the phase panel */
+#landmark-context {
+  position: fixed;
+  top: 300px;
+  left: 30px;
+  z-index: 5000;
+  width: 250px;
+  padding: 16px 18px;
+  background: rgba(20, 6, 30, 0.55);
+  border: 1px solid rgba(180, 120, 255, 0.45);
+  border-radius: 12px;
+  backdrop-filter: blur(15px);
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5), 0 0 24px rgba(150, 90, 255, 0.25);
+  animation: slideInLeft 0.4s cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+#landmark-context-title {
+  font-size: 1.15rem;
+  margin-bottom: 10px;
+}
+#landmark-context-body { display: flex; flex-direction: column; gap: 10px; }
+.landmark-context-row { display: flex; flex-direction: column; gap: 6px; }
+.landmark-context-label { font-size: 0.75rem; opacity: 0.7; letter-spacing: 1px; text-transform: uppercase; }
+.landmark-toggle-btn {
+  padding: 8px 10px;
+  border-radius: 8px;
+  border: 1px solid rgba(180, 120, 255, 0.6);
+  background: rgba(120, 70, 200, 0.25);
+  color: #e6d5ff;
+  font-family: 'Rajdhani', sans-serif;
+  font-weight: 600;
+  letter-spacing: 1px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+.landmark-toggle-btn:hover { background: rgba(150, 90, 255, 0.45); box-shadow: 0 0 14px rgba(150, 90, 255, 0.5); }
+
+/* Viewed-card readout in the Temple context window (name + payment breakdown) */
+.landmark-context-viewed {
+  margin-top: 2px;
+  padding-top: 10px;
+  border-top: 1px solid rgba(180, 120, 255, 0.25);
+  min-height: 40px;
+}
+.lc-viewed-hint { font-size: 0.78rem; opacity: 0.5; font-style: italic; }
+.lc-viewed-name {
+  font-family: 'Cinzel', serif;
+  font-size: 1rem;
+  color: #f0e6ff;
+  margin-bottom: 3px;
+}
+.lc-viewed-cost {
+  font-family: 'Rajdhani', sans-serif;
+  font-weight: 700;
+  font-size: 1.05rem;
+  letter-spacing: 1px;
+  color: #c9a8ff;
+  text-shadow: 0 0 8px rgba(150, 90, 255, 0.6);
+}
+
+/* Bazaar card unlocked by Lethargo's Temple: half-lifted grey + purple shadow */
+.bazaar-area .card.tp-affordable {
+  opacity: 0.82;
+  filter: none;
+  box-shadow: 0 0 22px 6px rgba(150, 90, 255, 0.75), 0 0 40px 10px rgba(120, 60, 220, 0.4);
+  cursor: pointer;
+}
+
+/* Floating "X TP" cost hint shown while hovering a TP-affordable card in Temple mode */
+.tp-cost-hint {
+  position: absolute;
+  z-index: 9200;
+  transform: translate(-50%, -50%);
+  padding: 3px 9px;
+  border-radius: 10px;
+  background: rgba(30, 8, 45, 0.92);
+  border: 1px solid rgba(180, 120, 255, 0.8);
+  color: #e6d5ff;
+  font-family: 'Rajdhani', sans-serif;
+  font-weight: 700;
+  font-size: 0.95rem;
+  letter-spacing: 1px;
+  white-space: nowrap;
+  pointer-events: none;
+  text-shadow: 0 0 8px rgba(150, 90, 255, 0.8);
+}
+
+/* Landmark lit as a direct-selection target (drop a card on it to use its effect) */
+.landmark-consume-target {
+  cursor: pointer;
+  outline: 2px solid rgba(0, 255, 120, 0.9);
+  outline-offset: 2px;
+  animation: landmark-consume-pulse 1.1s ease-in-out infinite;
+}
+
+@keyframes landmark-consume-pulse {
+  0%, 100% { box-shadow: 0 0 8px 2px rgba(0, 255, 120, 0.5); }
+  50%      { box-shadow: 0 0 26px 7px rgba(0, 255, 120, 0.95); }
+}
+
+/* Planetarium armed with staged discards: persistent glow + "Draw N" badge, click to draw */
+.planetarium-armed {
+  cursor: pointer;
+  outline: 2px solid rgba(120, 200, 255, 0.9);
+  outline-offset: 2px;
+  animation: planetarium-armed-pulse 1.1s ease-in-out infinite;
+}
+
+@keyframes planetarium-armed-pulse {
+  0%, 100% { box-shadow: 0 0 8px 2px rgba(120, 200, 255, 0.55); }
+  50%      { box-shadow: 0 0 26px 7px rgba(120, 200, 255, 0.95); }
+}
+
+/* Lower-third commit zone hint on the armed Planetarium (click here to draw) */
+.planetarium-armed::after {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 33%;
+  background: linear-gradient(to top, rgba(0, 120, 255, 0.4), transparent);
+  border-top: 1px solid rgba(120, 200, 255, 0.7);
+  border-radius: 0 0 8px 8px;
+  pointer-events: none;
+  z-index: 15;
+}
+
+.planetarium-badge {
+  position: absolute;
+  bottom: 6px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 20;
+  padding: 2px 10px;
+  border-radius: 10px;
+  background: rgba(10, 20, 40, 0.9);
+  border: 1px solid rgba(120, 200, 255, 0.9);
+  color: #bfe4ff;
+  font-weight: 700;
+  font-size: 0.8rem;
+  letter-spacing: 1px;
+  white-space: nowrap;
+  text-shadow: 0 0 8px rgba(120, 200, 255, 0.8);
+  pointer-events: none;
+}
+
+/* Clone Factory primed: glows gold until the second strike resolves */
+.clone-armed {
+  cursor: pointer;
+  outline: 2px solid rgba(255, 205, 110, 0.95);
+  outline-offset: 2px;
+  animation: clone-armed-pulse 1.1s ease-in-out infinite;
+}
+
+@keyframes clone-armed-pulse {
+  0%, 100% { box-shadow: 0 0 8px 2px rgba(255, 195, 90, 0.55); }
+  50%      { box-shadow: 0 0 26px 7px rgba(255, 205, 110, 0.95); }
+}
+
+.clone-badge {
+  position: absolute;
+  bottom: 6px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 20;
+  padding: 2px 10px;
+  border-radius: 10px;
+  background: rgba(40, 26, 6, 0.9);
+  border: 1px solid rgba(255, 205, 110, 0.9);
+  color: #ffe6b0;
+  font-weight: 700;
+  font-size: 0.8rem;
+  letter-spacing: 1px;
+  white-space: nowrap;
+  text-shadow: 0 0 8px rgba(255, 205, 110, 0.8);
+  pointer-events: none;
+}
+
+/* Aetherlab armed: upgradeable hand Steams glow gold to invite a click (Method A) */
+.aetherlab-upgradable {
+  cursor: pointer;
+  outline: 2px solid rgba(255, 205, 110, 0.9);
+  outline-offset: 2px;
+  animation: aetherlab-pulse 1.1s ease-in-out infinite;
+}
+
+/* Aetherlab: valid Bazaar steam drawers glow while a matching Steam is held (Method B) */
+.aetherlab-drop-target {
+  outline: 2px solid rgba(255, 205, 110, 0.9);
+  outline-offset: 2px;
+  animation: aetherlab-pulse 1.1s ease-in-out infinite;
+}
+
+@keyframes aetherlab-pulse {
+  0%, 100% { box-shadow: 0 0 8px 2px rgba(255, 195, 90, 0.5); }
+  50%      { box-shadow: 0 0 22px 6px rgba(255, 205, 110, 0.9); }
+}
+
+/* Attacker's effective attack Strength, shown on its card in the Creature Attack screen */
+.combat-preview { position: relative; }
+.combat-str-badge {
+  position: absolute;
+  bottom: -8px;
+  left: 50%;
+  transform: translateX(-50%);
+  min-width: 30px;
+  padding: 2px 8px;
+  border-radius: 12px;
+  background: rgba(20, 8, 8, 0.95);
+  border: 2px solid rgba(255, 90, 70, 0.95);
+  color: #ffd7cf;
+  font-weight: 700;
+  font-size: 1.05rem;
+  text-align: center;
+  text-shadow: 0 0 8px rgba(255, 90, 70, 0.8);
+  box-shadow: 0 0 14px rgba(255, 70, 50, 0.6);
+  z-index: 5;
+}
+
+/* Both players' Time Points, so the defender can judge block vs. artifact */
+#combat-tp-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  margin: 14px auto 4px;
+  max-width: 320px;
+}
+#combat-tp-row .ctp {
+  flex: 1;
+  padding: 6px 8px;
+  border-radius: 8px;
+  font-size: 0.72rem;
+  letter-spacing: 0.5px;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+}
+#combat-tp-row .ctp-attacker { border-color: rgba(255, 120, 90, 0.5); }
+#combat-tp-row .ctp-defender { border-color: rgba(120, 180, 255, 0.5); }
+
+/* --- Entrophy roll: casino-style spinning wheel of six die faces --- */
+.entrophy-overlay {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 8000;
+}
+.entrophy-panel {
+  width: min(92vw, 460px);
+  padding: 22px 22px 18px;
+  text-align: center;
+  border: 1px solid rgba(255, 205, 110, 0.4);
+  box-shadow: 0 0 40px rgba(255, 195, 90, 0.25);
+}
+.entrophy-title {
+  margin: 0 0 2px;
+  font-size: 1.8rem;
+  letter-spacing: 3px;
+}
+.entrophy-subtitle {
+  margin: 0 0 16px;
+  font-size: 0.85rem;
+  opacity: 0.85;
+  min-height: 1.1em;
+  letter-spacing: 1px;
+}
+.entrophy-result {
+  color: #ffdb8a;
+  font-weight: 700;
+  text-shadow: 0 0 10px rgba(255, 205, 110, 0.8);
+}
+.entrophy-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+.entrophy-tile {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
+  border-radius: 10px;
+  background: rgba(12, 16, 26, 0.85);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  text-align: left;
+  transition: transform 0.08s ease, box-shadow 0.08s ease, border-color 0.08s ease, background 0.08s ease;
+}
+.entrophy-tile.active {
+  transform: scale(1.06);
+  background: rgba(48, 34, 10, 0.95);
+  border-color: rgba(255, 205, 110, 0.95);
+  box-shadow: 0 0 22px 4px rgba(255, 195, 90, 0.75);
+}
+.entrophy-tile.landed {
+  animation: entrophy-land 0.55s ease-out 2;
+}
+@keyframes entrophy-land {
+  0%, 100% { box-shadow: 0 0 22px 4px rgba(255, 195, 90, 0.75); }
+  50%      { box-shadow: 0 0 34px 10px rgba(255, 220, 140, 1); }
+}
+
+/* Die face: 3×3 pip grid */
+.entrophy-die-face {
+  flex: 0 0 auto;
+  width: 40px;
+  height: 40px;
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  grid-template-rows: repeat(3, 1fr);
+  gap: 2px;
+  padding: 5px;
+  border-radius: 8px;
+  background: linear-gradient(145deg, #f4f4f4, #cfcfcf);
+  box-shadow: inset 0 0 4px rgba(0, 0, 0, 0.3);
+}
+.entrophy-die-face span { display: block; }
+.entrophy-die-face .pip {
+  align-self: center;
+  justify-self: center;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: #1a1a1a;
+}
+.entrophy-tile-label {
+  font-size: 0.82rem;
+  font-weight: 700;
+  color: #f0f0f0;
+  line-height: 1.1;
+}
+.entrophy-tile-sub {
+  font-size: 0.68rem;
+  opacity: 0.7;
+  letter-spacing: 0.5px;
+}
+.entrophy-footer {
+  margin-top: 16px;
+  min-height: 20px;
+}
+
+/* Conflict chooser: which landmark to use when two are eligible for the same discard */
+.landmark-choice-overlay {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 9500;
+}
+.landmark-choice-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 28px 32px;
+  min-width: 260px;
+  text-align: center;
+}
+.landmark-choice-title {
+  font-size: 1.4rem;
+  margin-bottom: 6px;
+}
+
+/* Creature awaiting a heal target pick (Dragura's Wasteland, multi-creature case) */
+.heal-target {
+  cursor: pointer;
+  outline: 2px solid rgba(123, 224, 160, 0.9);
+  outline-offset: 2px;
+  animation: heal-target-pulse 1s ease-in-out infinite;
+}
+
+@keyframes heal-target-pulse {
+  0%, 100% { box-shadow: 0 0 6px 1px rgba(123, 224, 160, 0.5); }
+  50%      { box-shadow: 0 0 20px 5px rgba(123, 224, 160, 0.95); }
+}
+
+/* Landmark awaiting a Threat target pick (any player's board, including your own) */
+.threat-target {
+  cursor: pointer;
+  outline: 2px solid rgba(224, 90, 90, 0.9);
+  outline-offset: 2px;
+  animation: threat-target-pulse 1s ease-in-out infinite;
+}
+
+@keyframes threat-target-pulse {
+  0%, 100% { box-shadow: 0 0 6px 1px rgba(224, 90, 90, 0.5); }
+  50%      { box-shadow: 0 0 20px 5px rgba(224, 90, 90, 0.95); }
+}
+
+/* Floating value text (e.g. "+1 TP") that rises and fades near a target */
+.float-value {
+  position: absolute;
+  z-index: 9000;
+  pointer-events: none;
+  transform: translate(-50%, -50%);
+  font-family: 'Rajdhani', sans-serif;
+  font-weight: 700;
+  font-size: 1.6rem;
+  letter-spacing: 1px;
+  text-shadow: 0 0 10px currentColor, 0 2px 4px rgba(0, 0, 0, 0.8);
+  animation: float-value-rise 1.2s ease-out forwards;
+}
+.float-value--gain { color: #7be0a0; }
+.float-value--damage { color: #ff6a5a; }
+
+@keyframes float-value-rise {
+  0%   { opacity: 0; transform: translate(-50%, -30%) scale(0.7); }
+  20%  { opacity: 1; transform: translate(-50%, -50%) scale(1.1); }
+  70%  { opacity: 1; transform: translate(-50%, -120%) scale(1); }
+  100% { opacity: 0; transform: translate(-50%, -170%) scale(1); }
 }
 
 @keyframes pulse-glow {

@@ -1,6 +1,15 @@
 
 document.addEventListener('DOMContentLoaded', () => {
     // --- Helpers ---
+    function showInfoToast(title, message) {
+        const toast = document.createElement('div');
+        toast.className = 'sim-toast info-toast tech-font';
+        toast.innerHTML = `<strong>${title}</strong><br><span>${message}</span>`;
+        document.body.appendChild(toast);
+        setTimeout(() => toast.classList.add('sim-toast-visible'), 50);
+        setTimeout(() => { toast.classList.remove('sim-toast-visible'); setTimeout(() => toast.remove(), 400); }, 3200);
+    }
+
     function shuffle(array) {
         let currentIndex = array.length,  randomIndex;
         while (currentIndex != 0) {
@@ -158,6 +167,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const creatureZone = document.getElementById('creature-zone');
 
     // --- Card Interaction State ---
+    let devMode = false;
     let heldCards = [];
     let heldCardSources = [];
     let heldGhost = null;
@@ -168,6 +178,15 @@ document.addEventListener('DOMContentLoaded', () => {
     let currentPhase = 0; // 0: Steam, 1: Construction, 2: Creature, 3: End
     let turnSkipped = false;
     let steamBoughtThisTurn = false;
+    let planetariumStaged = 0;          // cards discarded into the current Planetarium batch
+    let planetariumUsedThisTurn = false; // Planetarium is once per Construction Phase
+    let lethargoActive = false;          // Lethargo's Temple TP-buy mode is armed
+    let lethargoOnlyTP = false;          // payment mode: false = Steam+TP, true = Only TP
+    let lethargoUsedThisPhase = false;   // Temple is once per Construction Phase
+    let lethargoViewedCard = null;       // card currently hovered while the Temple is armed
+    let cloneFactoryArmed = false;       // Clone Factory: GoldSteam discarded, double-attack ready
+    let cloneSecondStrikePending = false; // first strike resolved, attacker owed a second strike
+    let cloneAttackerSlot = null;        // the creature slot mid double-attack
     let gameStarted = false;
     let gameWon = false;
     let activeStrDebuff = 0;
@@ -189,6 +208,28 @@ document.addEventListener('DOMContentLoaded', () => {
     closeDevlog.onclick = () => {
         devlogScreen.classList.add('hidden');
     };
+
+    // --- Dev Mode: freely move any card, ignoring cost and phases ---
+    const btnDevmode = document.getElementById('btn-devmode');
+    function setDevMode(on) {
+        devMode = on;
+        if (btnDevmode) btnDevmode.classList.toggle('devmode-active', devMode);
+        document.body.classList.toggle('dev-mode-on', devMode);
+        if (!devMode) {
+            // Clean toggle off: return any held card and clear leftover highlights
+            cancelGrab();
+            clearHighlights();
+            document.querySelectorAll('.hand-auto-drop').forEach(btn => btn.classList.add('hidden'));
+        }
+    }
+    if (btnDevmode) btnDevmode.onclick = () => setDevMode(!devMode);
+
+    document.addEventListener('keydown', (e) => {
+        if (e.key !== 'm' && e.key !== 'M') return;
+        const tag = (e.target.tagName || '').toLowerCase();
+        if (tag === 'input' || tag === 'textarea' || e.target.isContentEditable) return;
+        setDevMode(!devMode);
+    });
 
     const devlogTabs = document.querySelectorAll('.tab-btn');
     devlogTabs.forEach(tab => {
@@ -229,6 +270,13 @@ document.addEventListener('DOMContentLoaded', () => {
                         targetDie = 'night';
                     }
                     adjustPlayerDie(currentPlayer, targetDie, 1);
+
+                    // Feedback: pulse the landmark and float "+1 TP" over the gaining die.
+                    pulseLandmark(currentPlayer, 'Fountain of Youth');
+                    const dieGroup = board.querySelector(
+                        targetDie === 'day' ? '.day-die-group' : '.night-die-group'
+                    );
+                    floatValue(dieGroup, '+1 TP', 'gain');
                 }
 
                 currentPhase = 3;
@@ -237,7 +285,7 @@ document.addEventListener('DOMContentLoaded', () => {
         };
     }
 
-    const implementedCards = ["Pandorama", "Fountain of Youth", "Ichor", "Vulcanem", "Cravus", "Rampadon", "Smoke"];
+    const implementedCards = ["Pandorama", "Fountain of Youth", "Laser Catalyst", "Dragura's Wasteland", "Planetarium", "Lethargo's Temple", "Clone Factory", "Aetherlab", "Entrophy", "Meridius", "Meridia", "Time Thief", "Ichor", "Vulcanem", "Cravus", "Rampadon", "Smoke", "Dark Matter", "Reflector", "Talisman", "Reversal", "Faith", "Threat", "Confiscation"];
 
     // --- Intent Classification ---
     // auto: fires on its own when condition is met
@@ -246,9 +294,9 @@ document.addEventListener('DOMContentLoaded', () => {
     const intentMap = {
         'Pandorama': 'auto',
         'Fountain of Youth': 'auto',
-        "Dragura's Wasteland": 'active',
+        "Dragura's Wasteland": 'contextual',
         'Planetarium': 'contextual',
-        'Laser Catalyst': 'active',
+        'Laser Catalyst': 'contextual',
         "Lethargo's Temple": 'active',
         'Clone Factory': 'active',
         'Aetherlab': 'active',
@@ -298,6 +346,13 @@ document.addEventListener('DOMContentLoaded', () => {
             hand: ['LaserSteam', 'LaserSteam'],
             landmarks: ['Laser Catalyst'],
         },
+        'Planetarium': {
+            phase: 1,
+            desc: "Planetarium in play, 4 cards in Future. Construction Phase: discard cards to History (landmark glows 'Draw N'), then click Planetarium to draw that many.",
+            hand: ['FireSteam', 'GoldSteam', 'LaserSteam'],
+            landmarks: ['Planetarium'],
+            p1future: ['Ichor', 'Cravus', 'Vulcanem', 'Rampadon'],
+        },
         "Lethargo's Temple": {
             phase: 1,
             day: 10,
@@ -313,8 +368,8 @@ document.addEventListener('DOMContentLoaded', () => {
         },
         'Aetherlab': {
             phase: 1,
-            desc: "Aetherlab active, FireSteam in hand. Click Aetherlab to trade Fire → Gold.",
-            hand: ['FireSteam'],
+            desc: "Aetherlab in play, FireSteam + GoldSteam in hand. Method A: click Aetherlab, then a glowing Steam. Method B: drag a Steam onto its own/next drawer above the Bazaar.",
+            hand: ['FireSteam', 'GoldSteam'],
             landmarks: ['Aetherlab'],
         },
         'Cravus': {
@@ -361,14 +416,17 @@ document.addEventListener('DOMContentLoaded', () => {
             hand: ['FireSteam', 'GoldSteam', 'LaserSteam', 'Dark Matter'],
         },
         'Reflector': {
-            phase: 1,
-            desc: "Reflector in hand. Have Player 2 attack Player 1 — play Reflector to redirect.",
-            hand: ['FireSteam', 'Reflector'],
+            phase: 2,
+            desc: "Ichor attacking from Player 1. Reflector in Player 2's hand — play it in defense to redirect the attack back onto Player 1.",
+            p1creatures: [{ name: 'Ichor', damageTaken: 0 }],
+            p2hand: ['Reflector'],
         },
         'Talisman': {
-            phase: 1,
-            desc: "Talisman in hand with full payment (F+G+G+G+L). Play when targeted.",
-            hand: ['FireSteam', 'GoldSteam', 'GoldSteam', 'GoldSteam', 'Talisman'],
+            phase: 2,
+            desc: "Ichor attacking from Player 1, Talisman in Player 1's hand, Reflector in Player 2's hand. Attack, let Player 2 play Reflector — Player 1 gets a Talisman prompt to prevent the redirect.",
+            hand: ['Talisman'],
+            p1creatures: [{ name: 'Ichor', damageTaken: 0 }],
+            p2hand: ['Reflector'],
         },
         'Reversal': {
             phase: 1,
@@ -383,19 +441,47 @@ document.addEventListener('DOMContentLoaded', () => {
         },
         'Threat': {
             phase: 1,
-            desc: "Threat in hand (F+G+L). Player 2 has 2 Landmarks — must pay 4 TP or lose one.",
-            hand: ['FireSteam', 'GoldSteam', 'LaserSteam', 'Threat'],
+            desc: "Threat (F+G+L) in Bazaar S3 (buy it there to test). Player 1 has 1 Landmark, Player 2 has 2 — pick either board's Landmark, including your own.",
+            hand: ['FireSteam', 'GoldSteam', 'LaserSteam'],
+            landmarks: ['Fountain of Youth'],
             p2landmarks: ['Pandorama', 'Clone Factory'],
         },
         'Confiscation': {
             phase: 1,
-            desc: "Confiscation in hand (G+G+L+L). Player 2 has 3 cards — look at hand, take one.",
-            hand: ['GoldSteam', 'GoldSteam', 'LaserSteam', 'LaserSteam', 'Confiscation'],
+            desc: "Confiscation (G+G+L+L) in Bazaar S4 (buy it there to test). Player 2 has 3 cards — look at hand, take one.",
+            hand: ['GoldSteam', 'GoldSteam', 'LaserSteam', 'LaserSteam'],
             p2hand: ['Ichor', 'Cravus', 'Smoke'],
         },
     };
 
     const devLogData = [
+        { date: '2026-07-07', msg: "Confiscation (S4) — implemented (active): 'Look at target Opponent's Hand and take one Card to your Hand.' In 2-player V1 the opponent is automatic (resolveConfiscation() picks the other seat directly); with 3-4 players it reuses the exact same #target-player-overlay/#target-player-list pattern the Creature Attack flow and Dark Matter already use to ask which opponent, rather than inventing a new targeting UI — so adding more seats later needs no new Confiscation-specific code. Once the target is settled, showConfiscationPicker() reveals their Hand: auto-takes the card if they only have one, otherwise opens a 'Confiscation — P{n}'s Hand' list (same overlay styling as Reversal's History picker) naming every card so the caster can actually look before choosing; picking one moves it via the standard clearSlot()+finishSingleCardPlacement() into the caster's Hand (opening a temporary slot if full). A no-op if the target's Hand is empty. Preset updated to buy Confiscation from Bazaar S4 directly (matching the Reversal/Threat convention) instead of pre-seeding it in Hand. Verified via sim: P2 has Ichor/Cravus/Smoke — buying Confiscation opened the P2 Hand list showing all three, and picking Smoke moved it into P1's Hand while Ichor/Cravus stayed put and Confiscation itself landed in the Abyss." },
+        { date: '2026-07-07', msg: "Threat (S3) — implemented (active): 'Send an active Landmark of your choice to the Abyss, unless its owner pays 2 TP for each Landmark they own.' Targeting is cross-board and deliberately unrestricted — allLandmarksInPlay() collects every occupied Landmark slot from BOTH players' boards (tagged with its owner), so the caster can pick an opponent's Landmark OR their own on purpose (e.g. torching your own Meridius-boosting Landmark once it's done its job). Auto-resolves straight to the owner's choice screen if there's only one Landmark in play; otherwise promptThreatTarget() pulses every eligible Landmark on both boards with a red 'threat-target' glow (new CSS, styled like the existing green heal-target pulse) and a capture-phase click handler picks the target. beginThreatChoice() then computes the live cost via the existing countLandmarks(owner) helper (2 × however many Landmarks that owner owns right now, including the threatened one) and shows a small two-button PAY / SEND TO ABYSS overlay (same visual pattern as the Landmark discard conflict chooser) — PAY is grayed out if totalTimePoints(owner) can't cover it. Paying spends TP via the existing resolveDamageDirectly(cost, owner) (Day die first, same as combat); declining (or being unable to pay) discards the Landmark straight to the Abyss via clearSlot()+finishSingleCardPlacement(), same as any other Landmark removal. Extended the Threat sim preset with a Landmark on each board (P1: Fountain of Youth, P2: Pandorama + Clone Factory) instead of a pre-seeded Hand copy, since Threat now buys instantly from the Bazaar like the other Sparks. Verified via sim: bought Threat from Bazaar S3 with 3 Landmarks in play — all three glowed as valid targets; picking your own Fountain of Youth (P1, owns 1) correctly priced it at 2 TP and choosing Send to Abyss discarded it immediately; picking the opponent's Clone Factory (P2, owns 2) priced it at 4 TP and paying dropped P2's Day die 12→8 while the Landmark stayed in play." },
+        { date: '2026-07-07', msg: "Reversal (S1) / Faith (S2) — reworked how Sparks get played, per feedback that the grab-from-Bazaar-then-drop-on-Abyss gesture was confusing (you'd grab the card and then not know what to do with it). Sparks now buy-and-play in a single click: clicking a Spark's Bazaar tile pays its cost, resolves the effect immediately, and sends the card straight to the Abyss — it never passes through Hand. New logic lives in the Bazaar click handler (checked right after the 'unavailable' gate, before the old allSame-grab branch): copies the top card, calls the existing autoPayCost(), splices it out of activeBazaar, then reuses finishSingleCardPlacement() + resolveSparkEffect() to land it in the Abyss and fire its effect, exactly like the old drop-on-Abyss path did. The old grab-then-drop-on-Abyss mechanic (highlightValidZones' Spark branch, the click-to-place special-case on the Abyss tile, resolveSparkEffect's call inside placeCard) is left in place as a fallback — it's still what the Dev Log sim presets use (they seed Sparks directly into Hand for isolated single-card testing) and covers any future case where a Spark legitimately ends up in Hand. Verified via sim: loaded the Reversal preset (Ichor+Smoke in History, FireSteam+2 GoldSteam in Hand), then clicked the Bazaar's S1 tile directly (not the preset's Hand copy) — payment cards were spent from Hand, a fresh Reversal went straight to the Abyss, and the 'Take Which Card?' picker opened immediately with no grab step; picking Ichor moved it to Hand and left Smoke in History. Confirmed non-Spark buys (e.g. Landmarks) are unaffected — still gated by the existing 'unavailable'/afford checks and still use the grab/drop flow." },
+        { date: '2026-07-06', msg: "Reversal (S1) / Faith (S2) — both implemented (active), plus the Abyss now actually works as a zone. Sparks resolve their effect the instant the card lands in the Abyss (new resolveSparkEffect() hook in placeCard) — that drop already was the existing 'play a Spark' gesture, so it doubles as the trigger. Reversal: take a Card from your History Pile into your Hand — auto-resolves with one History card, otherwise opens a 'Take Which Card?' picker (same overlay style as the Landmark discard conflict chooser); no-ops harmlessly if History is empty. Faith: draws a Card and grants 3 Time Points via the existing drawCards()/gainTimePoints(). Along the way, fixed the Abyss itself: it was a dead zone before this — cardData has no entries at Bazaar location 'AB', so activeBazaar['AB'] was always empty, meaning the shared Abyss slot always rendered as an empty pile and clicking it did nothing, even though finishSingleCardPlacement was already writing sent-there cards into its own dataset.cardData. renderBazaar() and the Bazaar click handler now special-case loc 'AB' to read/display that dataset directly: a count badge ('N IN ABYSS') appears once occupied, and clicking it opens a view-only 'Abyss — Out of Game' list (no grabbing back — cards there are gone for good) so either player can inspect what's been sent there. Verified via sim presets: Reversal preset (Ichor + Smoke in History) — picking Smoke moved it to Hand, left Ichor in History, sent Reversal to Abyss; Faith preset — playing it drew a FireSteam and sent Faith to Abyss (3 TP grant capped out silently since both dice already sat at 12, matching gainTimePoints' existing cap behavior). Clicking the Abyss slot after both plays listed both cards; marked both done on the Card Implementation checklist." },
+        { date: '2026-07-06', msg: "Reflector (A3) / Talisman (A4) — both implemented (active). Reflector: playable from the existing PLAY ARTIFACT step of the Creature Attack defense screen; V1 is 2-player only, so 'change the attack target to a Player of your choice' resolves as bouncing the attack straight back at the attacker (new handleReflectorRedirect() + resolveReflectedAttack(), which deals the attacker's current Strength directly to them with no blocking step, then sends the attacker to History as normal). Talisman: wired as a general contextual response (offerTalismanResponse()) rather than a Reflector-only special case, since its text ('prevent a Card that targets you or any of your Cards') isn't scoped to one Artifact — any future targeted effect can call it. It fires right after Reflector redirects: the device passes to the newly-targeted player first (keeping hand contents hidden from whoever currently holds it) and a RESPOND? prompt only appears if they're actually holding Talisman; playing it moves both Reflector and Talisman to the responder's History Pile and resumes the original defense screen against the original defender, while declining (or not holding it) lets the reflected damage land. Extended both cards' sim presets with an attacking Ichor and the response card in the defender's hand (matching the existing Smoke preset's pattern) and marked both done on the Card Implementation checklist. Verified via sim preset walkthrough: P1's Ichor attacks P2, P2 plays Reflector, and with no Talisman in P1's hand the attack immediately bounces back — the redirected damage lands on P1 (the attacker) and Ichor moves to P1's History; with the Talisman preset loaded, a RESPOND? prompt appears for P1, and choosing PLAY TALISMAN sends both Reflector and Talisman to P1's History and reopens the original defense screen for P2 against Ichor." },
+        { date: '2026-07-06', msg: "Dark Matter (A2) — effect implemented (active): click it in hand during your Construction Phase to discard it to your History, draw a card, and (2-player V1: automatically, 3-4p: via the existing target-player-overlay) force the opponent into a new Dark Matter choice screen modeled on the Creature Attack modal — three buttons, SACRIFICE CREATURE / DISCARD CARD / LOSE 2 TIME POINTS, only one is ever taken. Each option auto-resolves when there is exactly one legal instance (a single Creature in zone, a single card in hand) and otherwise opens an inline picker reusing the Creature Attack screen's blocker-picker pattern so the opponent chooses which one. Sacrifice/discard move the chosen card to the defender's own History Pile (finishSingleCardPlacement) with a floating 'Sacrificed'/'Discarded' label; losing 2 TP routes through the existing resolveDamageDirectly (Day die first, same as combat damage). Disabled options are grayed out (e.g. no button if the opponent has zero Creatures or an empty hand) so it's clear only one selection is required. Verified via sim preset (Dark Matter + full payment in P1 hand, Construction Phase): clicking it discarded it to History, drew a card, and opened the choice screen targeting P2." },
+        { date: '2026-07-06', msg: "Time Thief (C6) — effect implemented (auto on attack): gains Time Points equal to the TOTAL damage he deals in one attack, no matter how it splits between a blocking Creature and spillover to the player — shared via a new applyTimeThiefGain(), hooked into both the unblocked direct-strike path and the blocked-combat path (all three outcomes: blocker defeated + spillover, attacker repelled, mutual destruction all still count as 'damage dealt' and grant TP; Meridia blocking him also counts, since he still dealt the damage even though she prevents it going anywhere). Damage is read post-debuff (e.g. Smoke's -1 Strength lowers the gain too, since it reduces calculateCurrentStrength before the gain is computed). Routed through the existing gainTimePoints(), which already refuses to top up a Day die that's hit 0 and been permanently removed — so a player capped at 12 TP forever stays capped at 12 even when Time Thief hands them TP. Verified via sim: direct strike for 3 grants +3 TP float on the Day die." },
+        { date: '2026-07-06', msg: "Meridia (C5) — effect completed (auto): her Health/Strength/Resistance is 0 base, +1 for each Artifact in her owner's History Pile (badge shown via meridiaArtifactBonus(), shared by zone display, attack, and block). Fixed a latent bug along the way: baseStrength/baseResistance init used `parseInt(...) || 1`, which clobbered a legitimate 0 (Meridia's base) back up to 1 — switched to an isNaN check in both finishSingleCardPlacement and the sim harness's creature loader. Three deviations wired in: (1) placing her in the Creature Zone with 0 effective HP (no Artifacts in History) now sacrifices her straight to History — 'Sacrificed (0 HP)' floats then she's discarded via checkMeridiaZeroHp(); (2) as a blocker she swallows the whole attack — any damage she takes sacrifices her and prevents ALL spillover to the player, regardless of the attacker's Strength; (3) when her owner's History reshuffles into a new Future Pile, Meridia is filtered out and sent to the Abyss instead of being shuffled back in. Also reordered the sim harness to load History before Creatures so History-dependent stats are correct at placement time. Verified via sim/manual state: 0-Artifact placement auto-sacrifices to History; 2-Artifact placement now correctly shows HP badge 2 (previously misread as 3 due to the `|| 1` bug) and survives; forcing an End Phase reshuffle with Meridia in History sends her to the Abyss (bazaar AB slot goes from empty to occupied) and leaves the rest shuffled into Future. The blocker-absorption branch mirrors the existing resolveCombat blocker-defeated path (clearSlot + finishSingleCardPlacement to History) and was verified by code review rather than a live combat click-through." },
+        { date: '2026-07-05', msg: "Creature Attack screen — now shows the attacker's effective attack Strength on its card, plus both players' total Time Points (P#(Attacker) · N TP / P#(Defender) · N TP), so the defender can weigh blocking vs. spending an Artifact. This is also where Meridius's buff now surfaces." },
+        { date: '2026-07-05', msg: "Meridius (C4) — effect implemented (auto on attack): when he attacks, he gains +1 Strength for each Landmark the defending player owns (base 2), and becomes unblockable if they own 3+. Scaling is computed against the chosen defender in beginAttack via countLandmarks(), reusing the shared attacker.unblockable flag. The buff is shown ONLY in the Creature Attack screen (not the zone badge) — it's attack-only, so it must not read as block strength, and with 3+ players it's unclear which opponent it scales off until you target. His native Health/block stays 2. Verified via sim (opponent with 3 Landmarks): attack-screen Strength reads 5, block disabled + 'Unblockable Attacker Detected!', direct strike for 5; at 2 Landmarks it reads 4, is blockable, and strikes for 4." },
+        { date: '2026-07-05', msg: "Entrophy (C3) — effect implemented (auto on attack): after you target a player, a casino-style wheel of the six die faces spins over the card — fast, then decelerating (ease-out), landing on a random face with a gold flash. The outcome rides on top of its base Strength 2: (1) No additional effect — attacks with 2; (2) +3 Strength — attacks with 5; (3) Unblockable — attacks with 2, no block; (4) +4 Time Points — you gain 4 TP, attack still lands with 2; (5) To Opponent's Hand — no attack, Entrophy is handed to the defender; (6) Attacks You — 2 damage to yourself, then to History. Generalized the old Rampadon-only 'unblockable' check into an attacker flag so the Unblockable face reuses it. Wheel appears after target selection (works for the 4-player path too). Verified via sim: all six outcomes — str 2 / str 5 / unblockable (block disabled) / +4 TP float + attack / creature moved to opponent hand with no attack / self takes 2 and Entrophy to History." },
+        { date: '2026-07-04', msg: "Aetherlab (L8) — trade UI reworked into two direct interactions (still once per Construction Phase). Method A: click the landmark to arm it — every upgradeable hand Steam (Fire/Gold with the next tier in stock) glows gold; click one to trade it up in place. Method B: grab a Steam from hand and drop it on its own drawer or the next-tier drawer above the Bazaar (those drawers glow while held) and it upgrades automatically. Either way the traded-in Steam returns to its Bazaar drawer and the next tier lands in hand. LaserSteam never glows (top tier). Replaces the old modal chooser; landmark only pulses (no persistent glow). Armed mode clears on re-click, phase change, or turn end. Verified: arm + click FireSteam → GoldSteam (Fire returned to ST1, once-per-phase locked); drag GoldSteam onto Laser drawer → LaserSteam; Laser has no glow/target." },
+        { date: '2026-07-04', msg: "Clone Factory (L7) — effect implemented (active): during the Creature Phase, click the Factory to discard a GoldSteam from hand and prime a double attack. The landmark glows gold with an '⚔ Attack ×2' badge; the next Creature you attack with strikes twice in a row instead of going to History after its first strike. Between strikes the attacker stays in its zone; on the second strike you re-pick the target (single opponent in 2-player V1) and, once it resolves, the creature moves to History and the glow clears. Priming needs a GoldSteam (alerts otherwise); an unused priming drops when you leave the Creature Phase. Shared finishAttacker() gate wraps both the direct-strike and blocked-combat cleanup paths. Uses the existing Clone Factory sim preset (Rampadon + GoldSteam). Verified: activate discards GoldSteam + glows; direct strike twice for full damage; blocked first strike then direct second; leaving Creature Phase clears an unused priming." },
+        { date: '2026-07-02', msg: "Lethargo's Temple context window now shows the hovered card + its full payment breakdown (e.g. \"Planetarium — 1 Fire + 5 TP\"), recomputed live when you flip the Steam+TP / Only-TP toggle. Clears to a hint on mouse-out. Verified: FGL reads \"1 Fire + 5 TP\" with a fire-only hand, \"6 TP\" in Only-TP mode." },
+        { date: '2026-07-02', msg: "Lethargo's Temple (L2) — effect implemented (active, once per Construction Phase): click the Temple to arm TP-buy mode. Bazaar cards you can't afford in Steam but can cover with Time Points light up with a purple 'unlocked' glow, and hovering any card shows its live TP cost. A new contextual 'Landmark in Use' window docks below the phase panel with a payment toggle — Steam + Time Points (spend steam first, TP for the gap) or Only Time Points (full TP). Buying spends the planned steam cards to History and drains TP off the Day die with a floating '-N TP' readout. Closes on re-click, after the purchase, or on phase change. Verified: activate lights 20 cards; hover L5 (LLLL) = 12 TP; FFF buy with 2 FireSteam = 2 steam + 1 TP (Day 10->9); Only-TP FFF = 3 TP, no steam spent (Day 10->7); once-per-phase lockout; all three close paths." },
+        { date: '2026-07-02', msg: 'Planetarium fix: staging a second card onto the armed landmark no longer accidentally triggers the draw. Only the lower third of the armed card commits (marked with a blue "click strip" + "▶ Draw N" badge); the upper two-thirds stay a drop zone for staging more, and while you are holding a card any click on it stages rather than commits. Verified: dropped a 2nd card while holding -> Draw 1 -> Draw 2 with no premature draw; empty-handed upper-third click was inert; lower-third click drew all staged (Future 4 -> 2).' },
+        { date: '2026-07-02', msg: 'Discard landmarks now work two ways. Path 1 (existing): drop a card into your own History and the game auto-resolves (or asks on a genuine conflict). Path 2 (new — direct selection): when you pick up a card, every landmark that could consume it glows green; dropping the card onto a landmark discards it to History and fires THAT landmark, no chooser needed. Shared eligibility via getDiscardLandmarkOptions(); highlighting reuses the grab flow. Verified: grabbing a FireSteam lights Wasteland (and Planetarium when both are present); dropping on Wasteland healed + discarded, dropping on Planetarium staged a draw with no chooser and left the creature untouched.' },
+        { date: '2026-07-02', msg: 'Planetarium (L4) — effect implemented (contextual, once per Construction Phase): discard any number of cards into your own History (each one arms the landmark with a persistent glow and a "Draw N" badge), then click the Planetarium to draw that many from Future all at once. Drawing only on commit prevents cherry-picking draws mid-discard. Safety net: advancing past Construction auto-commits any staged draws. Refactored the End-Phase draw loop into a shared drawCards(pNum, count) used by both. Added a "Which Landmark?" chooser for the genuine conflict (FireSteam in Construction with both Wasteland and Planetarium eligible) — all other discards resolve automatically. Added Future-pile support + a Planetarium preset to the sim harness. Verified: staging/commit (Future 4 → 2, hand +2), once-per-turn lockout, the conflict chooser (picking Wasteland healed instead of staging), and no End-Phase draw regression.' },
+        { date: '2026-07-02', msg: "Dragura's Wasteland (L3) — effect implemented (contextual): discarding a FireSteam into your own History during the Construction Phase fully heals a damaged Creature. One damaged Creature auto-heals; with several, they glow green and the player clicks which to heal. Wasteland pulses and a \"Healed\" float rises over the creature. Intent badge changed Active → Contextual. Verified via sim: single-target auto-heal (dmg 2 → 0) and multi-target pick (healed the chosen creature, left the other at 1)." },
+        { date: '2026-07-02', msg: 'Laser Catalyst (L5) — effect implemented (contextual): discarding a LaserSteam into your own History during the End Phase deals 1 unpreventable damage to the opponent (auto-targeted in 2-player V1, day die first). No menu — the Catalyst glows and a "-1 TP" float rises over the opponent\'s die. Intent badge changed Active → Contextual to match. Verified via sim: two discards took the opponent 12 → 11 → 10.' },
+        { date: '2026-07-02', msg: 'Landmark trigger feedback (shared): added pulseLandmark() + floatValue() helpers and matching CSS (.landmark-triggered glow, .float-value rise). Wired Fountain of Youth first — Skip Turn now pulses the landmark and floats "+1 TP" over the gaining die instead of applying the Time Point silently. Reusable for Laser Catalyst / Wasteland / Planetarium next.' },
+        { date: '2026-07-02', msg: 'Dev Log: made Card Implementation the default/left tab and Update History the second tab.' },
+        { date: '2026-07-02', msg: 'Auto-discard at hand limit: the End Phase "Discard (X)" button is now clickable and discards the X cheapest cards from Hand to the History Pile. Cheapness is ranked by Steam tier (Laser > Gold > Fire > AllSteam, cheapest), so a single Laser outranks any number of Fires and an empty/"-" cost (e.g. FireSteam) is cheapest.' },
+        { date: '2026-07-02', msg: 'Removed the manual Day/Night die +/- adjuster buttons (leftover from fully-manual play); card effects handle Time Points now. Clicking a die face still lowers it by 1.' },
+        { date: '2026-07-02', msg: 'Added Dev Mode (toggle button next to Dev Log, or press M): freely grab any card from anywhere (Bazaar, hands, zones) and drop it into any zone on either board, ignoring cost, phase, and type restrictions. Bazaar slots stay non-reorderable. Button glows gold and a "DEV MODE" banner shows while active; toggling off cleanly returns any held card and clears highlights.' },
+        { date: '2026-07-02', msg: 'Locked Player Count to 2 in Options (3/4 show a "Coming Soon" toast instead of expanding the board) while keeping the 3-4 player layout code intact for later.' },
+        { date: '2026-07-02', msg: 'Split Creature HP into separate Strength and Resistance values in cardData/runtime state (e.g. Ichor: Strength 2, Resistance 2), preparing for future cards that redistribute them independently.' },
         { date: '2026-04-11', msg: 'Updated combat resolution: Changed automatic timer to a manual "Close" button for better readability of battle results.' },
         { date: '2026-04-11', msg: 'Refined combat UI: Removed redundant buttons, integrated toggle-based blocking, and replaced alerts with in-game feedback.' },
         { date: '2026-04-11', msg: 'Added visual combat enhancements with blocker previews, state-toggling, and card-tap animations.' },
@@ -529,6 +615,18 @@ document.addEventListener('DOMContentLoaded', () => {
                     });
                 }
 
+                // History Pile (loaded before Creatures so History-dependent effects,
+                // e.g. Meridia's Artifact-count HP, see the right state when she's placed).
+                if (cfg.history) {
+                    const histSlot = board.querySelector('.history-pile');
+                    if (histSlot) {
+                        const items = cfg.history.map(name => cardData.find(c => c.name === name)).filter(Boolean);
+                        histSlot.dataset.cardData = JSON.stringify(items);
+                        histSlot.classList.remove('slot-empty');
+                        updateStackIndicator(histSlot);
+                    }
+                }
+
                 // Creatures
                 if (cfg.creatures) {
                     board.querySelectorAll('.creature-zone-main .card').forEach(s => {
@@ -543,21 +641,27 @@ document.addEventListener('DOMContentLoaded', () => {
                         const found = cardData.find(c => c.name === spec.name);
                         if (found && cSlots[i]) {
                             const summonTurn = spec.forceThisTurn ? totalTurns : 0;
-                            const c = { ...found, baseHealth: parseInt(found.health) || 1, damageTaken: spec.damageTaken || 0, summonedOnTurn: summonTurn };
+                            const pStr = parseInt(found.strength ?? found.health);
+                            const pRes = parseInt(found.resistance ?? found.health);
+                            const c = { ...found, baseStrength: Number.isNaN(pStr) ? 1 : pStr, baseResistance: Number.isNaN(pRes) ? 1 : pRes, damageTaken: spec.damageTaken || 0, summonedOnTurn: summonTurn };
                             finishSingleCardPlacement(cSlots[i], c);
                             updateCreatureVisuals(cSlots[i]);
                         }
                     });
                 }
 
-                // History Pile
-                if (cfg.history) {
-                    const histSlot = board.querySelector('.history-pile');
-                    if (histSlot) {
-                        const items = cfg.history.map(name => cardData.find(c => c.name === name)).filter(Boolean);
-                        histSlot.dataset.cardData = JSON.stringify(items);
-                        histSlot.classList.remove('slot-empty');
-                        updateStackIndicator(histSlot);
+                // Future Pile (deck to draw from — e.g. for Planetarium)
+                if (cfg.future) {
+                    const futSlot = board.querySelector('.future-pile');
+                    if (futSlot) {
+                        const items = cfg.future.map(name => cardData.find(c => c.name === name)).filter(Boolean);
+                        futSlot.dataset.cardData = JSON.stringify(items);
+                        futSlot.classList.remove('slot-empty');
+                        futSlot.style.backgroundImage = "url('assets/card_back.png')";
+                        futSlot.style.backgroundColor = 'transparent';
+                        const label = futSlot.querySelector('.pile-label');
+                        if (label) label.style.display = 'none';
+                        updateStackIndicator(futSlot);
                     }
                 }
             }
@@ -569,6 +673,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 landmarks: sim.landmarks,
                 creatures: sim.p1creatures,
                 history: sim.p1history,
+                future: sim.p1future,
             });
 
             if (sim.p2landmarks || sim.p2hand || sim.p2creatures) {
@@ -658,28 +763,11 @@ document.addEventListener('DOMContentLoaded', () => {
         // Ensure symmetrical hand layout matches the initial slots
         updateHandLayout(pNum);
 
-        // Setup consolidated dice buttons for this player
-        const dieButtons = container.querySelectorAll('.die-btn');
-        dieButtons.forEach(btn => {
-            btn.addEventListener('click', (e) => {
-                const dayGroup = container.querySelector('.day-die-group');
-                const nightGroup = container.querySelector('.night-die-group');
-                
-                // Logic: Affect Day (left) if it's in play. 
-                // If Day is vanished and Night is not, affect Night.
-                let target = 'day';
-                if (dayGroup.classList.contains('vanished') && !nightGroup.classList.contains('vanished')) {
-                    target = 'night';
-                }
-                
-                adjustPlayerDie(pNum, target, btn.classList.contains('plus') ? 1 : -1);
-            });
-        });
-
-        // Click on die face
+        // Click on die face — manual Time Point adjustment, Dev Mode only
         const diceNum = container.querySelectorAll('.circle-counter');
         diceNum.forEach(die => {
             die.addEventListener('click', () => {
+                if (!devMode) return;
                 const type = die.classList.contains('orange-die') ? 'day' : 'night';
                 adjustPlayerDie(pNum, type, -1);
             });
@@ -700,7 +788,23 @@ document.addEventListener('DOMContentLoaded', () => {
                         clearSlot(slot);
                     }
                 } else if (!slot.classList.contains('slot-empty')) {
+                    // Aetherlab armed (Method A): clicking a glowing, upgradeable hand Steam trades it up.
+                    if (!devMode && aetherlabActive && currentPhase === 1
+                        && slot.classList.contains('aetherlab-upgradable')
+                        && slot.closest('.player-zone')?.id === `player-${currentPlayer}`) {
+                        tryAetherlabUpgradeHandSlot(slot);
+                        return;
+                    }
                     const cardData = JSON.parse(slot.dataset.cardData);
+
+                    // Dark Matter: play from hand during your Construction Phase — draws a
+                    // card, then a chosen opponent must pick one of three costs.
+                    const isMyBoard = slot.closest('.player-zone')?.id === `player-${currentPlayer}`;
+                    if (!devMode && isMyBoard && currentPhase === 1 && cardData.name === 'Dark Matter') {
+                        triggerDarkMatter(cardData, slot);
+                        return;
+                    }
+
                     grabCard(cardData, slot);
                     clearSlot(slot);
                 }
@@ -861,8 +965,8 @@ document.addEventListener('DOMContentLoaded', () => {
                 // Add Attack logic here
                 const isCreatureZone = slot.parentNode && slot.parentNode.classList.contains('creature-zone-main');
                 const isMyBoard = slot.closest('.player-zone') && slot.closest('.player-zone').id === `player-${currentPlayer}`;
-                
-                if (isCreatureZone && isMyBoard && currentPhase === 2) {
+
+                if (!devMode && isCreatureZone && isMyBoard && currentPhase === 2) {
                     // It's the Creature Phase and my creature - Try to attack
                     if (cardData.summonedOnTurn < totalTurns || cardData.name.includes("Cravus") || cardData.name.includes("Rampadon")) {
                          showAttackMenu(cardData, slot);
@@ -872,14 +976,22 @@ document.addEventListener('DOMContentLoaded', () => {
                     return;
                 }
 
-                // Aetherlab trade action (Construction Phase only, once per phase)
+                // Aetherlab: toggle upgrade mode (Construction Phase only, once per phase)
                 const isLandmarkZone = slot.parentNode && slot.parentNode.classList.contains('landmark-zone-main');
-                if (isLandmarkZone && isMyBoard && currentPhase === 1 && cardData.name === 'Aetherlab') {
-                    if (aetherlabUsedThisPhase) {
-                        alert('Aetherlab can only trade once per Construction Phase.');
-                        return;
-                    }
-                    showAetherlabTradeUI();
+                if (!devMode && isLandmarkZone && isMyBoard && currentPhase === 1 && cardData.name === 'Aetherlab') {
+                    toggleAetherlab();
+                    return;
+                }
+
+                // Lethargo's Temple: toggle TP-buy mode (Construction Phase only, once per phase)
+                if (!devMode && isLandmarkZone && isMyBoard && currentPhase === 1 && cardData.name === "Lethargo's Temple") {
+                    toggleLethargo();
+                    return;
+                }
+
+                // Clone Factory: discard a GoldSteam to attack twice in a row (Creature Phase).
+                if (!devMode && isLandmarkZone && isMyBoard && currentPhase === 2 && cardData.name === 'Clone Factory') {
+                    activateCloneFactory();
                     return;
                 }
 
@@ -987,16 +1099,16 @@ document.addEventListener('DOMContentLoaded', () => {
 
 
     function grabCard(card, sourceEl = null) {
-        // Restriction: Creatures in Creature Zone cannot be grabbed
-        if (sourceEl && sourceEl.parentNode && sourceEl.parentNode.classList.contains('creature-zone-main')) {
+        // Restriction: Creatures in Creature Zone cannot be grabbed (bypassed in Dev Mode)
+        if (!devMode && sourceEl && sourceEl.parentNode && sourceEl.parentNode.classList.contains('creature-zone-main')) {
             return;
         }
 
         // If grabbing from Bazaar/Source, ensures we don't accidentally stack with previous holds
         const isFromBazaar = sourceEl && sourceEl.dataset.loc && !sourceEl.closest('.player-zone');
         const isFromHand = sourceEl && sourceEl.classList.contains('hand-slot');
-        
-        if (currentPhase === 3 && !isFromHand) {
+
+        if (!devMode && currentPhase === 3 && !isFromHand) {
             // Silently block non-hand grabs in End Phase
             return;
         }
@@ -1029,7 +1141,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const isAttacker = slot.closest('.player-zone') && slot.closest('.player-zone').id === `player-${currentPlayer}`;
         const tempMod = isAttacker ? -activeStrDebuff : 0;
         const damage = card.damageTaken || 0;
-        
+
         // Final value: (Base + Buffs - Debuffs) - Damage
         const finalVal = Math.max(0, (baseStr + permMod + tempMod) - damage);
         
@@ -1045,12 +1157,16 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function getBaseStrength(card) {
-        let str = parseInt(card.health) || 0;
+        let str = parseInt(card.strength ?? card.health) || 0;
         if (card.description && card.description.includes("Strength")) {
             const match = card.description.match(/Strength (\d+)/);
             if (match) str = parseInt(match[1]);
         }
         return str;
+    }
+
+    function getBaseResistance(card) {
+        return parseInt(card.resistance ?? card.health) || 0;
     }
 
     function updateHeldGhost() {
@@ -1160,6 +1276,24 @@ document.addEventListener('DOMContentLoaded', () => {
 
     function highlightValidZones(card) {
         clearHighlights();
+
+        // Dev Mode: any card may go into any slot on any board (Bazaar excluded)
+        if (devMode) {
+            const devTargets = Array.from(document.querySelectorAll(
+                '.player-zone .hand-slot.slot-empty, .player-zone .hand-auto-drop, ' +
+                '.player-zone .creature-zone-main .card.slot-empty, ' +
+                '.player-zone .landmark-zone-main .card.slot-empty, ' +
+                '.player-zone .future-pile, .player-zone .history-pile, .card--abyss'
+            ));
+            devTargets.forEach(t => {
+                const fire = document.createElement('div');
+                fire.className = 'fire-spot fire-gold';
+                t.appendChild(fire);
+                t.classList.add('valid-drop-target');
+            });
+            return;
+        }
+
         let targets = [];
         let color = 'white';
         const activeBoard = document.getElementById(`player-${currentPlayer}`);
@@ -1186,6 +1320,15 @@ document.addEventListener('DOMContentLoaded', () => {
         } else {
             // Steam etc to hand
             targets = Array.from(activeBoard.querySelectorAll('.hand-slot.slot-empty, .hand-auto-drop'));
+            // Aetherlab (Method B): a held Steam can also be dropped on its own drawer or the
+            // next-tier drawer in the Bazaar to trade up. Light those drawers as drop targets.
+            const upSpec = AETHERLAB_UPGRADE[card.number];
+            if (aetherlabReady() && upSpec && bazaarHasSteam(upSpec.toLoc)) {
+                upSpec.validDrawers.forEach(loc => {
+                    const drawer = document.querySelector(`.bazaar-area .card[data-loc="${loc}"]`);
+                    if (drawer) { targets.push(drawer); drawer.classList.add('aetherlab-drop-target'); }
+                });
+            }
         }
 
         // EVERY non-spark, non-steam card can now be added to Future or History as requested
@@ -1202,11 +1345,26 @@ document.addEventListener('DOMContentLoaded', () => {
             t.appendChild(fire);
             t.classList.add('valid-drop-target');
         });
+
+        // Direct landmark selection (Path 2): also light up any landmark that could
+        // consume this card. Dropping onto it discards the card to History and fires
+        // that specific landmark — the explicit alternative to the History drop.
+        getDiscardLandmarkOptions(card).forEach(opt => {
+            const el = findLandmark(currentPlayer, opt.name);
+            if (el && !el.classList.contains('valid-drop-target')) {
+                const fire = document.createElement('div');
+                fire.className = 'fire-spot fire-green';
+                el.appendChild(fire);
+                el.classList.add('valid-drop-target', 'landmark-consume-target');
+            }
+        });
     }
 
     function clearHighlights() {
         document.querySelectorAll('.fire-spot').forEach(f => f.remove());
         document.querySelectorAll('.valid-drop-target').forEach(t => t.classList.remove('valid-drop-target'));
+        document.querySelectorAll('.landmark-consume-target').forEach(t => t.classList.remove('landmark-consume-target'));
+        document.querySelectorAll('.aetherlab-drop-target').forEach(t => t.classList.remove('aetherlab-drop-target'));
     }
 
     function placeCard(targetSlot) {
@@ -1223,7 +1381,38 @@ document.addEventListener('DOMContentLoaded', () => {
         const isHandAction = isHand || isAutoDrop;
 
         const topCard = heldCards[0];
-        
+
+        // Direct landmark selection (Path 2): dropping a card onto a glowing landmark
+        // discards it to History and fires THAT landmark's effect. Bypasses the normal
+        // placement/validity flow because the target is an occupied landmark, not a slot.
+        if (targetSlot.classList.contains('landmark-consume-target')) {
+            const landmarkName = (() => {
+                try { return JSON.parse(targetSlot.dataset.cardData).name; } catch (e) { return null; }
+            })();
+            const activeBoard = document.getElementById(`player-${currentPlayer}`);
+            const histPile = activeBoard && activeBoard.querySelector('.history-pile');
+            if (histPile && landmarkName) {
+                const c = heldCards.shift();
+                heldCardSources.shift();
+                finishSingleCardPlacement(histPile, c); // discard to History (source hand slot already cleared on grab)
+                fireLandmarkByName(landmarkName, c);
+            }
+
+            if (heldCards.length === 0) {
+                document.querySelectorAll('.hand-auto-drop').forEach(btn => btn.classList.add('hidden'));
+                if (heldGhost) heldGhost.remove();
+                heldGhost = null;
+                document.onmousemove = null;
+                clearHighlights();
+            } else {
+                updateHeldGhost();
+                highlightValidZones(heldCards[0]);
+            }
+            if (window.updateBazaarLighting) window.updateBazaarLighting();
+            consolidateHand(currentPlayer);
+            return;
+        }
+
         let isValid = false;
         if (topCard.type === 'Spark') {
             isValid = isAbyss; // ONLY Abyss for Spark
@@ -1236,13 +1425,18 @@ document.addEventListener('DOMContentLoaded', () => {
                       (topCard.type === 'Steam' && isHandAction);
         }
 
+        // Dev Mode allows any non-Bazaar slot as a valid target
+        if (devMode) {
+            isValid = isStack || isHandAction || isCreatureZone || isLandmarkZone;
+        }
+
         if (!isValid) return;
 
 
 
-        // Phase specific restrictions for zones
-        if (isCreatureZone && (currentPhase !== 1 && currentPhase !== 2)) return;
-        if (isLandmarkZone && currentPhase !== 1) return;
+        // Phase specific restrictions for zones (bypassed in Dev Mode)
+        if (!devMode && isCreatureZone && (currentPhase !== 1 && currentPhase !== 2)) return;
+        if (!devMode && isLandmarkZone && currentPhase !== 1) return;
 
         if (isAutoDrop) {
             const handSlotsContainer = targetSlot.closest('.player-zone').querySelector('.hand-slots');
@@ -1267,8 +1461,8 @@ document.addEventListener('DOMContentLoaded', () => {
         const activeBoard = document.getElementById(`player-${currentPlayer}`);
         const isToActiveBoard = targetSlot.closest('.player-zone') === activeBoard;
 
-        // ONLY pay if originating from Bazaar (Buying)
-        if (isFromBazaar && topCard.cost) {
+        // ONLY pay if originating from Bazaar (Buying) — Dev Mode takes cards for free
+        if (!devMode && isFromBazaar && topCard.cost) {
             if (currentPhase === 3) return; // Cannot buy during End Phase
             
             // Restriction: Only 1 Steam total per turn from Bazaar
@@ -1277,10 +1471,15 @@ document.addEventListener('DOMContentLoaded', () => {
                 steamBoughtThisTurn = true;
             }
 
-            autoPayCost(topCard);
+            // Lethargo's Temple: when armed, non-Steam buys are paid in Steam+TP (or Only TP).
+            if (lethargoActive && currentPhase === 1 && topCard.type !== 'Steam') {
+                payWithLethargo(topCard);
+            } else {
+                autoPayCost(topCard);
+            }
         }
 
-        if (currentPhase === 3 && !isHistory && !isHandAction) {
+        if (!devMode && currentPhase === 3 && !isHistory && !isHandAction) {
             // End Phase only allows discarding to History or putting card back to Hand
             return;
         }
@@ -1329,6 +1528,14 @@ document.addEventListener('DOMContentLoaded', () => {
             if (s && s.dataset.loc) removeFromBazaar(s, c);
             finishSingleCardPlacement(targetSlot, c);
         }
+
+        // Landmarks triggered by discarding a card into your own History (Catalyst /
+        // Wasteland / Planetarium), disambiguated by phase + type inside the coordinator.
+        if (isHistory && isToActiveBoard) resolveHistoryDiscard(topCard);
+
+        // Sparks resolve their effect the instant they land in the Abyss — that drop IS
+        // the "play" gesture (manual enforcement: the player pulls the trigger themselves).
+        if (isAbyss && topCard.type === 'Spark') resolveSparkEffect(currentPlayer, topCard);
 
         if (heldCards.length === 0) {
             document.querySelectorAll('.hand-auto-drop').forEach(btn => btn.classList.add('hidden'));
@@ -1380,8 +1587,14 @@ document.addEventListener('DOMContentLoaded', () => {
             if (targetSlot.parentNode && targetSlot.parentNode.classList.contains('creature-zone-main')) {
                 if (card.summonedOnTurn === undefined) card.summonedOnTurn = totalTurns;
                 if (card.damageTaken === undefined) card.damageTaken = 0;
-                if (!card.baseHealth) {
-                    card.baseHealth = parseInt(card.health) || 1;
+                // parseInt || 1 would clobber a legitimate 0 base stat (e.g. Meridia); use isNaN instead.
+                if (card.baseStrength === undefined) {
+                    const p = parseInt(card.strength ?? card.health);
+                    card.baseStrength = Number.isNaN(p) ? 1 : p;
+                }
+                if (card.baseResistance === undefined) {
+                    const p = parseInt(card.resistance ?? card.health);
+                    card.baseResistance = Number.isNaN(p) ? 1 : p;
                 }
             }
             targetSlot.dataset.cardData = JSON.stringify(card);
@@ -1413,6 +1626,10 @@ document.addEventListener('DOMContentLoaded', () => {
         if (isStack) updateStackIndicator(targetSlot);
         bindHoverToElement(targetSlot, card);
         updateCreatureVisuals(targetSlot);
+
+        if (!isStack && targetSlot.parentNode && targetSlot.parentNode.classList.contains('creature-zone-main')) {
+            checkMeridiaZeroHp(targetSlot, card);
+        }
     }
 
     function bindHoverToElement(el, cardData) {
@@ -1478,9 +1695,17 @@ document.addEventListener('DOMContentLoaded', () => {
             const loc = card.dataset.loc;
             if (!loc) return;
 
-            const allInLoc = activeBazaar[loc] || [];
-            const availableCards = allInLoc.filter(c => selectedSets.includes(c.set));
-            
+            const isAbyssLoc = loc === 'AB';
+            let availableCards;
+            if (isAbyssLoc) {
+                // The Abyss isn't a Bazaar sale pile (no cardData entries target it) — it
+                // accumulates real out-of-game cards in its own dataset.cardData instead.
+                try { availableCards = JSON.parse(card.dataset.cardData || '[]'); } catch (e) { availableCards = []; }
+            } else {
+                const allInLoc = activeBazaar[loc] || [];
+                availableCards = allInLoc.filter(c => selectedSets.includes(c.set));
+            }
+
             // Clean up old stack visuals (Undoing previous stack thing)
             card.querySelectorAll('.card-stack-layer').forEach(e => e.remove());
 
@@ -1491,19 +1716,20 @@ document.addEventListener('DOMContentLoaded', () => {
                 card.style.border = '';
             } else {
                 card.classList.remove('empty-pile');
-                
+
                 const topCard = availableCards[availableCards.length - 1];
                 const isSingleSet = selectedSets.length === 1;
                 const isDestiny = topCard.type === 'Destiny' || loc === 'D' || loc === 'DA';
-                const isAbyss = loc === 'AB';
+                const isAbyss = isAbyssLoc;
                 const isSteam = topCard.type === 'Steam';
 
                 // Display count indicator only
                 card.querySelectorAll('.rarity-indicator').forEach(e => e.remove());
-                if (availableCards.length > 1) {
+                if (availableCards.length > 1 || (isAbyss && availableCards.length >= 1)) {
                     const indicator = document.createElement('div');
                     indicator.className = 'rarity-indicator tech-font';
-                    indicator.innerHTML = `<span class="count-value">${availableCards.length}</span><span class="count-label"> LEFT</span>`;
+                    const label = isAbyss ? ' IN ABYSS' : ' LEFT';
+                    indicator.innerHTML = `<span class="count-value">${availableCards.length}</span><span class="count-label">${label}</span>`;
                     card.appendChild(indicator);
                 }
 
@@ -1563,26 +1789,13 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         });
 
-        const canAfford = (topCard) => {
-            if (topCard.location === 'AB' || topCard.location === 'D' || topCard.location === 'DA') return true; 
+        // Pure Steam affordability (no Time Points involved).
+        const steamAfford = (topCard) => {
+            if (topCard.location === 'AB' || topCard.location === 'D' || topCard.location === 'DA') return true;
             if (topCard.name === 'FireSteam' || !topCard.cost || topCard.cost === '-') return true;
 
             let costString = topCard.cost;
             if (topCard.name === 'GoldSteam') costString = 'AAA';
-
-            if (hasLethargos) {
-                // Lethargo's Temple: player may pay with TP (F=1, G=2, L=3) instead of Steam
-                let tpCost = 0;
-                for (const ch of costString) {
-                    if (ch === 'F') tpCost += 1;
-                    else if (ch === 'G') tpCost += 2;
-                    else if (ch === 'L') tpCost += 3;
-                    else if (ch === 'A') tpCost += 1; // minimum cost per AllSteam slot
-                }
-                const playerTP = (playersState[currentPlayer].day + playersState[currentPlayer].night);
-                if (playerTP >= tpCost) return true;
-                // If not enough TP, fall through to normal Steam check
-            }
 
             let costCost = { F: 0, G: 0, L: 0, A: 0 };
             for (let char of costString) {
@@ -1598,20 +1811,26 @@ document.addEventListener('DOMContentLoaded', () => {
 
             if (availF < costCost.F) return false;
             availF -= costCost.F;
-
             if (availG < costCost.G) return false;
             availG -= costCost.G;
-
             if (availL < costCost.L) return false;
             availL -= costCost.L;
 
             let remainingSteams = availF + availG + availL;
             if (remainingSteams < costCost.A) return false;
-
             return true;
         };
 
+        // Lethargo's Temple TP affordability — only when the Temple mode is armed.
+        const templeArmed = hasLethargos && lethargoActive && !lethargoUsedThisPhase;
+        const tpAfford = (topCard) => {
+            if (!topCard.cost || topCard.cost === '-') return false;
+            const plan = planLethargoPayment(topCard);
+            return (playersState[currentPlayer].day + playersState[currentPlayer].night) >= plan.tp;
+        };
+
         bazaarCards.forEach(cardContainer => {
+            cardContainer.classList.remove('tp-affordable');
             if (cardContainer.classList.contains('empty-pile')) {
                 cardContainer.classList.remove('unavailable');
                 return;
@@ -1634,15 +1853,19 @@ document.addEventListener('DOMContentLoaded', () => {
             } else if (currentPhase === 1) {
                 if (!isSteam) isAvailablePhase = true;
             } else if (currentPhase === 2 || currentPhase === 3) {
-                isAvailablePhase = false; 
+                isAvailablePhase = false;
             }
-            
-            const affordable = canAfford(topCard);
+
+            const steamOK = steamAfford(topCard);
+            // Temple unlocks cards you can't afford in Steam but can cover with Time Points.
+            const tpOK = templeArmed && !isSteam && !steamOK && tpAfford(topCard);
+            const affordable = steamOK || tpOK;
 
             if (!isAvailablePhase || !affordable) {
                 cardContainer.classList.add('unavailable');
             } else {
                 cardContainer.classList.remove('unavailable');
+                if (isAvailablePhase && tpOK) cardContainer.classList.add('tp-affordable');
             }
         });
     }
@@ -1662,6 +1885,8 @@ document.addEventListener('DOMContentLoaded', () => {
             // Deselect / Return logic
             if (heldCards.length > 0) {
                 e.stopPropagation();
+                // Aetherlab (Method B): dropping a held Steam on a same/next-tier drawer trades it up.
+                if (tryAetherlabDrop(cardContainer)) return;
                 // If it's Abyss, we place. Otherwise, we return to source.
                 if (cardContainer.classList.contains('card--abyss') && heldCards[0].type === 'Spark') {
                     placeCard(cardContainer);
@@ -1671,18 +1896,65 @@ document.addEventListener('DOMContentLoaded', () => {
                 return;
             }
 
-            if (cardContainer.classList.contains('unavailable')) return;
+            // Abyss: shared, view-only zone (removed from the game entirely). Any player can
+            // click it to see the full list of what's out of game — no grabbing, no cost gate.
+            if (loc === 'AB') {
+                let abyssCards = [];
+                try { abyssCards = JSON.parse(cardContainer.dataset.cardData || '[]'); } catch (e) { /* empty */ }
+                if (abyssCards.length === 0) return;
+
+                const locationTitle = document.getElementById('location-title');
+                const locationCards = document.getElementById('location-cards');
+                locationTitle.textContent = 'Abyss — Out of Game';
+                locationCards.innerHTML = '';
+                locationCardPreview.classList.add('hidden');
+
+                abyssCards.forEach(c => {
+                    const cardDiv = document.createElement('div');
+                    cardDiv.className = 'location-card-item glass-panel';
+                    cardDiv.innerHTML = `
+                        <div class="loc-card-header">
+                            <span class="loc-card-num">${c.number || ''}</span>
+                            <span class="loc-card-name">${c.name}</span>
+                        </div>
+                        <div class="loc-card-cost">${c.cost || '-'}</div>
+                    `;
+                    bindHoverToElement(cardDiv, c);
+                    locationCards.appendChild(cardDiv);
+                });
+                locationModal.classList.remove('hidden');
+                return;
+            }
+
+            if (!devMode && cardContainer.classList.contains('unavailable')) return;
 
             const allInLoc = activeBazaar[loc] || [];
             const availableCards = allInLoc.filter(c => selectedSets.includes(c.set));
             if (availableCards.length === 0) return;
-            
+
+            // Sparks buy-and-play in one click: pay cost, resolve the effect immediately,
+            // then send the card straight to the Abyss. No grab/drop step — a Spark never
+            // rests in Hand from a Bazaar buy (that's what made the old flow confusing).
+            if (availableCards[0].type === 'Spark') {
+                if (!devMode && !gameStarted) return;
+                const card = { ...availableCards[availableCards.length - 1] };
+                if (!devMode) autoPayCost(card);
+                const idx = allInLoc.findIndex(c => c.name === card.name);
+                if (idx !== -1) allInLoc.splice(idx, 1);
+                renderBazaar();
+                if (window.updateBazaarLighting) window.updateBazaarLighting();
+                const abyssEl = document.querySelector('.card--abyss');
+                finishSingleCardPlacement(abyssEl, card);
+                resolveSparkEffect(currentPlayer, card);
+                return;
+            }
+
             // If all cards in the pile are the same name, just grab the top one directly
             const allSame = availableCards.every(c => c.name === availableCards[0].name);
 
             if (allSame) {
                 if (heldCards.length === 0) {
-                    if (!gameStarted && cardContainer.closest('.bazaar-area')) return; // Block direct grab before start
+                    if (!devMode && !gameStarted && cardContainer.closest('.bazaar-area')) return; // Block direct grab before start
                     grabCard(availableCards[availableCards.length - 1], cardContainer);
                 }
                 return;
@@ -1708,7 +1980,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 
                 cardDiv.addEventListener('click', (ev) => {
                     ev.stopPropagation();
-                    if (!gameStarted && cardContainer.closest('.bazaar-area')) return; // Block grab from modal before start
+                    if (!devMode && !gameStarted && cardContainer.closest('.bazaar-area')) return; // Block grab from modal before start
                     if (heldCards.length > 0) return; // Prevent double-grab
                     grabCard(c, cardContainer); // Stack returns to its Bazaar container
                     locationModal.classList.add('hidden');
@@ -1730,10 +2002,19 @@ document.addEventListener('DOMContentLoaded', () => {
                     showCardDetails(availableCards[availableCards.length-1], true);
                 }, 750);
             }
+            // Lethargo's Temple armed: show this card's Time-Point cost immediately,
+            // and mirror it (name + full breakdown) into the context window.
+            const live = (activeBazaar[loc] || []).filter(c => selectedSets.includes(c.set));
+            if (live.length > 0) {
+                showTpCostHint(cardContainer, live[live.length - 1]);
+                if (lethargoActive) updateLethargoViewed(live[live.length - 1]);
+            }
         });
         cardContainer.addEventListener('mouseleave', () => {
             clearTimeout(hoverTimer);
             cardModal.classList.add('hidden');
+            hideTpCostHint();
+            if (lethargoActive) updateLethargoViewed(null);
         });
     });
 
@@ -1760,9 +2041,11 @@ document.addEventListener('DOMContentLoaded', () => {
 
     closeSetsModalBtn.addEventListener('click', () => {
         setsModal.classList.add('hidden');
+        optionsModal.classList.remove('hidden');
     });
 
     btnSets.addEventListener('click', () => {
+        optionsModal.classList.add('hidden');
         setsModal.classList.remove('hidden');
     });
 
@@ -1881,6 +2164,761 @@ document.addEventListener('DOMContentLoaded', () => {
             if (winnerTitle) winnerTitle.textContent = `DRAW!`;
             gameOverOverlay.classList.remove('hidden');
         }
+    }
+
+    // --- Shared landmark trigger feedback ---
+    // Return the landmark card element (by name) on a player's board, or null.
+    function findLandmark(pNum, cardName) {
+        const board = document.getElementById(`player-${pNum}`);
+        if (!board) return null;
+        const slots = board.querySelectorAll('.landmark-zone-main .card:not(.slot-empty)');
+        for (const s of slots) {
+            try {
+                if (JSON.parse(s.dataset.cardData).name === cardName) return s;
+            } catch (e) { /* skip */ }
+        }
+        return null;
+    }
+
+    // Briefly glow a landmark card (by name, on a player's board) to signal it fired.
+    function pulseLandmark(pNum, cardName) {
+        const s = findLandmark(pNum, cardName);
+        if (!s) return null;
+        s.classList.remove('landmark-triggered');
+        void s.offsetWidth; // restart animation
+        s.classList.add('landmark-triggered');
+        setTimeout(() => s.classList.remove('landmark-triggered'), 900);
+        return s;
+    }
+
+    // Float a short value (e.g. "+1 TP") centered over a target element, then fade upward.
+    function floatValue(targetEl, text, variant = 'gain') {
+        if (!targetEl) return;
+        const rect = targetEl.getBoundingClientRect();
+        const el = document.createElement('div');
+        el.className = `float-value float-value--${variant}`;
+        el.textContent = text;
+        el.style.left = `${rect.left + rect.width / 2}px`;
+        el.style.top = `${rect.top + rect.height / 2}px`;
+        document.body.appendChild(el);
+        setTimeout(() => el.remove(), 1300);
+    }
+
+    // --- Clone Factory: discard a GoldSteam during the Creature Phase to attack twice ---
+    // Click the landmark before attacking. It discards a GoldSteam from hand, then arms the
+    // next Creature's attack to strike twice in a row (target re-selectable on the 2nd strike).
+    // The landmark glows until the second strike resolves. See finishAttacker /
+    // maybeCloneSecondStrike for how the attacker is kept in its zone between the two strikes.
+    function activateCloneFactory() {
+        if (cloneFactoryArmed) {
+            alert('Clone Factory is already primed — attack with a Creature to use both strikes.');
+            return;
+        }
+        const board = document.getElementById(`player-${currentPlayer}`);
+        if (!board) return;
+
+        // Need a GoldSteam in hand to spend.
+        const goldSlot = Array.from(board.querySelectorAll('.hand-slot:not(.slot-empty)')).find(s => {
+            try { return JSON.parse(s.dataset.cardData).name === 'GoldSteam'; } catch (e) { return false; }
+        });
+        if (!goldSlot) {
+            alert('Clone Factory needs a GoldSteam in hand to activate.');
+            return;
+        }
+
+        // Discard the GoldSteam to History.
+        const data = JSON.parse(goldSlot.dataset.cardData);
+        const historySlot = board.querySelector('.history-pile');
+        animateCardToHistory(goldSlot, historySlot, data);
+        clearSlot(goldSlot);
+        updateHandLayout(currentPlayer);
+
+        cloneFactoryArmed = true;
+        cloneSecondStrikePending = false;
+        cloneAttackerSlot = null;
+        armCloneFactory();
+        pulseLandmark(currentPlayer, 'Clone Factory');
+    }
+
+    function armCloneFactory() {
+        const el = findLandmark(currentPlayer, 'Clone Factory');
+        if (!el) return;
+        el.classList.add('clone-armed');
+        if (!el.querySelector('.clone-badge')) {
+            const badge = document.createElement('div');
+            badge.className = 'clone-badge tech-font';
+            badge.textContent = '⚔ Attack ×2';
+            el.appendChild(badge);
+        }
+    }
+
+    function disarmCloneFactory() {
+        cloneFactoryArmed = false;
+        cloneSecondStrikePending = false;
+        cloneAttackerSlot = null;
+        document.querySelectorAll('.landmark-zone-main .clone-armed').forEach(el => {
+            el.classList.remove('clone-armed');
+            const badge = el.querySelector('.clone-badge');
+            if (badge) badge.remove();
+        });
+    }
+
+    // Move a spent attacker to History after its strike — unless Clone Factory is primed for a
+    // first strike, in which case the creature stays in its zone to strike a second time.
+    function finishAttacker(attackerSlot, attacker, attackerHistory) {
+        if (cloneFactoryArmed && !cloneSecondStrikePending) {
+            cloneSecondStrikePending = true;
+            cloneAttackerSlot = attackerSlot;
+            return; // keep the creature in place for its second attack
+        }
+        clearSlot(attackerSlot);
+        finishSingleCardPlacement(attackerHistory, attacker);
+        if (cloneFactoryArmed) disarmCloneFactory();
+    }
+
+    // After an attack's result overlay closes, if Clone Factory kept the attacker for a second
+    // strike, re-open the attack flow for that same creature (target re-selectable).
+    function maybeCloneSecondStrike() {
+        if (!cloneSecondStrikePending) return;
+        const slot = cloneAttackerSlot;
+        if (!slot || slot.classList.contains('slot-empty')) { disarmCloneFactory(); return; }
+        let data;
+        try { data = JSON.parse(slot.dataset.cardData); } catch (e) { disarmCloneFactory(); return; }
+        pulseLandmark(currentPlayer, 'Clone Factory');
+        // Brief delay so the previous overlay fully hides before the second strike opens.
+        setTimeout(() => triggerAttack(data, slot), 150);
+    }
+
+    // --- Landmark effects triggered by discarding a card into your own History ---
+    // These share one gesture (drop a card into your own History, normally illegal) and
+    // are disambiguated by phase + Steam type. When exactly one landmark is eligible it
+    // fires automatically; when two are eligible (Wasteland + Planetarium on a FireSteam
+    // in Construction) the player is asked which to use.
+
+    // Laser Catalyst: LaserSteam, End Phase -> 1 unpreventable damage to the opponent.
+    function catalystEligible(card) {
+        return !devMode && card && card.name === 'LaserSteam'
+            && currentPhase === 3 && !!findLandmark(currentPlayer, 'Laser Catalyst');
+    }
+    function fireCatalyst() {
+        const opponent = (currentPlayer % activePlayerCount) + 1;
+        // Determine which die takes the hit BEFORE applying damage, so the float lands
+        // on the correct die even when this point empties the Day die.
+        const dieSel = playersState[opponent].day > 0 ? '.day-die-group' : '.night-die-group';
+        resolveDamageDirectly(1, opponent);
+        pulseLandmark(currentPlayer, 'Laser Catalyst');
+        const oppBoard = document.getElementById(`player-${opponent}`);
+        if (oppBoard) floatValue(oppBoard.querySelector(dieSel), '-1 TP', 'damage');
+    }
+
+    // Dragura's Wasteland: FireSteam, Construction Phase -> fully heal a damaged Creature.
+    function damagedCreatures() {
+        const board = document.getElementById(`player-${currentPlayer}`);
+        if (!board) return [];
+        return [...board.querySelectorAll('.creature-zone-main .card:not(.slot-empty)')].filter(s => {
+            try { return (JSON.parse(s.dataset.cardData).damageTaken || 0) > 0; } catch (e) { return false; }
+        });
+    }
+    function wastelandEligible(card) {
+        return !devMode && card && card.name === 'FireSteam'
+            && currentPhase === 1 && !!findLandmark(currentPlayer, "Dragura's Wasteland")
+            && damagedCreatures().length > 0;
+    }
+    function fireWasteland() {
+        const damaged = damagedCreatures();
+        if (damaged.length === 0) return;
+        if (damaged.length === 1) healCreature(damaged[0]);
+        else promptHealTarget(damaged);
+    }
+
+    // Planetarium: any card, Construction Phase, once per turn -> stage discards, then
+    // click the landmark to draw an equal number from Future (see staging helpers below).
+    function planetariumEligible(card) {
+        return !devMode && card && currentPhase === 1
+            && !planetariumUsedThisTurn && !!findLandmark(currentPlayer, 'Planetarium');
+    }
+
+    // Which landmarks could consume this card right now (given phase + type + state).
+    function getDiscardLandmarkOptions(card) {
+        if (devMode || !card) return [];
+        const options = [];
+        if (catalystEligible(card))    options.push({ name: 'Laser Catalyst', fire: fireCatalyst });
+        if (wastelandEligible(card))   options.push({ name: "Dragura's Wasteland", fire: fireWasteland });
+        if (planetariumEligible(card)) options.push({ name: 'Planetarium', fire: stagePlanetarium });
+        return options;
+    }
+
+    // Fire a specific landmark's discard effect by name (used by direct selection).
+    function fireLandmarkByName(name, card) {
+        const opt = getDiscardLandmarkOptions(card).find(o => o.name === name);
+        if (opt) opt.fire();
+    }
+
+    // Coordinator: called after a card lands in the active player's History pile.
+    // (Path 1 — drop into History and let the game disambiguate.)
+    function resolveHistoryDiscard(card) {
+        const options = getDiscardLandmarkOptions(card);
+        if (options.length === 0) return;
+        if (options.length === 1) { options[0].fire(); return; }
+        promptLandmarkChoice(options); // genuine 2+ conflict -> ask
+    }
+
+    // Small chooser shown only for the real conflict case (2+ eligible landmarks).
+    function promptLandmarkChoice(options) {
+        const overlay = document.createElement('div');
+        overlay.className = 'overlay landmark-choice-overlay';
+        const panel = document.createElement('div');
+        panel.className = 'glass-panel landmark-choice-panel';
+        const title = document.createElement('div');
+        title.className = 'fantasy-font glowing-text landmark-choice-title';
+        title.textContent = 'Which Landmark?';
+        panel.appendChild(title);
+        options.forEach(opt => {
+            const btn = document.createElement('button');
+            btn.className = 'menu-btn tech-font';
+            btn.textContent = opt.name;
+            btn.onclick = () => { overlay.remove(); opt.fire(); };
+            panel.appendChild(btn);
+        });
+        overlay.appendChild(panel);
+        document.body.appendChild(overlay);
+    }
+
+    // --- Spark effects ---
+    // Sparks are one-shot: the effect fires the instant the card lands in the Abyss (see the
+    // resolveSparkEffect() call in placeCard) — that drop IS the "play" gesture in this manual-
+    // enforcement engine. Add new Sparks by registering their name below.
+    const sparkEffects = {
+        'Reversal': (pNum) => resolveReversal(pNum),
+        'Faith': (pNum) => resolveFaith(pNum),
+        'Threat': (pNum) => resolveThreat(pNum),
+        'Confiscation': (pNum) => resolveConfiscation(pNum),
+    };
+
+    function resolveSparkEffect(pNum, card) {
+        const fn = sparkEffects[card.name];
+        if (fn) fn(pNum, card);
+    }
+
+    // Faith: Draw a Card. Gain 3 Time Points.
+    async function resolveFaith(pNum) {
+        await drawCards(pNum, 1);
+        gainTimePoints(pNum, 3);
+        const board = document.getElementById(`player-${pNum}`);
+        if (board) {
+            const dieSel = playersState[pNum].day > 0 ? '.day-die-group' : '.night-die-group';
+            floatValue(board.querySelector(dieSel), '+3 TP', 'gain');
+        }
+    }
+
+    // Reversal: Take a Card from your History Pile and place it in your Hand.
+    // If History is empty the Spark simply has nothing to take — it still resolves (and is
+    // still sent to the Abyss), it just does nothing.
+    function resolveReversal(pNum) {
+        const board = document.getElementById(`player-${pNum}`);
+        if (!board) return;
+        const historyPile = board.querySelector('.history-pile');
+        if (!historyPile) return;
+
+        let history = [];
+        try { history = JSON.parse(historyPile.dataset.cardData || '[]'); } catch (e) { /* empty */ }
+        if (history.length === 0) return;
+
+        const takeCardAt = (idx) => {
+            const [taken] = history.splice(idx, 1);
+            if (history.length === 0) {
+                clearStackSlot(historyPile, 'History');
+            } else {
+                historyPile.dataset.cardData = JSON.stringify(history);
+                const newTop = history[history.length - 1];
+                const slug = slugify(newTop.name);
+                if (newTop.type === 'Steam') {
+                    historyPile.style.backgroundImage = `url('assets/${slug}.png')`;
+                } else if (newTop.set === 'Unity' && slug) {
+                    historyPile.style.backgroundImage = `url('assets/cards/${slug}.png')`;
+                } else {
+                    historyPile.style.backgroundImage = '';
+                    historyPile.style.backgroundColor = 'rgba(255,255,255,0.1)';
+                    historyPile.textContent = newTop.name;
+                }
+                bindHoverToElement(historyPile, newTop);
+                updateStackIndicator(historyPile);
+            }
+
+            const handSlots = Array.from(board.querySelectorAll('.hand-slot'));
+            let targetSlot = handSlots.find(s => s.classList.contains('slot-empty'));
+            if (!targetSlot) {
+                targetSlot = createSlot('hand');
+                targetSlot.classList.add('temporary-slot');
+                board.querySelector('.hand-slots').appendChild(targetSlot);
+            }
+            finishSingleCardPlacement(targetSlot, taken);
+            updateHandLayout(pNum);
+            floatValue(targetSlot, `+ ${taken.name}`, 'gain');
+        };
+
+        if (history.length === 1) { takeCardAt(0); return; }
+
+        // 2+ cards in History — let the player pick which one comes back.
+        const overlay = document.createElement('div');
+        overlay.className = 'overlay landmark-choice-overlay';
+        const panel = document.createElement('div');
+        panel.className = 'glass-panel landmark-choice-panel';
+        const title = document.createElement('div');
+        title.className = 'fantasy-font glowing-text landmark-choice-title';
+        title.textContent = 'Reversal — Take Which Card?';
+        panel.appendChild(title);
+        history.forEach((c, idx) => {
+            const btn = document.createElement('button');
+            btn.className = 'menu-btn tech-font';
+            btn.textContent = c.name;
+            btn.onclick = () => { overlay.remove(); takeCardAt(idx); };
+            panel.appendChild(btn);
+        });
+        overlay.appendChild(panel);
+        document.body.appendChild(overlay);
+    }
+
+    // Threat: Send an active Landmark of your choice to the Abyss, unless its owner pays
+    // 2 Time Points for each Landmark they own. "Of your choice" means ANY Landmark in play —
+    // including your own (e.g. torching your own Meridius-boosting Landmark on purpose).
+    function allLandmarksInPlay() {
+        const found = [];
+        for (let p = 1; p <= activePlayerCount; p++) {
+            const board = document.getElementById(`player-${p}`);
+            if (!board) continue;
+            board.querySelectorAll('.landmark-zone-main .card:not(.slot-empty)').forEach(slot => {
+                found.push({ slot, owner: p });
+            });
+        }
+        return found;
+    }
+
+    function resolveThreat() {
+        const targets = allLandmarksInPlay();
+        if (targets.length === 0) return; // nothing in play to threaten
+        if (targets.length === 1) { beginThreatChoice(targets[0]); return; }
+        promptThreatTarget(targets);
+    }
+
+    // 2+ Landmarks in play — let the caster click which one to threaten (any board, any owner).
+    function promptThreatTarget(targets) {
+        const cleanup = () => targets.forEach(t => {
+            t.slot.classList.remove('threat-target');
+            if (t.slot._threatHandler) t.slot.removeEventListener('click', t.slot._threatHandler, true);
+            delete t.slot._threatHandler;
+        });
+        targets.forEach(t => {
+            t.slot.classList.add('threat-target');
+            const handler = (e) => {
+                e.stopPropagation();
+                e.preventDefault();
+                cleanup();
+                beginThreatChoice(t);
+            };
+            t.slot._threatHandler = handler;
+            t.slot.addEventListener('click', handler, true); // capture: preempt the normal landmark click
+        });
+    }
+
+    // The target is chosen — its owner may pay 2 TP per Landmark they currently own to keep it.
+    function beginThreatChoice(target) {
+        const { slot, owner } = target;
+        let cardData;
+        try { cardData = JSON.parse(slot.dataset.cardData); } catch (e) { return; }
+
+        const landmarkCount = countLandmarks(owner);
+        const cost = landmarkCount * 2;
+        const canPay = totalTimePoints(owner) >= cost;
+
+        const overlay = document.createElement('div');
+        overlay.className = 'overlay landmark-choice-overlay';
+        const panel = document.createElement('div');
+        panel.className = 'glass-panel landmark-choice-panel';
+        const title = document.createElement('div');
+        title.className = 'fantasy-font glowing-text landmark-choice-title';
+        title.textContent = `Threat — ${cardData.name} (P${owner})`;
+        panel.appendChild(title);
+
+        const desc = document.createElement('div');
+        desc.className = 'tech-font';
+        desc.style.cssText = 'font-size:11px;opacity:0.75;margin:-6px 0 4px;';
+        desc.textContent = `P${owner} may pay ${cost} TP (2 × ${landmarkCount} Landmark${landmarkCount === 1 ? '' : 's'} owned) to keep it.`;
+        panel.appendChild(desc);
+
+        const btnPay = document.createElement('button');
+        btnPay.className = 'menu-btn tech-font';
+        btnPay.textContent = `Pay ${cost} TP`;
+        btnPay.disabled = !canPay;
+        btnPay.style.opacity = canPay ? '1' : '0.5';
+        btnPay.onclick = () => {
+            if (!canPay) return;
+            overlay.remove();
+            resolveDamageDirectly(cost, owner);
+            floatValue(slot, `-${cost} TP`, 'damage');
+        };
+        panel.appendChild(btnPay);
+
+        const btnDecline = document.createElement('button');
+        btnDecline.className = 'menu-btn secondary-btn tech-font';
+        btnDecline.textContent = 'Send to Abyss';
+        btnDecline.onclick = () => {
+            overlay.remove();
+            const abyssEl = document.querySelector('.card--abyss');
+            clearSlot(slot);
+            finishSingleCardPlacement(abyssEl, cardData);
+            floatValue(abyssEl, `${cardData.name} Lost`, 'damage');
+        };
+        panel.appendChild(btnDecline);
+
+        overlay.appendChild(panel);
+        document.body.appendChild(overlay);
+    }
+
+    // Confiscation: Look at target Opponent's Hand and take one Card to your Hand.
+    // 2-player V1: the opponent is automatic. With 3-4 players, reuse the same
+    // target-player-overlay the attack flow and Dark Matter already use to pick which one.
+    function resolveConfiscation(casterPNum) {
+        if (activePlayerCount === 2) {
+            const opponent = casterPNum === 1 ? 2 : 1;
+            showConfiscationPicker(casterPNum, opponent);
+        } else {
+            const overlay = document.getElementById('target-player-overlay');
+            const list = document.getElementById('target-player-list');
+            list.innerHTML = '';
+            for (let i = 1; i <= activePlayerCount; i++) {
+                if (i === casterPNum) continue;
+                const circle = document.createElement('div');
+                circle.className = `target-circle p${i}`;
+                circle.textContent = `P${i}`;
+                circle.onclick = () => {
+                    overlay.classList.add('hidden');
+                    showConfiscationPicker(casterPNum, i);
+                };
+                list.appendChild(circle);
+            }
+            overlay.classList.remove('hidden');
+        }
+    }
+
+    // The opponent is chosen — look at their Hand and take one Card. Auto-resolves with one
+    // card in Hand; otherwise shows every card in that Hand (the "look at" part) to pick from.
+    // A no-op if their Hand is empty.
+    function showConfiscationPicker(casterPNum, targetPNum) {
+        const targetBoard = document.getElementById(`player-${targetPNum}`);
+        if (!targetBoard) return;
+        const handSlots = Array.from(targetBoard.querySelectorAll('.hand-slot:not(.slot-empty)'));
+        if (handSlots.length === 0) return;
+
+        const takeFrom = (slot) => {
+            let data;
+            try { data = JSON.parse(slot.dataset.cardData); } catch (e) { return; }
+            clearSlot(slot);
+            updateHandLayout(targetPNum);
+
+            const casterBoard = document.getElementById(`player-${casterPNum}`);
+            const casterHandSlots = Array.from(casterBoard.querySelectorAll('.hand-slot'));
+            let dest = casterHandSlots.find(s => s.classList.contains('slot-empty'));
+            if (!dest) {
+                dest = createSlot('hand');
+                dest.classList.add('temporary-slot');
+                casterBoard.querySelector('.hand-slots').appendChild(dest);
+            }
+            finishSingleCardPlacement(dest, data);
+            updateHandLayout(casterPNum);
+            floatValue(dest, `+ ${data.name}`, 'gain');
+        };
+
+        if (handSlots.length === 1) { takeFrom(handSlots[0]); return; }
+
+        const overlay = document.createElement('div');
+        overlay.className = 'overlay landmark-choice-overlay';
+        const panel = document.createElement('div');
+        panel.className = 'glass-panel landmark-choice-panel';
+        const title = document.createElement('div');
+        title.className = 'fantasy-font glowing-text landmark-choice-title';
+        title.textContent = `Confiscation — P${targetPNum}'s Hand`;
+        panel.appendChild(title);
+        handSlots.forEach(slot => {
+            let data;
+            try { data = JSON.parse(slot.dataset.cardData); } catch (e) { return; }
+            const btn = document.createElement('button');
+            btn.className = 'menu-btn tech-font';
+            btn.textContent = data.name;
+            btn.onclick = () => { overlay.remove(); takeFrom(slot); };
+            panel.appendChild(btn);
+        });
+        overlay.appendChild(panel);
+        document.body.appendChild(overlay);
+    }
+
+    // --- Planetarium staging ---
+    // Each discard adds one to the staged count and arms the landmark (persistent glow +
+    // "Draw N" badge). Draws happen all at once on commit, so you can't cherry-pick draws.
+    function stagePlanetarium() {
+        planetariumStaged += 1;
+        armPlanetarium();
+    }
+    function armPlanetarium() {
+        const el = findLandmark(currentPlayer, 'Planetarium');
+        if (!el) return;
+        el.classList.add('planetarium-armed');
+        let badge = el.querySelector('.planetarium-badge');
+        if (!badge) {
+            badge = document.createElement('div');
+            badge.className = 'planetarium-badge tech-font';
+            el.appendChild(badge);
+        }
+        badge.textContent = `▶ Draw ${planetariumStaged}`;
+        if (!el._planetariumHandler) {
+            // Only the lower third of the armed card commits the draw; the upper two-thirds
+            // stay a drop zone so you can keep staging more cards onto it. While you're
+            // holding a card, any click here is a placement (stage one more), never a commit.
+            el._planetariumHandler = (e) => {
+                if (heldCards.length > 0) return; // placing a card -> let it bubble to placeCard
+                const rect = el.getBoundingClientRect();
+                const inLowerThird = (e.clientY - rect.top) >= rect.height * (2 / 3);
+                e.stopPropagation();
+                e.preventDefault();
+                if (inLowerThird) commitPlanetarium();
+            };
+            el.addEventListener('click', el._planetariumHandler, true); // capture: preempt normal click
+        }
+    }
+    function disarmPlanetarium() {
+        const el = findLandmark(currentPlayer, 'Planetarium');
+        if (!el) return;
+        el.classList.remove('planetarium-armed');
+        const badge = el.querySelector('.planetarium-badge');
+        if (badge) badge.remove();
+        if (el._planetariumHandler) {
+            el.removeEventListener('click', el._planetariumHandler, true);
+            delete el._planetariumHandler;
+        }
+    }
+    async function commitPlanetarium() {
+        const n = planetariumStaged;
+        if (n <= 0) return;
+        planetariumStaged = 0;
+        planetariumUsedThisTurn = true;
+        disarmPlanetarium();
+        pulseLandmark(currentPlayer, 'Planetarium');
+        await drawCards(currentPlayer, n);
+    }
+
+    // --- Lethargo's Temple: buy a card with Time Points instead of Steam ---
+    // Once per Construction Phase. Click the Temple to arm TP-buy mode; a context window
+    // offers a payment toggle (Steam+TP vs Only TP). Buying spends steam first (unless
+    // Only-TP), covering the rest with Time Points off the Day die.
+
+    function countHandSteams(pNum) {
+        const board = document.getElementById(`player-${pNum}`);
+        const counts = { F: 0, G: 0, L: 0 };
+        if (!board) return counts;
+        board.querySelectorAll('.hand-slot:not(.slot-empty)').forEach(s => {
+            try {
+                const d = JSON.parse(s.dataset.cardData);
+                if (d.number === 'STM1') counts.F++;
+                else if (d.number === 'STM2') counts.G++;
+                else if (d.number === 'STM3') counts.L++;
+            } catch (e) { /* skip */ }
+        });
+        return counts;
+    }
+
+    // Plan a Temple purchase: which steam cards to spend + how many TP. Steam-first unless
+    // Only-TP mode. Returns { tp, steamTypes } where steamTypes are the steam cards to spend.
+    function planLethargoPayment(card) {
+        const need = { F: 0, G: 0, L: 0, A: 0 };
+        for (const ch of (card.cost || '')) if (need[ch] !== undefined) need[ch]++;
+        const TP = { F: 1, G: 2, L: 3, A: 1 };
+
+        if (lethargoOnlyTP) {
+            return { tp: need.F * TP.F + need.G * TP.G + need.L * TP.L + need.A * TP.A, steamTypes: [] };
+        }
+
+        const avail = countHandSteams(currentPlayer);
+        const steamTypes = [];
+        let tp = 0;
+        const useOrTP = (type, tpCost) => {
+            if (avail[type] > 0) { avail[type]--; steamTypes.push(type); }
+            else tp += tpCost;
+        };
+        for (let i = 0; i < need.F; i++) useOrTP('F', TP.F);
+        for (let i = 0; i < need.G; i++) useOrTP('G', TP.G);
+        for (let i = 0; i < need.L; i++) useOrTP('L', TP.L);
+        for (let i = 0; i < need.A; i++) { // AllSteam: any steam, cheapest first
+            if (avail.F > 0) { avail.F--; steamTypes.push('F'); }
+            else if (avail.G > 0) { avail.G--; steamTypes.push('G'); }
+            else if (avail.L > 0) { avail.L--; steamTypes.push('L'); }
+            else tp += TP.A;
+        }
+        return { tp, steamTypes };
+    }
+
+    function toggleLethargo() {
+        if (lethargoUsedThisPhase) return; // once per Construction Phase
+        lethargoActive = !lethargoActive;
+        if (lethargoActive) openLethargoContext();
+        else closeLandmarkContext();
+        pulseLandmark(currentPlayer, "Lethargo's Temple");
+        updateBazaarLighting();
+    }
+
+    function deactivateLethargo() {
+        lethargoActive = false;
+        closeLandmarkContext();
+        hideTpCostHint();
+        updateBazaarLighting();
+    }
+
+    function openLethargoContext() {
+        const win = document.getElementById('landmark-context');
+        const title = document.getElementById('landmark-context-title');
+        const body = document.getElementById('landmark-context-body');
+        if (!win || !title || !body) return;
+        title.textContent = "Lethargo's Temple";
+        body.innerHTML = '';
+        const row = document.createElement('div');
+        row.className = 'landmark-context-row';
+        const label = document.createElement('div');
+        label.className = 'landmark-context-label';
+        label.textContent = 'Payment method';
+        const btn = document.createElement('button');
+        btn.className = 'landmark-toggle-btn';
+        const sync = () => { btn.textContent = lethargoOnlyTP ? 'Only Time Points' : 'Steam + Time Points'; };
+        sync();
+        btn.onclick = () => { lethargoOnlyTP = !lethargoOnlyTP; sync(); hideTpCostHint(); updateLethargoViewed(lethargoViewedCard); updateBazaarLighting(); };
+        row.appendChild(label);
+        row.appendChild(btn);
+        body.appendChild(row);
+
+        // Viewed-card readout: name + payment breakdown for whatever card is hovered.
+        const viewed = document.createElement('div');
+        viewed.id = 'landmark-context-viewed';
+        viewed.className = 'landmark-context-viewed';
+        body.appendChild(viewed);
+        updateLethargoViewed(null);
+
+        win.classList.remove('hidden');
+    }
+
+    // Format a Temple purchase as e.g. "2 Fire + 4 TP" (steam cards spent, then TP).
+    function formatLethargoBreakdown(card) {
+        const plan = planLethargoPayment(card);
+        const counts = { F: 0, G: 0, L: 0 };
+        plan.steamTypes.forEach(t => counts[t]++);
+        const parts = [];
+        if (counts.F) parts.push(`${counts.F} Fire`);
+        if (counts.G) parts.push(`${counts.G} Gold`);
+        if (counts.L) parts.push(`${counts.L} Laser`);
+        if (plan.tp > 0) parts.push(`${plan.tp} TP`);
+        return parts.length ? parts.join(' + ') : 'Free';
+    }
+
+    // Update the context window's viewed-card readout (null clears it to a hint).
+    function updateLethargoViewed(card) {
+        lethargoViewedCard = card;
+        const el = document.getElementById('landmark-context-viewed');
+        if (!el) return;
+        if (!card || !card.name || !card.cost || card.cost === '-') {
+            el.innerHTML = '<span class="lc-viewed-hint">Hover a card to see its cost</span>';
+            return;
+        }
+        el.innerHTML =
+            `<div class="lc-viewed-name">${card.name}</div>` +
+            `<div class="lc-viewed-cost">${formatLethargoBreakdown(card)}</div>`;
+    }
+
+    function closeLandmarkContext() {
+        const win = document.getElementById('landmark-context');
+        if (win) win.classList.add('hidden');
+    }
+
+    // Execute a Temple purchase: spend planned steam cards to History + TP off the dice.
+    function payWithLethargo(card) {
+        const plan = planLethargoPayment(card);
+        const board = document.getElementById(`player-${currentPlayer}`);
+        const historySlot = board && board.querySelector('.history-pile');
+        if (!board || !historySlot) return;
+
+        // Spend the planned steam cards (leftmost matching of each type).
+        const used = new Set();
+        plan.steamTypes.forEach((type, idx) => {
+            const num = type === 'F' ? 'STM1' : type === 'G' ? 'STM2' : 'STM3';
+            const slot = Array.from(board.querySelectorAll('.hand-slot:not(.slot-empty)')).find(s => {
+                if (used.has(s)) return false;
+                try { return JSON.parse(s.dataset.cardData).number === num; } catch (e) { return false; }
+            });
+            if (slot) {
+                used.add(slot);
+                const data = JSON.parse(slot.dataset.cardData);
+                animateCardToHistory(slot, historySlot, data, idx * 100);
+                clearSlot(slot);
+            }
+        });
+
+        // Spend Time Points (Day die first) with a floating readout on the dice.
+        if (plan.tp > 0) {
+            const dieSel = playersState[currentPlayer].day > 0 ? '.day-die-group' : '.night-die-group';
+            resolveDamageDirectly(plan.tp, currentPlayer);
+            floatValue(board.querySelector(dieSel), `-${plan.tp} TP`, 'damage');
+        }
+
+        lethargoUsedThisPhase = true;
+        deactivateLethargo();
+    }
+
+    // Hover readout: show a card's Temple TP cost while the Temple is armed.
+    function showTpCostHint(cardContainer, card) {
+        hideTpCostHint();
+        if (!lethargoActive || !card || !card.cost || card.cost === '-') return;
+        const plan = planLethargoPayment(card);
+        if (plan.tp <= 0) return;
+        const rect = cardContainer.getBoundingClientRect();
+        const hint = document.createElement('div');
+        hint.className = 'tp-cost-hint';
+        hint.id = 'tp-cost-hint';
+        hint.textContent = `${plan.tp} TP`;
+        hint.style.left = `${rect.left + rect.width / 2}px`;
+        hint.style.top = `${rect.top - 6}px`;
+        document.body.appendChild(hint);
+    }
+    function hideTpCostHint() {
+        const h = document.getElementById('tp-cost-hint');
+        if (h) h.remove();
+    }
+
+    // Fully heal a damaged creature (reset damageTaken), with feedback.
+    function healCreature(slot) {
+        try {
+            const card = JSON.parse(slot.dataset.cardData);
+            card.damageTaken = 0;
+            slot.dataset.cardData = JSON.stringify(card);
+            updateCreatureVisuals(slot);
+            pulseLandmark(currentPlayer, "Dragura's Wasteland");
+            floatValue(slot, 'Healed', 'gain');
+        } catch (e) { /* skip */ }
+    }
+
+    // When more than one creature is damaged, let the player click which to heal.
+    function promptHealTarget(slots) {
+        const cleanup = () => slots.forEach(s => {
+            s.classList.remove('heal-target');
+            if (s._healHandler) s.removeEventListener('click', s._healHandler, true);
+            delete s._healHandler;
+        });
+        slots.forEach(s => {
+            s.classList.add('heal-target');
+            const handler = (e) => {
+                e.stopPropagation();
+                e.preventDefault();
+                cleanup();
+                healCreature(s);
+            };
+            s._healHandler = handler;
+            s.addEventListener('click', handler, true); // capture: preempt the normal creature click
+        });
     }
 
     function adjustPlayerDie(pNum, type, delta) {
@@ -2077,8 +3115,7 @@ document.addEventListener('DOMContentLoaded', () => {
     document.addEventListener('click', (e) => {
         const isInteractive = e.target.closest('.card') || 
                             e.target.closest('.location-card-item') || 
-                            e.target.closest('.menu-btn') || 
-                            e.target.closest('.die-btn') || 
+                            e.target.closest('.menu-btn') ||
                             e.target.closest('.dice-d12') ||
                             e.target.closest('.modal-content') ||
                             e.target.closest('.card-link') ||
@@ -2263,6 +3300,30 @@ document.addEventListener('DOMContentLoaded', () => {
         }, delay);
     }
 
+    // Meridia has 0 base Health/Strength/Resistance; she gains +1 for each Artifact
+    // currently in her owner's History Pile. Shared by her zone badge, attack, and block math.
+    function meridiaArtifactBonus(historySlot) {
+        if (!historySlot || !historySlot.dataset.cardData) return 0;
+        try {
+            const hData = JSON.parse(historySlot.dataset.cardData);
+            return Array.isArray(hData) ? hData.filter(c => c.type === 'Artifact').length : (hData.type === 'Artifact' ? 1 : 0);
+        } catch(e) { return 0; }
+    }
+
+    // Meridia is dead on arrival with no Artifacts in History (0 base HP). Sacrifice her
+    // straight to History the moment she's placed in the Creature Zone with 0 effective HP.
+    function checkMeridiaZeroHp(slot, card) {
+        if (card.name !== 'Meridia') return;
+        const history = slot.closest('.player-zone').querySelector('.history-pile');
+        if (meridiaArtifactBonus(history) > 0) return;
+        floatValue(slot, 'Sacrificed (0 HP)', 'damage');
+        setTimeout(() => {
+            if (slot.classList.contains('slot-empty')) return;
+            clearSlot(slot);
+            finishSingleCardPlacement(history, card);
+        }, 500);
+    }
+
     function updateCreatureVisuals(slot) {
         if (!slot || slot.classList.contains('slot-empty') || !slot.dataset.cardData) return;
         try {
@@ -2270,30 +3331,26 @@ document.addEventListener('DOMContentLoaded', () => {
             if (card.type !== 'Creature') return;
 
             slot.querySelectorAll('.creature-stat-badge, .health-badge, .str-marker').forEach(b => b.remove());
-            
+
             // Calculate special buffs (e.g., Meridia)
             let bonus = 0;
             if (card.name === 'Meridia') {
-                const history = slot.closest('.player-zone').querySelector('.history-pile');
-                if (history && history.dataset.cardData) {
-                    try {
-                        const hData = JSON.parse(history.dataset.cardData);
-                        const artifacts = Array.isArray(hData) ? hData.filter(c => c.type === 'Artifact').length : (hData.type === 'Artifact' ? 1 : 0);
-                        bonus = artifacts;
-                    } catch(e) {}
-                }
+                bonus = meridiaArtifactBonus(slot.closest('.player-zone').querySelector('.history-pile'));
             }
-            
-            const base = parseInt(card.baseHealth) || 0;
+            // Meridius's +Strength is attack-only and target-dependent, so it is NOT shown on the
+            // zone badge (that would misread as block strength / be ambiguous with 3+ players).
+            // His buff is surfaced only in the Creature Attack screen — see decorateCombatScreen.
+
+            const base = parseInt(card.baseStrength ?? card.baseHealth) || 0;
             const curStr = base + bonus - (card.damageTaken || 0);
-            
+
             // Only show the badge if the strength/health has changed from the printed/base value
             if (curStr === base && bonus === 0 && (card.damageTaken || 0) === 0) return;
 
             const badge = document.createElement('div');
             badge.className = 'creature-stat-badge tech-font';
             badge.textContent = curStr;
-            
+
             if ((card.damageTaken || 0) > 0) badge.classList.add('damage');
             if (bonus > 0) badge.classList.add('buffed');
 
@@ -2301,77 +3358,145 @@ document.addEventListener('DOMContentLoaded', () => {
         } catch(e) {}
     }
 
-    function showAetherlabTradeUI() {
+    // --- Aetherlab: trade a Steam up one tier (Fire→Gold, Gold→Laser) using the Bazaar ---
+    // Two ways to use it, both once per Construction Phase:
+    //   Method A — click the landmark to arm it; upgradeable hand Steams glow; click one to trade up.
+    //   Method B — grab a Steam from hand and drop it on its own drawer (or the next-tier drawer)
+    //              in the Bazaar; it trades up automatically (no arming needed).
+    // Either way the traded-in Steam returns to its own Bazaar drawer and you draw the next tier.
+    // LaserSteam is already the top tier and can't be upgraded.
+    const AETHERLAB_UPGRADE = {
+        STM1: { fromLoc: 'ST1', toLoc: 'ST2', validDrawers: ['ST1', 'ST2'], nextName: 'GoldSteam' },  // Fire → Gold
+        STM2: { fromLoc: 'ST2', toLoc: 'ST3', validDrawers: ['ST2', 'ST3'], nextName: 'LaserSteam' }, // Gold → Laser
+    };
+
+    function aetherlabReady() {
+        return !devMode && currentPhase === 1 && !aetherlabUsedThisPhase
+            && !!findLandmark(currentPlayer, 'Aetherlab');
+    }
+
+    function bazaarHasSteam(loc) {
+        return (activeBazaar[loc] || []).filter(c => selectedSets.includes(c.set)).length > 0;
+    }
+
+    // Take the next-tier Steam out of the Bazaar and return the traded-in Steam to its drawer.
+    // Returns the upgraded card, or null if it can't be done (top tier / no Bazaar stock).
+    function aetherlabUpgradeCard(steamCard) {
+        const spec = AETHERLAB_UPGRADE[steamCard.number];
+        if (!spec || !bazaarHasSteam(spec.toLoc)) return null;
+        const toPile = activeBazaar[spec.toLoc] || [];
+        const upgraded = toPile.pop();
+        activeBazaar[spec.toLoc] = toPile;
+        if (!upgraded) return null;
+        activeBazaar[spec.fromLoc] = activeBazaar[spec.fromLoc] || [];
+        activeBazaar[spec.fromLoc].push({ ...steamCard });
+        return { ...upgraded };
+    }
+
+    function eligibleHandSteams() {
         const board = document.getElementById(`player-${currentPlayer}`);
-        const handSlots = Array.from(board.querySelectorAll('.hand-slot:not(.slot-empty)'));
-
-        const fireSlots = handSlots.filter(s => {
-            try { return JSON.parse(s.dataset.cardData).number === 'STM1'; } catch(e) { return false; }
+        if (!board) return [];
+        return Array.from(board.querySelectorAll('.hand-slot:not(.slot-empty)')).filter(s => {
+            try {
+                const d = JSON.parse(s.dataset.cardData);
+                const spec = AETHERLAB_UPGRADE[d.number];
+                return spec && bazaarHasSteam(spec.toLoc);
+            } catch (e) { return false; }
         });
-        const goldSlots = handSlots.filter(s => {
-            try { return JSON.parse(s.dataset.cardData).number === 'STM2'; } catch(e) { return false; }
-        });
+    }
 
-        const options = [];
-        const goldInBazaar = (activeBazaar['ST2'] || []).filter(c => selectedSets.includes(c.set));
-        const laserInBazaar = (activeBazaar['ST3'] || []).filter(c => selectedSets.includes(c.set));
+    function highlightAetherlabSteams() {
+        clearAetherlabHighlights();
+        eligibleHandSteams().forEach(s => s.classList.add('aetherlab-upgradable'));
+    }
 
-        if (fireSlots.length > 0 && goldInBazaar.length > 0) {
-            options.push({ label: 'Trade FireSteam → GoldSteam', fromSlot: fireSlots[0], fromLoc: 'ST1', toLoc: 'ST2' });
-        }
-        if (goldSlots.length > 0 && laserInBazaar.length > 0) {
-            options.push({ label: 'Trade GoldSteam → LaserSteam', fromSlot: goldSlots[0], fromLoc: 'ST2', toLoc: 'ST3' });
-        }
+    function clearAetherlabHighlights() {
+        document.querySelectorAll('.aetherlab-upgradable').forEach(s => s.classList.remove('aetherlab-upgradable'));
+    }
 
-        if (options.length === 0) {
-            alert('No valid Aetherlab trade available. You need a FireSteam (for Gold) or GoldSteam (for Laser) in hand, and the target Steam must be in the Bazaar.');
+    function toggleAetherlab() {
+        if (aetherlabUsedThisPhase) {
+            alert('Aetherlab can only trade once per Construction Phase.');
             return;
         }
+        aetherlabActive = !aetherlabActive;
+        pulseLandmark(currentPlayer, 'Aetherlab');
+        if (aetherlabActive) {
+            const eligible = eligibleHandSteams();
+            if (eligible.length === 0) {
+                aetherlabActive = false;
+                alert('No Steam to upgrade. You need a FireSteam or GoldSteam in hand and the next tier available in the Bazaar.');
+                return;
+            }
+            highlightAetherlabSteams();
+        } else {
+            clearAetherlabHighlights();
+        }
+    }
 
-        const overlay = document.createElement('div');
-        overlay.className = 'overlay';
-        overlay.style.zIndex = '7000';
-        overlay.innerHTML = `
-            <div class="modal-content glass-panel action-menu">
-                <h3 class="tech-font">AETHERLAB TRADE</h3>
-                <p class="tech-font" style="font-size:11px;opacity:0.7;margin-bottom:10px;">Once per Construction Phase — pay a Steam, receive the next tier.</p>
-                <div class="action-buttons" id="aetherlab-options"></div>
-                <button class="menu-btn secondary-btn" id="aetherlab-cancel" style="margin-top:8px;">CANCEL</button>
-            </div>`;
-        document.body.appendChild(overlay);
+    function deactivateAetherlab() {
+        aetherlabActive = false;
+        clearAetherlabHighlights();
+    }
 
-        const optContainer = overlay.querySelector('#aetherlab-options');
-        options.forEach(opt => {
-            const btn = document.createElement('button');
-            btn.className = 'menu-btn combat-btn';
-            btn.textContent = opt.label;
-            btn.onclick = () => {
-                // Return traded-in Steam to its Bazaar pile
-                const tradeInCard = JSON.parse(opt.fromSlot.dataset.cardData);
-                activeBazaar[opt.fromLoc] = activeBazaar[opt.fromLoc] || [];
-                activeBazaar[opt.fromLoc].push({ ...tradeInCard });
+    // Book-keeping shared by both trade paths.
+    function finishAetherlabTrade() {
+        aetherlabUsedThisPhase = true;
+        aetherlabActive = false;
+        clearAetherlabHighlights();
+        pulseLandmark(currentPlayer, 'Aetherlab');
+        renderBazaar();
+        updateBazaarLighting();
+    }
 
-                // Take upgraded Steam from Bazaar
-                const toPile = activeBazaar[opt.toLoc] || [];
-                const upgradedCard = toPile.pop();
-                activeBazaar[opt.toLoc] = toPile;
+    // Method A: upgrade the Steam sitting in a given hand slot, in place.
+    function tryAetherlabUpgradeHandSlot(slot) {
+        let card;
+        try { card = JSON.parse(slot.dataset.cardData); } catch (e) { return false; }
+        const spec = AETHERLAB_UPGRADE[card.number];
+        if (!spec) return false;
+        const upgraded = aetherlabUpgradeCard(card);
+        if (!upgraded) {
+            alert(`No ${spec.nextName} left in the Bazaar to trade for.`);
+            return false;
+        }
+        clearSlot(slot);
+        finishSingleCardPlacement(slot, upgraded);
+        floatValue(slot, `▲ ${upgraded.name}`, 'gain');
+        finishAetherlabTrade();
+        return true;
+    }
 
-                if (!upgradedCard) { overlay.remove(); return; }
+    // Method B: a held Steam was dropped on a Bazaar steam drawer. Upgrade if the drawer is the
+    // Steam's own tier or the next tier up, and the next tier is in stock.
+    function tryAetherlabDrop(drawerEl) {
+        if (!aetherlabReady()) return false;
+        const held = heldCards[0];
+        if (!held || held.type !== 'Steam') return false;
+        const spec = AETHERLAB_UPGRADE[held.number];
+        if (!spec || !spec.validDrawers.includes(drawerEl.dataset.loc)) return false;
+        const upgraded = aetherlabUpgradeCard(held);
+        if (!upgraded) return false;
 
-                // Replace Steam in hand
-                clearSlot(opt.fromSlot);
-                const emptySlot = Array.from(board.querySelectorAll('.hand-slot.slot-empty'))[0] || opt.fromSlot;
-                finishSingleCardPlacement(emptySlot, upgradedCard);
+        // Consume the held Steam (its source hand slot was already cleared on grab) and
+        // drop the upgraded tier into the first free hand slot.
+        heldCards.shift();
+        heldCardSources.shift();
+        const board = document.getElementById(`player-${currentPlayer}`);
+        const emptySlot = Array.from(board.querySelectorAll('.hand-slot.slot-empty'))[0];
+        if (emptySlot) {
+            finishSingleCardPlacement(emptySlot, upgraded);
+            floatValue(emptySlot, `▲ ${upgraded.name}`, 'gain');
+        }
 
-                aetherlabUsedThisPhase = true;
-                renderBazaar();
-                updateBazaarLighting();
-                overlay.remove();
-            };
-            optContainer.appendChild(btn);
-        });
-
-        overlay.querySelector('#aetherlab-cancel').onclick = () => overlay.remove();
+        // Clear the held-card UI state.
+        if (heldGhost) heldGhost.remove();
+        heldGhost = null;
+        document.onmousemove = null;
+        document.querySelectorAll('.hand-auto-drop').forEach(btn => btn.classList.add('hidden'));
+        clearHighlights();
+        finishAetherlabTrade();
+        return true;
     }
 
     function showAttackMenu(attackerCard, attackerSlot) {
@@ -2396,12 +3521,12 @@ document.addEventListener('DOMContentLoaded', () => {
     function triggerAttack(attackerCard, attackerSlot) {
         if (activePlayerCount === 2) {
             const defender = currentPlayer === 1 ? 2 : 1;
-            initiateDefense(attackerCard, attackerSlot, defender);
+            beginAttack(attackerCard, attackerSlot, defender);
         } else {
             const overlay = document.getElementById('target-player-overlay');
             const list = document.getElementById('target-player-list');
             list.innerHTML = '';
-            
+
             for (let i = 1; i <= activePlayerCount; i++) {
                 if (i === currentPlayer) continue;
                 const circle = document.createElement('div');
@@ -2409,12 +3534,362 @@ document.addEventListener('DOMContentLoaded', () => {
                 circle.textContent = `P${i}`;
                 circle.onclick = () => {
                     overlay.classList.add('hidden');
-                    initiateDefense(attackerCard, attackerSlot, i);
+                    beginAttack(attackerCard, attackerSlot, i);
                 };
                 list.appendChild(circle);
             }
             overlay.classList.remove('hidden');
         }
+    }
+
+    // Dark Matter (A2): Construction Phase — discard it to your History, draw a card, then a
+    // chosen player must pick one of three costs. In 2-player V1 the opponent is automatic;
+    // with more players, reuse the same target-player-overlay the attack flow uses.
+    async function triggerDarkMatter(cardData, slot) {
+        const board = slot.closest('.player-zone');
+        const historySlot = board.querySelector('.history-pile');
+        clearSlot(slot);
+        finishSingleCardPlacement(historySlot, cardData);
+
+        await drawCards(currentPlayer, 1);
+
+        if (activePlayerCount === 2) {
+            const target = currentPlayer === 1 ? 2 : 1;
+            showDarkMatterChoice(target);
+        } else {
+            const overlay = document.getElementById('target-player-overlay');
+            const list = document.getElementById('target-player-list');
+            list.innerHTML = '';
+            for (let i = 1; i <= activePlayerCount; i++) {
+                if (i === currentPlayer) continue;
+                const circle = document.createElement('div');
+                circle.className = `target-circle p${i}`;
+                circle.textContent = `P${i}`;
+                circle.onclick = () => {
+                    overlay.classList.add('hidden');
+                    showDarkMatterChoice(i);
+                };
+                list.appendChild(circle);
+            }
+            overlay.classList.remove('hidden');
+        }
+    }
+
+    // Present the three Dark Matter costs to the targeted player. Each option auto-resolves
+    // when there is only one legal instance (one Creature, one hand card); otherwise the
+    // player picks which one, mirroring the blocker-picker used in the Creature Attack screen.
+    function showDarkMatterChoice(defenderNum) {
+        const defenderBoard = document.getElementById(`player-${defenderNum}`);
+        const overlay = document.getElementById('darkmatter-overlay');
+        const preview = document.getElementById('darkmatter-preview');
+        const target = document.getElementById('darkmatter-target');
+        const feedbackEl = document.getElementById('darkmatter-feedback');
+        const btnSac = document.getElementById('btn-dm-sacrifice');
+        const btnDisc = document.getElementById('btn-dm-discard');
+        const btnTp = document.getElementById('btn-dm-losetp');
+
+        preview.style.backgroundImage = "url('assets/cards/dark_matter.png')";
+        preview.textContent = '';
+        target.style.backgroundImage = '';
+        target.classList.remove('faded', 'active-blocker');
+        target.textContent = `P${defenderNum}`;
+
+        const existingPicker = document.getElementById('dm-picker');
+        if (existingPicker) existingPicker.remove();
+        feedbackEl.textContent = "Choose ONE:";
+
+        const creatures = Array.from(defenderBoard.querySelectorAll('.creature-zone-main .card:not(.slot-empty)'));
+        const handCards = Array.from(defenderBoard.querySelectorAll('.hand-slot:not(.slot-empty)'));
+
+        [btnSac, btnDisc, btnTp].forEach(b => { b.classList.remove('in-use'); b.style.opacity = '1'; });
+        btnSac.disabled = creatures.length === 0;
+        btnSac.style.opacity = btnSac.disabled ? '0.5' : '1';
+        btnDisc.disabled = handCards.length === 0;
+        btnDisc.style.opacity = btnDisc.disabled ? '0.5' : '1';
+        btnTp.disabled = false;
+
+        let resolved = false;
+        const finish = (msg) => {
+            if (resolved) return;
+            resolved = true;
+            btnSac.disabled = btnDisc.disabled = btnTp.disabled = true;
+            feedbackEl.textContent = msg;
+            setTimeout(() => overlay.classList.add('hidden'), 900);
+        };
+
+        function showPicker(items, labelFn, onPick) {
+            const picker = document.createElement('div');
+            picker.id = 'dm-picker';
+            picker.style.cssText = 'margin-top:10px;text-align:center;';
+            picker.innerHTML = '<p class="tech-font" style="font-size:10px;opacity:0.7;margin-bottom:6px;">SELECT ONE:</p>';
+            const row = document.createElement('div');
+            row.style.cssText = 'display:flex;gap:6px;flex-wrap:wrap;justify-content:center;';
+            items.forEach((item) => {
+                const btn = document.createElement('button');
+                btn.className = 'menu-btn secondary-btn';
+                btn.style.cssText = 'padding:4px 8px;font-size:10px;min-width:80px;';
+                btn.textContent = labelFn(item);
+                btn.onclick = (ev) => { ev.stopPropagation(); onPick(item); };
+                row.appendChild(btn);
+            });
+            picker.appendChild(row);
+            document.querySelector('#darkmatter-overlay .combat-modal').appendChild(picker);
+        }
+
+        function sacrificeCreature(cSlot) {
+            const cData = JSON.parse(cSlot.dataset.cardData);
+            const hist = defenderBoard.querySelector('.history-pile');
+            floatValue(cSlot, 'Sacrificed', 'damage');
+            clearSlot(cSlot);
+            finishSingleCardPlacement(hist, cData);
+            finish(`${cData.name} Sacrificed.`);
+        }
+
+        function discardHandCard(hSlot) {
+            const hData = JSON.parse(hSlot.dataset.cardData);
+            const hist = defenderBoard.querySelector('.history-pile');
+            floatValue(hSlot, 'Discarded', 'damage');
+            clearSlot(hSlot);
+            finishSingleCardPlacement(hist, hData);
+            finish(`${hData.name} Discarded.`);
+        }
+
+        btnSac.onclick = () => {
+            if (resolved || creatures.length === 0) return;
+            const pickerEl = document.getElementById('dm-picker');
+            if (pickerEl) pickerEl.remove();
+            if (creatures.length === 1) {
+                sacrificeCreature(creatures[0]);
+            } else {
+                showPicker(creatures, (s) => JSON.parse(s.dataset.cardData).name, sacrificeCreature);
+            }
+        };
+
+        btnDisc.onclick = () => {
+            if (resolved || handCards.length === 0) return;
+            const pickerEl = document.getElementById('dm-picker');
+            if (pickerEl) pickerEl.remove();
+            if (handCards.length === 1) {
+                discardHandCard(handCards[0]);
+            } else {
+                showPicker(handCards, (s) => JSON.parse(s.dataset.cardData).name, discardHandCard);
+            }
+        };
+
+        btnTp.onclick = () => {
+            if (resolved) return;
+            resolveDamageDirectly(2, defenderNum);
+            const dieSel = playersState[defenderNum].day > 0 ? '.day-die-group' : '.night-die-group';
+            floatValue(defenderBoard.querySelector(dieSel), '-2 TP', 'damage');
+            finish('Lost 2 Time Points.');
+        };
+
+        overlay.classList.remove('hidden');
+    }
+
+    // The defender is now chosen. Most creatures go straight to the defense step; Entrophy first
+    // rolls its die (the casino wheel), and Meridius scales off the defender's Landmarks.
+    function beginAttack(attacker, attackerSlot, defenderNum) {
+        if (attacker.name.includes('Entrophy')) {
+            rollEntrophy(attacker, attackerSlot, defenderNum);
+        } else if (attacker.name.includes('Meridius')) {
+            initiateDefense(meridiusAttacker(attacker, defenderNum), attackerSlot, defenderNum);
+        } else {
+            initiateDefense(attacker, attackerSlot, defenderNum);
+        }
+    }
+
+    // How many Landmarks a player has in play.
+    function countLandmarks(pNum) {
+        const board = document.getElementById(`player-${pNum}`);
+        return board ? board.querySelectorAll('.landmark-zone-main .card:not(.slot-empty)').length : 0;
+    }
+
+    // Meridius: +1 Strength per Landmark the defender owns; unblockable at 3+ (his base is 2).
+    function meridiusAttacker(base, defenderNum) {
+        const bonus = countLandmarks(defenderNum);
+        const a = { ...base };
+        a.baseStrength = (parseInt(a.baseStrength ?? a.baseHealth) || 0) + bonus;
+        if (bonus >= 3) a.unblockable = true;
+        return a;
+    }
+
+    // --- Entrophy: roll a die on attack; the outcome sits on top of its base Strength 2 ---
+    // Instead of a physical die we spin a 6-tile wheel (fast → slowing → stops), casino-style,
+    // laying out the same six faces as the card. Grid order below is row-major so the two columns
+    // match the card: [none|unblock] / [str3|tp4] / [hand|self].
+    const ENTROPHY_OUTCOMES = [
+        { id: 'none',    pips: 1, label: 'No Additional Effect', sub: 'Attacks with 2' },
+        { id: 'unblock', pips: 4, label: 'Unblockable',          sub: 'Attacks with 2' },
+        { id: 'str3',    pips: 2, label: '+3 Strength',          sub: 'Attacks with 5' },
+        { id: 'tp4',     pips: 5, label: '+4 Time Points',       sub: 'You gain 4 TP' },
+        { id: 'hand',    pips: 3, label: "To Opponent's Hand",   sub: 'No attack' },
+        { id: 'self',    pips: 6, label: 'Attacks You',          sub: '2 damage to you' },
+    ];
+
+    // Standard die pip positions on a 3×3 grid (cell indices 0–8).
+    const DIE_PIPS = {
+        1: [4], 2: [0, 8], 3: [0, 4, 8], 4: [0, 2, 6, 8], 5: [0, 2, 4, 6, 8], 6: [0, 2, 3, 5, 6, 8],
+    };
+    function buildPips(n) {
+        const face = document.createElement('div');
+        face.className = 'entrophy-die-face';
+        const on = new Set(DIE_PIPS[n] || []);
+        for (let i = 0; i < 9; i++) {
+            const cell = document.createElement('span');
+            if (on.has(i)) cell.className = 'pip';
+            face.appendChild(cell);
+        }
+        return face;
+    }
+
+    function rollEntrophy(attacker, attackerSlot, defenderNum) {
+        const finalIdx = Math.floor(Math.random() * ENTROPHY_OUTCOMES.length);
+
+        const overlay = document.createElement('div');
+        overlay.className = 'overlay entrophy-overlay';
+        const panel = document.createElement('div');
+        panel.className = 'glass-panel entrophy-panel';
+        panel.innerHTML = `<h2 class="fantasy-font glowing-text entrophy-title">ENTROPHY</h2>
+            <p class="tech-font entrophy-subtitle">Rolling the die&hellip;</p>`;
+        const grid = document.createElement('div');
+        grid.className = 'entrophy-grid';
+        const tiles = ENTROPHY_OUTCOMES.map(o => {
+            const tile = document.createElement('div');
+            tile.className = 'entrophy-tile';
+            tile.appendChild(buildPips(o.pips));
+            const txt = document.createElement('div');
+            txt.className = 'entrophy-tile-text';
+            txt.innerHTML = `<div class="entrophy-tile-label tech-font">${o.label}</div>
+                <div class="entrophy-tile-sub tech-font">${o.sub}</div>`;
+            tile.appendChild(txt);
+            grid.appendChild(tile);
+            return tile;
+        });
+        panel.appendChild(grid);
+        const footer = document.createElement('div');
+        footer.className = 'entrophy-footer';
+        panel.appendChild(footer);
+        overlay.appendChild(panel);
+        document.body.appendChild(overlay);
+
+        const setActive = (i) => tiles.forEach((t, k) => t.classList.toggle('active', k === i));
+
+        // Spin: cycle the highlight through every tile, fast at first then decelerating, and land
+        // on finalIdx after enough steps. Deceleration is an ease-out on the step delay.
+        const minSteps = 22;
+        let step = 0;
+        let idx = 0;
+        function tick() {
+            setActive(idx);
+            if (step >= minSteps && idx === finalIdx) { land(); return; }
+            idx = (idx + 1) % ENTROPHY_OUTCOMES.length;
+            step++;
+            const progress = Math.min(1, step / (minSteps + ENTROPHY_OUTCOMES.length));
+            const delay = 45 + Math.pow(progress, 3) * 330; // ~45ms → ~375ms
+            setTimeout(tick, delay);
+        }
+
+        function land() {
+            const outcome = ENTROPHY_OUTCOMES[finalIdx];
+            tiles[finalIdx].classList.add('landed');
+            panel.querySelector('.entrophy-subtitle').innerHTML =
+                `<span class="entrophy-result">${outcome.label}</span> &mdash; ${outcome.sub}`;
+            const btn = document.createElement('button');
+            btn.className = 'menu-btn combat-btn';
+            btn.textContent = outcome.id === 'hand' || outcome.id === 'self' ? 'RESOLVE' : 'ATTACK';
+            btn.onclick = () => {
+                overlay.remove();
+                applyEntrophyOutcome(outcome.id, attacker, attackerSlot, defenderNum);
+            };
+            footer.appendChild(btn);
+        }
+
+        tick();
+    }
+
+    // Build the effective attacker for this roll (Strength/Unblockable ride on top of the base 2).
+    function entrophyAttacker(base, outcomeId) {
+        const a = { ...base };
+        if (outcomeId === 'str3') a.baseStrength = (parseInt(a.baseStrength ?? a.baseHealth) || 0) + 3;
+        if (outcomeId === 'unblock') a.unblockable = true;
+        return a;
+    }
+
+    // Add Time Points to a player (Day die first, up to 12 each; a lost die stays lost).
+    function gainTimePoints(pNum, amount) {
+        const st = playersState[pNum];
+        if (!st) return;
+        let rem = amount;
+        if (st.day > 0) { const add = Math.min(12 - st.day, rem); adjustPlayerDie(pNum, 'day', add); rem -= add; }
+        if (rem > 0 && st.night > 0) adjustPlayerDie(pNum, 'night', rem);
+    }
+
+    function applyEntrophyOutcome(outcomeId, base, slot, defenderNum) {
+        switch (outcomeId) {
+            case 'none':
+            case 'str3':
+            case 'unblock':
+                initiateDefense(entrophyAttacker(base, outcomeId), slot, defenderNum);
+                break;
+            case 'tp4': {
+                gainTimePoints(currentPlayer, 4);
+                const board = document.getElementById(`player-${currentPlayer}`);
+                const dieSel = playersState[currentPlayer].day > 0 ? '.day-die-group' : '.night-die-group';
+                if (board) floatValue(board.querySelector(dieSel), '+4 TP', 'gain');
+                initiateDefense(entrophyAttacker(base, 'none'), slot, defenderNum); // attack still lands with 2
+                break;
+            }
+            case 'hand': {
+                // No attack — Entrophy is handed to the defending player instead.
+                const oppBoard = document.getElementById(`player-${defenderNum}`);
+                const empty = oppBoard && oppBoard.querySelector('.hand-slot.slot-empty');
+                clearSlot(slot);
+                if (empty) finishSingleCardPlacement(empty, { ...base, summonedOnTurn: totalTurns });
+                updateHandLayout(defenderNum);
+                break;
+            }
+            case 'self': {
+                // Attacks its own controller for 2, then to History.
+                resolveDamageDirectly(2, currentPlayer);
+                const board = document.getElementById(`player-${currentPlayer}`);
+                const dieSel = playersState[currentPlayer].day > 0 ? '.day-die-group' : '.night-die-group';
+                if (board) floatValue(board.querySelector(dieSel), '-2 TP', 'damage');
+                const hist = slot.closest('.player-zone').querySelector('.history-pile');
+                clearSlot(slot);
+                finishSingleCardPlacement(hist, base);
+                break;
+            }
+        }
+    }
+
+    // A player's total Time Points (both dice combined).
+    function totalTimePoints(pNum) {
+        const st = playersState[pNum];
+        return st ? (st.day + st.night) : 0;
+    }
+
+    // Dress the Creature Attack screen: show the attacker's effective attack Strength on its card
+    // (this is where Meridius's Landmark buff appears — attack-only), plus both players' Time
+    // Points so you can judge whether to block or spend an Artifact.
+    function decorateCombatScreen(attacker, attackerSlot, defenderNum) {
+        const attackerPreview = document.getElementById('attacker-preview');
+        attackerPreview.querySelector('.combat-str-badge')?.remove();
+        const badge = document.createElement('div');
+        badge.className = 'combat-str-badge tech-font';
+        badge.textContent = calculateCurrentStrength(attacker, attackerSlot);
+        attackerPreview.appendChild(badge);
+
+        let tpRow = document.getElementById('combat-tp-row');
+        if (!tpRow) {
+            tpRow = document.createElement('div');
+            tpRow.id = 'combat-tp-row';
+            tpRow.className = 'tech-font';
+            document.getElementById('combat-info').insertAdjacentElement('afterend', tpRow);
+        }
+        tpRow.innerHTML =
+            `<span class="ctp ctp-attacker">P${currentPlayer} (Attacker) &middot; ${totalTimePoints(currentPlayer)} TP</span>` +
+            `<span class="ctp ctp-defender">P${defenderNum} (Defender) &middot; ${totalTimePoints(defenderNum)} TP</span>`;
     }
 
     function initiateDefense(attacker, attackerSlot, defenderNum) {
@@ -2432,6 +3907,8 @@ document.addEventListener('DOMContentLoaded', () => {
         defenderTarget.classList.remove('battle-tap-defender');
         feedbackEl.classList.remove('combat-feedback-vital');
 
+        decorateCombatScreen(attacker, attackerSlot, defenderNum);
+
         const availableCreatures = Array.from(defenderBoard.querySelectorAll('.creature-zone-main .card:not(.slot-empty)'));
         const artifactsInHand = Array.from(defenderBoard.querySelectorAll('.hand-slot:not(.slot-empty)')).filter(s => {
             const dataStr = s.dataset.cardData;
@@ -2446,8 +3923,8 @@ document.addEventListener('DOMContentLoaded', () => {
         let isCombatResolved = false;
         let selectedBlockerSlot = availableCreatures.length > 0 ? availableCreatures[0] : null;
 
-        const isRampadon = attacker.name.includes("Rampadon");
-        if (isRampadon) {
+        const isUnblockable = attacker.name.includes("Rampadon") || attacker.unblockable;
+        if (isUnblockable) {
              btnBlock.disabled = true;
              btnBlock.style.opacity = "0.5";
              feedbackEl.textContent = "Unblockable Attacker Detected!";
@@ -2468,14 +3945,14 @@ document.addEventListener('DOMContentLoaded', () => {
         btnBlock.classList.remove('in-use');
         btnArtifact.classList.remove('in-use');
         btnContinue.textContent = "CONTINUE";
-        if (!isRampadon) feedbackEl.textContent = "Direct Damage Selected";
+        if (!isUnblockable) feedbackEl.textContent = "Direct Damage Selected";
         
         // Ensure options are visible
         btnBlock.classList.remove('hidden');
         btnArtifact.classList.remove('hidden');
 
         btnBlock.onclick = () => {
-            if (isCombatResolved || isRampadon) return;
+            if (isCombatResolved || isUnblockable) return;
             isBlocking = !isBlocking;
 
             // Remove any existing creature picker
@@ -2541,6 +4018,7 @@ document.addEventListener('DOMContentLoaded', () => {
         btnContinue.onclick = () => {
             if (isCombatResolved) {
                 defenseOverlay.classList.add('hidden');
+                maybeCloneSecondStrike();
                 return;
             }
 
@@ -2583,30 +4061,38 @@ document.addEventListener('DOMContentLoaded', () => {
     function resolveDamageDirect(attacker, attackerSlot, defenderNum) {
         const feedbackEl = document.getElementById('combat-feedback');
         feedbackEl.classList.add('combat-feedback-vital');
-        
+
         const str = calculateCurrentStrength(attacker, attackerSlot);
         feedbackEl.textContent = `Direct Strike for ${str} Damage!`;
-        
+
         resolveDamageDirectly(str, defenderNum);
-        
+        applyTimeThiefGain(attacker, attackerSlot, str);
+
         const attackerHistory = attackerSlot.closest('.player-zone').querySelector('.history-pile');
-        clearSlot(attackerSlot);
-        finishSingleCardPlacement(attackerHistory, attacker);
+        finishAttacker(attackerSlot, attacker, attackerHistory);
         // initAllActiveBoards() removed - it was resetting the game.
+    }
+
+    // Time Thief gains Time Points equal to the TOTAL damage he deals in an attack,
+    // no matter how it's split between a blocking Creature and spillover to the player,
+    // and after any Strength debuffs (e.g. Smoke) have already reduced the total.
+    // Routed through the shared gainTimePoints(), so a Day die already removed (hit 0)
+    // stays removed forever — the gain only ever tops up the Night die in that case.
+    function applyTimeThiefGain(attacker, attackerSlot, damageDealt) {
+        if (attacker.name !== 'Time Thief' || damageDealt <= 0) return;
+        const ownerBoard = attackerSlot.closest('.player-zone');
+        const ownerNum = parseInt(ownerBoard.id.split('-')[1]);
+        gainTimePoints(ownerNum, damageDealt);
+        const dieSel = playersState[ownerNum].day > 0 ? '.day-die-group' : '.night-die-group';
+        floatValue(ownerBoard.querySelector(dieSel), `+${damageDealt} TP`, 'gain');
     }
 
     function calculateCurrentStrength(attacker, attackerSlot) {
         let bonus = 0;
         if (attacker.name === 'Meridia') {
-            const history = attackerSlot.closest('.player-zone').querySelector('.history-pile');
-            if (history && history.dataset.cardData) {
-                try {
-                    const hData = JSON.parse(history.dataset.cardData);
-                    bonus = Array.isArray(hData) ? hData.filter(c => c.type === 'Artifact').length : 0;
-                } catch(e) {}
-            }
+            bonus = meridiaArtifactBonus(attackerSlot.closest('.player-zone').querySelector('.history-pile'));
         }
-        let base = (parseInt(attacker.baseHealth) || 0) + bonus - (attacker.damageTaken || 0);
+        let base = (parseInt(attacker.baseStrength ?? attacker.baseHealth) || 0) + bonus - (attacker.damageTaken || 0);
         return Math.max(0, base - activeStrDebuff);
     }
 
@@ -2615,18 +4101,28 @@ document.addEventListener('DOMContentLoaded', () => {
         feedbackEl.classList.add('combat-feedback-vital');
         
         const attackerStr = calculateCurrentStrength(attacker, attackerSlot);
-        let bBonus = 0;
-        if (blockerData.name === 'Meridia') {
-            const h = blockerSlot.closest('.player-zone').querySelector('.history-pile');
-            try {
-                const d = JSON.parse(h.dataset.cardData);
-                bBonus = Array.isArray(d) ? d.filter(c => c.type === 'Artifact').length : 0;
-            } catch(e) {}
-        }
-        const blockerStr = (parseInt(blockerData.baseHealth) || 0) + bBonus - (blockerData.damageTaken || 0);
-        
         const attackerHistory = attackerSlot.closest('.player-zone').querySelector('.history-pile');
         const blockerHistory = blockerSlot.closest('.player-zone').querySelector('.history-pile');
+
+        // Time Thief deals his full current Strength no matter how the block resolves
+        // (absorbed by the blocker, spilled to the player, or both) — gain TP for all of it.
+        applyTimeThiefGain(attacker, attackerSlot, attackerStr);
+
+        // Meridia swallows the whole attack: any damage she blocks sacrifices her and
+        // prevents ALL remaining damage (no spillover to the player), regardless of Strength.
+        if (blockerData.name === 'Meridia') {
+            if (attackerStr > 0) {
+                feedbackEl.textContent = "Meridia Sacrificed! All Damage Prevented.";
+                clearSlot(blockerSlot);
+                finishSingleCardPlacement(blockerHistory, blockerData);
+            } else {
+                feedbackEl.textContent = "Attacker Repelled! Defender Survives.";
+            }
+            finishAttacker(attackerSlot, attacker, attackerHistory);
+            return;
+        }
+
+        const blockerStr = (parseInt(blockerData.baseResistance ?? blockerData.baseHealth) || 0) - (blockerData.damageTaken || 0);
 
         if (attackerStr > blockerStr) {
             const overflow = attackerStr - blockerStr;
@@ -2646,9 +4142,8 @@ document.addEventListener('DOMContentLoaded', () => {
             finishSingleCardPlacement(blockerHistory, blockerData);
         }
 
-        // Cleanup Attacker - ALWAYS move to history regardless of outcome
-        clearSlot(attackerSlot);
-        finishSingleCardPlacement(attackerHistory, attacker);
+        // Cleanup Attacker - move to history (unless Clone Factory keeps it for a 2nd strike)
+        finishAttacker(attackerSlot, attacker, attackerHistory);
     }
 
     function resolveDamageDirectly(damage, playerNum) {
@@ -2678,7 +4173,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const defenderBoard = document.getElementById(`player-${defenderNum}`);
         const availableCreatures = Array.from(defenderBoard.querySelectorAll('.creature-zone-main .card:not(.slot-empty)'));
         if (availableCreatures.length === 0) {
-            resolveDamageDirectly(parseInt(attacker.baseHealth) || 0, defenderNum);
+            resolveDamageDirectly(parseInt(attacker.baseStrength ?? attacker.baseHealth) || 0, defenderNum);
             return;
         }
         selectBlocker(attacker, attackerSlot, defenderNum, availableCreatures);
@@ -2745,16 +4240,22 @@ document.addEventListener('DOMContentLoaded', () => {
             followUp.onclick = () => {
                 // Process Multi-Selection
                 let smokesPlayed = 0;
+                let reflectorPlayed = false;
                 selectedSlots.forEach(slot => {
                     const artifactData = JSON.parse(slot.dataset.cardData);
                     const history = slot.closest('.player-zone').querySelector('.history-pile');
                     clearSlot(slot);
                     finishSingleCardPlacement(history, artifactData);
-                    
+
                     // CARD EFFECT: SMOKE (Stackable)
                     if (artifactData.name === "Smoke") {
                         activeStrDebuff += 1;
                         smokesPlayed++;
+                    }
+
+                    // CARD EFFECT: REFLECTOR - redirects the attack instead of blocking/debuffing it.
+                    if (artifactData.name === "Reflector") {
+                        reflectorPlayed = true;
                     }
                 });
 
@@ -2786,12 +4287,129 @@ document.addEventListener('DOMContentLoaded', () => {
                 document.getElementById(`player-${currentPlayer}`).classList.add('active-player');
                 gameField.className = originalClass;
 
-                // Return to defense overlay
-                const defenseOverlay = document.getElementById('defense-overlay');
-                defenseOverlay.classList.remove('hidden');
-                initiateDefense(attacker, attackerSlot, defenderNum);
+                if (reflectorPlayed) {
+                    // Reflector redirects the attack instead of resuming the normal defense screen.
+                    handleReflectorRedirect(attacker, attackerSlot, defenderNum);
+                } else {
+                    // Return to defense overlay
+                    const defenseOverlay = document.getElementById('defense-overlay');
+                    defenseOverlay.classList.remove('hidden');
+                    initiateDefense(attacker, attackerSlot, defenderNum);
+                }
             };
         }, "SELECT ARTIFACT");
+    }
+
+    // Generic contextual response: before an Artifact's effect against `targetPlayerNum`
+    // resolves, give them a chance to play Talisman (if they're holding it) to prevent it —
+    // Talisman's text ("prevent a Card that targets you or any of your Cards") isn't specific
+    // to any one Artifact, so this is written to work for Reflector today and any future
+    // targeted Artifact/Creature effect without changes. The device is passed to the target
+    // first so hand contents stay hidden from whoever currently holds it; if they don't have
+    // Talisman there's nothing to decide, so the effect proceeds automatically.
+    function offerTalismanResponse(targetPlayerNum, sourceCardName, { onPrevented, onProceed }) {
+        const gameField = document.getElementById('game-field');
+        const originalClass = gameField.className;
+        const originallyActive = document.querySelector('.player-zone.active-player');
+        const restoreView = () => {
+            document.querySelectorAll('.player-zone').forEach(z => z.classList.remove('active-player'));
+            if (originallyActive) originallyActive.classList.add('active-player');
+            gameField.className = originalClass;
+        };
+
+        passDevice(targetPlayerNum, () => {
+            const targetBoard = document.getElementById(`player-${targetPlayerNum}`);
+            document.querySelectorAll('.player-zone').forEach(z => z.classList.remove('active-player'));
+            targetBoard.classList.add('active-player');
+            gameField.className = `players-${activePlayerCount} turn-p${targetPlayerNum}`;
+
+            const talismanSlot = Array.from(targetBoard.querySelectorAll('.hand-slot:not(.slot-empty)'))
+                .find(s => {
+                    try { return JSON.parse(s.dataset.cardData).name === 'Talisman'; }
+                    catch (e) { return false; }
+                });
+
+            if (!talismanSlot) { restoreView(); onProceed(); return; }
+
+            const overlay = document.createElement('div');
+            overlay.className = 'overlay';
+            overlay.style.cssText = 'position:fixed;inset:0;z-index:7000;display:flex;align-items:center;justify-content:center;';
+            overlay.innerHTML = `
+                <div class="glass-panel modal-content" style="max-width:320px;text-align:center;padding:20px;">
+                    <h3 class="tech-font">RESPOND?</h3>
+                    <p class="tech-font" style="font-size:13px;opacity:0.85;margin:8px 0 16px;">
+                        Player ${targetPlayerNum}, ${sourceCardName} is targeting you. Play Talisman to prevent it?
+                    </p>
+                    <div style="display:flex;gap:10px;justify-content:center;">
+                        <button class="menu-btn combat-btn" id="talisman-yes">PLAY TALISMAN</button>
+                        <button class="menu-btn secondary-btn" id="talisman-no">ALLOW EFFECT</button>
+                    </div>
+                </div>`;
+            document.body.appendChild(overlay);
+
+            overlay.querySelector('#talisman-yes').onclick = () => {
+                const talismanData = JSON.parse(talismanSlot.dataset.cardData);
+                const history = targetBoard.querySelector('.history-pile');
+                clearSlot(talismanSlot);
+                finishSingleCardPlacement(history, talismanData);
+                updateHandLayout(targetPlayerNum);
+                overlay.remove();
+                restoreView();
+                onPrevented();
+            };
+            overlay.querySelector('#talisman-no').onclick = () => {
+                overlay.remove();
+                restoreView();
+                onProceed();
+            };
+        }, "RESOLVE RESPONSE");
+    }
+
+    // Reflector (A3): "Change the attack target to a Player of your choice." V1 is 2-player
+    // only, so the only choice is the attacker themself — the attack bounces straight back.
+    // Before it lands, offer the newly-targeted player (the attacker) a Talisman response.
+    function handleReflectorRedirect(attacker, attackerSlot, defenderNum) {
+        const newTarget = currentPlayer;
+        offerTalismanResponse(newTarget, 'Reflector', {
+            onPrevented: () => {
+                passDevice(defenderNum, () => {
+                    document.querySelectorAll('.player-zone').forEach(z => z.classList.remove('active-player'));
+                    document.getElementById(`player-${defenderNum}`).classList.add('active-player');
+                    document.getElementById('game-field').className = `players-${activePlayerCount} turn-p${defenderNum}`;
+                    document.getElementById('defense-overlay').classList.remove('hidden');
+                    initiateDefense(attacker, attackerSlot, defenderNum);
+                    const feedbackEl = document.getElementById('combat-feedback');
+                    feedbackEl.textContent = "Talisman prevents Reflector! Attack proceeds normally.";
+                    feedbackEl.classList.add('combat-feedback-vital');
+                }, "RESUME DEFENSE");
+            },
+            onProceed: () => resolveReflectedAttack(attacker, attackerSlot, newTarget)
+        });
+    }
+
+    // Reflector's redirect resolved: the attack lands on the new target directly (it's being
+    // bounced back, not freshly declared, so no blocking step), then the attacker goes to History.
+    function resolveReflectedAttack(attacker, attackerSlot, newTargetNum) {
+        const defenseOverlay = document.getElementById('defense-overlay');
+        const feedbackEl = document.getElementById('combat-feedback');
+        const btnBlock = document.getElementById('btn-block-creature');
+        const btnArtifact = document.getElementById('btn-play-artifact');
+        const btnContinue = document.getElementById('btn-combat-continue');
+
+        defenseOverlay.classList.remove('hidden');
+        btnBlock.classList.add('hidden');
+        btnArtifact.classList.add('hidden');
+        feedbackEl.classList.add('combat-feedback-vital');
+
+        const str = calculateCurrentStrength(attacker, attackerSlot);
+        feedbackEl.textContent = `Reflected! Attack redirected to Player ${newTargetNum} for ${str} Damage!`;
+        resolveDamageDirectly(str, newTargetNum);
+
+        const attackerHistory = attackerSlot.closest('.player-zone').querySelector('.history-pile');
+        finishAttacker(attackerSlot, attacker, attackerHistory);
+
+        btnContinue.textContent = "CLOSE";
+        btnContinue.onclick = () => { defenseOverlay.classList.add('hidden'); maybeCloneSecondStrike(); };
     }
 
     function showCardDetails(card, showBazaarStack = false) {
@@ -3026,14 +4644,18 @@ document.addEventListener('DOMContentLoaded', () => {
     playerCountToggle.addEventListener('click', (e) => {
         const btn = e.target.closest('.toggle-btn');
         if (!btn) return;
-        
+
+        if (btn.classList.contains('disabled')) {
+            showInfoToast('COMING SOON', `${btn.dataset.count}-Player mode is still in the workshop. Only 2 players for now.`);
+            return;
+        }
+
         playerCountToggle.querySelectorAll('.toggle-btn').forEach(b => b.classList.remove('active'));
         btn.classList.add('active');
-        
+
         activePlayerCount = parseInt(btn.dataset.count);
         gameField.className = `players-${activePlayerCount}`;
-        
-        // Re-init boards
+
         // Re-init boards
         initAllActiveBoards();
     });
@@ -3068,9 +4690,24 @@ document.addEventListener('DOMContentLoaded', () => {
 
     function progressPhase() {
         if (gameWon) return; // Disable all phase interaction if game won
+
+        // Safety net: leaving Construction with uncommitted Planetarium discards still
+        // grants the owed draws, so a forgotten click never eats your cards.
+        if (currentPhase === 1 && planetariumStaged > 0) commitPlanetarium();
+
+        // Changing phase closes any armed Landmark context (e.g. Lethargo's Temple).
+        if (lethargoActive) deactivateLethargo();
+        if (aetherlabActive) deactivateAetherlab();
+
+        // Leaving the Creature Phase drops an unused Clone Factory priming (GoldSteam already spent).
+        if (currentPhase === 2 && cloneFactoryArmed && !cloneSecondStrikePending) disarmCloneFactory();
+
         if (currentPhase === 3) {
-            // Final check on hand limit
-            if (!canEndTurn()) return;
+            // Over the hand limit: clicking "Discard" auto-discards the cheapest cards
+            if (!canEndTurn()) {
+                autoDiscardToLimit();
+                return;
+            }
         }
 
         if (currentPhase < 3) {
@@ -3105,7 +4742,7 @@ document.addEventListener('DOMContentLoaded', () => {
         blocks.forEach((b, i) => {
             b.classList.toggle('active', i === currentPhase);
         });
-        
+
         const btn = document.getElementById('next-phase-btn');
         const skipBtn = document.getElementById('skip-turn-btn');
 
@@ -3130,6 +4767,55 @@ document.addEventListener('DOMContentLoaded', () => {
         }
 
         if (window.updateBazaarLighting) window.updateBazaarLighting();
+        checkHandLimit();
+    }
+
+    // Card value for the auto-discard heuristic (lower = cheaper = discarded first).
+    // Steam TIER dominates pip count: Laser > Gold > Fire > AllSteam (cheapest).
+    // So a single Laser outranks any number of Fires; an empty/'-' cost (e.g. FireSteam) is cheapest of all.
+    function cardCostValue(card) {
+        const cost = (card && card.cost) ? String(card.cost) : '';
+        let nF = 0, nG = 0, nL = 0, nA = 0;
+        for (const ch of cost) {
+            if (ch === 'F') nF++;
+            else if (ch === 'G') nG++;
+            else if (ch === 'L') nL++;
+            else if (ch === 'A') nA++;
+        }
+        return nL * 1e6 + nG * 1e4 + nF * 1e2 + nA;
+    }
+
+    function getMaxHand(board) {
+        let maxHand = 5;
+        board.querySelectorAll('.landmark-zone-main .card:not(.slot-empty)').forEach(s => {
+            try { if (JSON.parse(s.dataset.cardData).name === 'Pandorama') maxHand += 2; } catch (e) {}
+        });
+        return maxHand;
+    }
+
+    // Discard the cheapest cards from the current player's hand down to the hand limit.
+    function autoDiscardToLimit() {
+        const board = document.getElementById(`player-${currentPlayer}`);
+        if (!board) return;
+
+        const maxHand = getMaxHand(board);
+        const occupied = Array.from(board.querySelectorAll('.hand-slot'))
+            .filter(s => !s.classList.contains('slot-empty'));
+        const need = occupied.length - maxHand;
+        if (need <= 0) return;
+
+        const ranked = occupied.map(s => {
+            let card;
+            try { card = JSON.parse(s.dataset.cardData); } catch (e) { card = {}; }
+            return { slot: s, card, value: cardCostValue(card) };
+        }).sort((a, b) => a.value - b.value);
+
+        const historySlot = board.querySelector('.history-pile');
+        ranked.slice(0, need).forEach(({ slot, card }) => {
+            if (historySlot) finishSingleCardPlacement(historySlot, card);
+            clearSlot(slot);
+        });
+
         checkHandLimit();
     }
 
@@ -3178,12 +4864,15 @@ document.addEventListener('DOMContentLoaded', () => {
                 const handSlots = Array.from(board.querySelectorAll('.hand-slot'));
                 const occupiedCount = handSlots.filter(s => !s.classList.contains('slot-empty')).length;
 
-                btn.disabled = true;
-                btn.classList.add('disabled');
+                // Keep clickable: clicking it auto-discards the cheapest cards
+                btn.disabled = false;
+                btn.classList.remove('disabled');
+                btn.classList.add('discard-mode');
                 btn.textContent = `Discard (${occupiedCount - maxHand})`;
             } else {
                 btn.disabled = false;
                 btn.classList.remove('disabled');
+                btn.classList.remove('discard-mode');
                 btn.textContent = 'End Turn';
             }
         }
@@ -3191,6 +4880,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     let endPhaseTriggered = false; // Prevent multiple triggers in same phase
     let aetherlabUsedThisPhase = false;
+    let aetherlabActive = false; // Aetherlab upgrade mode armed (Method A)
 
     async function animateReshuffle(pNum) {
         const board = document.getElementById(`player-${pNum}`);
@@ -3227,16 +4917,20 @@ document.addEventListener('DOMContentLoaded', () => {
     async function triggerEndPhaseDrawing() {
         if (endPhaseTriggered) return;
         endPhaseTriggered = true;
+        const drawCount = turnSkipped ? 3 : 2;
+        await drawCards(currentPlayer, drawCount);
+    }
 
-        const board = document.getElementById(`player-${currentPlayer}`);
+    // Draw `drawCount` cards from a player's Future pile into their hand, with the same
+    // reshuffle + deal animation the End Phase uses. Shared by End Phase and Planetarium.
+    async function drawCards(pNum, drawCount) {
+        const board = document.getElementById(`player-${pNum}`);
         if (!board) return;
-        
+
         const futurePile = board.querySelector('.future-pile');
         const historyPile = board.querySelector('.history-pile');
         if (!futurePile || !historyPile) return;
 
-        const drawCount = turnSkipped ? 3 : 2;
-        
         const getFutureData = () => {
             try { return JSON.parse(futurePile.dataset.cardData || '[]'); } catch(e) { return []; }
         };
@@ -3264,16 +4958,25 @@ document.addEventListener('DOMContentLoaded', () => {
         // Use a loop instead of simple forEach to handle async reshuffle if needed
         for (let i = 0; i < targets.length; i++) {
             const targetSlot = targets[i];
-            
+
             let currentFuture = getFutureData();
-            
+
             if (currentFuture.length === 0) {
                 let currentHistory = getHistoryData();
                 if (currentHistory.length > 0) {
                     // PERFORM VISUAL RESHUFFLE
-                    await animateReshuffle(currentPlayer);
-                    
-                    currentFuture = shuffleArray([...currentHistory]);
+                    await animateReshuffle(pNum);
+
+                    // Meridia can't survive being folded back into a new Future Pile —
+                    // she's discarded to the Abyss instead when History reshuffles.
+                    const meridiaCards = currentHistory.filter(c => c.name === 'Meridia');
+                    const shuffleable = currentHistory.filter(c => c.name !== 'Meridia');
+                    if (meridiaCards.length) {
+                        activeBazaar['AB'] = (activeBazaar['AB'] || []).concat(meridiaCards);
+                        renderBazaar();
+                    }
+
+                    currentFuture = shuffleArray([...shuffleable]);
                     historyPile.dataset.cardData = JSON.stringify([]);
                     updateStackIndicator(historyPile);
                     futurePile.dataset.cardData = JSON.stringify(currentFuture);
@@ -3285,13 +4988,13 @@ document.addEventListener('DOMContentLoaded', () => {
                 const card = currentFuture.pop();
                 futurePile.dataset.cardData = JSON.stringify(currentFuture);
                 updateStackIndicator(futurePile);
-                
-                updateHandLayout(currentPlayer);
+
+                updateHandLayout(pNum);
                 animateCardDeal(futurePile, targetSlot, card);
-                
+
                 setTimeout(checkHandLimit, 650);
             }
-            
+
             // Wait for card animation to finish before next draw
             await new Promise(r => setTimeout(r, 500));
         }
@@ -3434,8 +5137,16 @@ document.addEventListener('DOMContentLoaded', () => {
         currentPhase = 0;
         turnSkipped = false;
         steamBoughtThisTurn = false;
+        planetariumStaged = 0;
+        planetariumUsedThisTurn = false;
+        lethargoActive = false;
+        lethargoOnlyTP = false;
+        lethargoUsedThisPhase = false;
+        disarmCloneFactory();
+        closeLandmarkContext();
         activeStrDebuff = 0;
         aetherlabUsedThisPhase = false;
+        deactivateAetherlab();
 
         const hint = document.getElementById('next-player-hint');
         if (hint) hint.textContent = `To Player ${currentPlayer}`;

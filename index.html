@@ -15,6 +15,7 @@
         <button class="menu-btn" id="btn-database">Database</button>
         <button class="menu-btn" id="btn-options">Options</button>
         <button class="menu-btn" id="btn-devlog">Dev Log</button>
+        <button class="menu-btn" id="btn-devmode" title="Dev Mode (M): freely move any card, ignore cost & phases">Dev Mode</button>
     </div>
 
     <!-- Quick Help Window -->
@@ -34,6 +35,12 @@
         <button id="next-phase-btn" class="tech-font">Next Phase</button>
         <button id="skip-turn-btn" class="tech-font hidden">Skip Turn</button>
         <div class="phase-hint tech-font">[SPACEBAR]</div>
+    </div>
+
+    <!-- Contextual "Landmark in Use" window (below the phase panel) -->
+    <div id="landmark-context" class="hidden">
+        <div id="landmark-context-title" class="fantasy-font glowing-text">Landmark</div>
+        <div id="landmark-context-body" class="tech-font"></div>
     </div>
 
     <!-- Pass Device Overlay -->
@@ -279,8 +286,8 @@
                     <span class="option-label">Player Count:</span>
                     <div class="option-toggle" id="player-count-toggle">
                         <button class="toggle-btn active" data-count="2">2</button>
-                        <button class="toggle-btn" data-count="3">3</button>
-                        <button class="toggle-btn" data-count="4">4</button>
+                        <button class="toggle-btn disabled" data-count="3" title="Coming Soon">3</button>
+                        <button class="toggle-btn disabled" data-count="4" title="Coming Soon">4</button>
                     </div>
                 </div>
                 <div class="option-row">
@@ -353,10 +360,6 @@
             <!-- Play Area -->
             <div class="board-upper-row merged-row">
                 <div class="dice-sidebar">
-                    <div class="die-adjusters">
-                        <button class="die-btn plus">+</button>
-                        <button class="die-btn minus">-</button>
-                    </div>
                     <div class="dice-counters-row">
                         <div class="die-group day-die-group">
                             <div class="die-viewport mini-die">
@@ -449,6 +452,23 @@
         </div>
     </div>
 
+    <div id="darkmatter-overlay" class="overlay hidden">
+        <div class="modal-content glass-panel combat-modal">
+            <h2 class="tech-font">DARK MATTER!</h2>
+            <div id="combat-info">
+                <div id="darkmatter-preview" class="combat-preview"></div>
+                <div class="combat-vs">VS</div>
+                <div id="darkmatter-target" class="combat-preview">PLAYER</div>
+            </div>
+            <div class="defense-options">
+                <button id="btn-dm-sacrifice" class="menu-btn combat-btn">SACRIFICE CREATURE</button>
+                <button id="btn-dm-discard" class="menu-btn combat-btn">DISCARD CARD</button>
+                <button id="btn-dm-losetp" class="menu-btn combat-btn">LOSE 2 TIME POINTS</button>
+            </div>
+            <div id="darkmatter-feedback" class="tech-font">Choose ONE:</div>
+        </div>
+    </div>
+
     <div id="target-player-overlay" class="overlay hidden">
         <div class="modal-content glass-panel">
             <h2 class="tech-font">SELECT TARGET PLAYER</h2>
@@ -463,15 +483,15 @@
             <h2 class="fantasy-font glowing-text">DEVELOPER LOG</h2>
             
             <div class="devlog-tabs tech-font">
-                <button class="tab-btn active" data-tab="history">Update History</button>
-                <button class="tab-btn" data-tab="checklist">Card Implementation</button>
+                <button class="tab-btn active" data-tab="checklist">Card Implementation</button>
+                <button class="tab-btn" data-tab="history">Update History</button>
             </div>
 
-            <div id="devlog-content" class="tech-font log-list">
+            <div id="devlog-content" class="tech-font log-list hidden">
                 <!-- Log entries will be injected here -->
             </div>
 
-            <div id="devlog-checklist" class="tech-font log-list hidden">
+            <div id="devlog-checklist" class="tech-font log-list">
                 <div class="checklist-grid">
                     <!-- Cards with status icons will be injected here -->
                 </div>
