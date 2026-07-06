@@ -326,6 +326,16 @@ body {
   z-index: 100;
 }
 
+.back-to-arcade-btn {
+  position: fixed;
+  top: 20px;
+  left: 20px;
+  z-index: 100;
+  text-decoration: none;
+  display: inline-flex;
+  align-items: center;
+}
+
 .menu-btn {
   background: var(--glass-bg);
   border: 1px solid var(--glass-border);
