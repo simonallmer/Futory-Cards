@@ -284,7 +284,7 @@ document.addEventListener('DOMContentLoaded', () => {
         };
     }
 
-    const implementedCards = ["Pandorama", "Fountain of Youth", "Laser Catalyst", "Dragura's Wasteland", "Planetarium", "Lethargo's Temple", "Clone Factory", "Aetherlab", "Entrophy", "Meridius", "Meridia", "Time Thief", "Ichor", "Vulcanem", "Cravus", "Rampadon", "Smoke", "Dark Matter", "Reflector", "Talisman", "Reversal", "Faith", "Threat", "Confiscation", "Gravitas", "Time Bender", "Meridia's Cabin", "Repo Station"];
+    const implementedCards = ["Pandorama", "Fountain of Youth", "Laser Catalyst", "Dragura's Wasteland", "Planetarium", "Lethargo's Temple", "Clone Factory", "Aetherlab", "Entrophy", "Meridius", "Meridia", "Time Thief", "Ichor", "Vulcanem", "Cravus", "Rampadon", "Smoke", "Dark Matter", "Reflector", "Talisman", "Reversal", "Faith", "Threat", "Confiscation", "Gravitas", "Time Bender", "Meridia's Cabin", "Repo Station", "Hand of Rhone"];
 
     // --- Intent Classification ---
     // auto: fires on its own when condition is met
@@ -319,6 +319,7 @@ document.addEventListener('DOMContentLoaded', () => {
         'Time Bender': 'active',
         "Meridia's Cabin": 'auto',
         'Repo Station': 'contextual',
+        'Hand of Rhone': 'active',
     };
 
     // --- Simulation Presets ---
@@ -487,9 +488,17 @@ document.addEventListener('DOMContentLoaded', () => {
             p1creatures: [{ name: 'Cravus', damageTaken: 0 }, { name: 'Vulcanem', damageTaken: 0 }],
             p2creatures: [{ name: 'Ichor', damageTaken: 1 }],
         },
+        'Hand of Rhone': {
+            phase: 1,
+            day: 9,
+            rhoneCharge: 5,
+            desc: "Hand of Rhone at full charge (5 + auto +1 on entering Construction = 6 Force). Click it and Release: the Force alternates ×6 — Opponent -3 TP, You +3 TP (full-charge heal).",
+            landmarks: ['Hand of Rhone'],
+        },
     };
 
     const devLogData = [
+        { date: '2026-07-08', msg: "Hand of Rhone (Duality L5) — implemented (active), per Simon's design: charging is AUTOMATIC — entering your Construction Phase adds +1 Force to the landmark's counting die (capped at 6, shown as a violet '⚡ N Force' badge that turns gold at full charge), hooked into updatePhaseUI's phase-1 branch with a once-per-phase guard, so the Computer's Rhone charges too. Releasing is the player's call: clicking the landmark in your Construction Phase opens the same docked 'Landmark in Use' context window Lethargo's Temple uses, showing the charge and a live outcome preview ('Opponent −2 TP · You −1 TP'), with a Release Force button. The Force travels around the table alternating opponent → you → opponent… for the charged distance, resolving one pass per beat (~550ms) with -1 TP floats on each active die — in 2-player either direction reaches the opponent first, so the direction choice waits for 3-4p. Under 6 it's the shot-in-the-knee trade (3 Force: opponent −2, you −1); at the FULL charge of 6 your own passes heal instead of damage (opponent −3, you +3), routed through gainTimePoints/resolveDamageDirectly so Time Bender's active die and the lost-die cap are respected. Releasing removes the die (charge to 0, badge gone); a destroyed landmark takes its charge with it, and Play Again resets all four counters. The 'unless deactivated' clause on charging is noted and will be wired when the face-down deactivation subsystem lands (needed for Atlantica/Sleep Potion/Razo/Masiota). Sim preset seeds 5 Force so the load-time auto-charge demonstrates itself by completing the full 6. Verified live both ways: at 3 Force the release hit Opponent 12→10 and You 9→8; at 6 the badge went gold, the preview read 'Opponent −3 TP · You +3 TP', and the release finished Opponent 12→9, You 9→12. No alerts, no console errors." },
         { date: '2026-07-08', msg: "Repo Station (Duality L4) — implemented (contextual), per Simon's rulings: 'defeat an opponent's Creature' means your ATTACK destroys their blocker — including mutual destruction, and including Meridia self-sacrificing to swallow your hit — while a repelled attack and defensive blocking give nothing; the sacrifice half is legal in your Construction AND Creature Phases. Auto half: applyRepoStationGain(attackerSlot) is hooked into all three blocker-destroyed branches of resolveCombat (outright defeat, mutual destruction, Meridia absorption); it resolves the owner from the attacker slot's board — not currentPlayer — so it also fires correctly when the Computer's attack defeats a human blocker, and only pays out if that owner actually has Repo Station in play. Active half: click the Station during your Construction or Creature Phase — one Creature in the zone sacrifices immediately; with several, every Creature-type card pulses with the red threat-target glow (Artifact cards lying in the zone via Lotus are excluded — you can't 'sacrifice' a Lotus) and a capture-phase click picks the victim, exactly the Threat/Wasteland picker pattern. Sacrifice = 'Sacrificed' float + clearSlot to your own History + landmark pulse + 1 TP via gainTimePoints (which respects both the 12 cap and Time Bender's active-die routing). Sim preset (Creature Phase, Day 10, Cravus + Vulcanem vs a weakened Ichor). Verified live: clicking the Station pulsed both creatures, picking Vulcanem moved it to History with Day 10→11; then attacking with Cravus into the blocking Ichor read 'Blocker Defeated! 1 Spillover Damage.' and Repo Station paid again, Day 11→12, with Ichor landing in P2's History. No alerts, no console errors." },
         { date: '2026-07-08', msg: "Meridia's Cabin (Duality L3) — implemented (auto), per Simon's ruling on the wording: the History Pile part counts the TOP CARD ONLY (an Artifact on top = +1, never more from History), and 'unoccupied in your Creature Zone' means Artifacts lying there without a Creature on them — today that can only be Lotus (A2, not yet implemented), so the zone half of cabinBonus() already counts Artifact-type cards in Creature-Zone slots and will light up the moment Lotus lands. Every Creature on the Cabin owner's board gains +N to its single HP value (both attack strength and block resistance — Meridia precedent), wired into all four consumers: the zone stat badge (updateCreatureVisuals, reusing the green 'buffed' styling), attack strength (calculateCurrentStrength), the human blocker's resistance in resolveCombat, and the Computer's block-decision heuristic (aiChooseBlocker), so the AI weighs the buff when choosing walls. The interesting part is liveness — the buff moves whenever the History top changes, so updateStackIndicator (the one chokepoint every History write already flows through) now refreshes the board's creature badges on any History change. That also fixes a latent staleness bug for Meridia's own badge, which previously only updated on placement. Sim preset: Cabin + Ichor in zone, Smoke (Artifact) on top of History. Verified live: Ichor's badge showed 3 (2 base + 1, buffed green); discarding a FireSteam onto History covered the Smoke and the badge dropped back to base (no badge) immediately, alert-free, no console errors." },
         { date: '2026-07-08', msg: "Time Bender (Duality L2) — implemented (active): 'Once per Construction Phase, you may switch your active Time Die.' This needed a concept the engine didn't have — until now 'damage comes off the Day die first' was hardcoded in resolveDamageDirectly, gainTimePoints, Fountain of Youth's Skip-Turn grant, and seven scattered float-position ternaries. All of it now routes through one shared pair: playersState gains an activeDie field ('day' default, reset on Play Again) and activeDieType(pNum) resolves which die TP changes hit first — with a built-in fallback, since a die at 0 is permanently lost and can't be active. This is groundwork Duality reuses: Aromeas (C5) reads 'your active Time Die' too. The landmark follows the Clone Factory click pattern: click Time Bender during your Construction Phase (once per phase, reset alongside Aetherlab's flag) to flip the active die — persistent across turns until switched again. Visual language: the landmark pulses, 'Night Active'/'Day Active' floats over the newly active die, and while Night is the active die its counter wears a pulsing cyan marker ring (new .active-die-marker CSS riding the existing blue-die palette; Day-active is the default state and stays unmarked, so the board only glows when something unusual is true). Sim preset: Time Bender in play at Day 10 / Night 8 with Faith + payment in hand. Verified live: clicking the landmark set the marker ring with no alert; a second click correctly refused ('already switched this Construction Phase'); playing Faith then put its +3 TP on the NIGHT die (8→11) while Day stayed at 10 — proof the routing actually moved, since day-first would have gone 10→12 with the remainder spilling to Night. No console errors." },
@@ -723,6 +732,13 @@ document.addEventListener('DOMContentLoaded', () => {
                     hand: sim.p2hand,
                     creatures: sim.p2creatures,
                 });
+            }
+
+            // Pre-charge Hand of Rhone (its auto +1 then fires via updatePhaseUI below).
+            if (sim.rhoneCharge !== undefined) {
+                rhoneCharge[1] = sim.rhoneCharge;
+                rhoneChargedThisPhase = false;
+                updateRhoneBadge(1);
             }
 
             const phaseUI = document.getElementById('game-phase-display');
@@ -1037,6 +1053,12 @@ document.addEventListener('DOMContentLoaded', () => {
                 // Time Bender: switch your active Time Die (Construction Phase, once per phase).
                 if (!devMode && isLandmarkZone && isMyBoard && currentPhase === 1 && cardData.name === 'Time Bender') {
                     activateTimeBender();
+                    return;
+                }
+
+                // Hand of Rhone: open the Force context window (Construction Phase).
+                if (!devMode && isLandmarkZone && isMyBoard && currentPhase === 1 && cardData.name === 'Hand of Rhone') {
+                    toggleRhoneContext();
                     return;
                 }
 
@@ -2456,6 +2478,125 @@ document.addEventListener('DOMContentLoaded', () => {
         pulseLandmark(currentPlayer, 'Repo Station');
         gainTimePoints(currentPlayer, 1);
         floatValue(board.querySelector(activeDieSel(currentPlayer)), '+1 TP', 'gain');
+    }
+
+    // --- Hand of Rhone (Duality L5): charge Force each Construction Phase, then release it ---
+    // Charging is automatic: +1 Force (the counting Futory Die, capped at 6) when the owner
+    // enters their Construction Phase. Click the landmark during your Construction Phase to
+    // open its context window and release the Force: it travels around the table — in
+    // 2-player V1 it alternates opponent, you, opponent… for the charged distance, 1 damage
+    // per pass (either table direction reaches the opponent first, so no direction choice is
+    // needed until 3-4 players). At a full charge of 6 the owner HEALS on their own passes
+    // instead of taking damage (opponent -3 / you +3). Releasing removes the die (charge 0).
+    const rhoneCharge = { 1: 0, 2: 0, 3: 0, 4: 0 };
+    let rhoneChargedThisPhase = false;
+    let rhoneContextOpen = false;
+    let rhoneReleasing = false;
+
+    function updateRhoneBadge(pNum) {
+        const el = findLandmark(pNum, 'Hand of Rhone');
+        if (!el) { rhoneCharge[pNum] = 0; return; } // landmark gone -> its die goes with it
+        let badge = el.querySelector('.rhone-badge');
+        if (rhoneCharge[pNum] <= 0) { if (badge) badge.remove(); return; }
+        if (!badge) {
+            badge = document.createElement('div');
+            badge.className = 'rhone-badge tech-font';
+            el.appendChild(badge);
+        }
+        badge.textContent = `⚡ ${rhoneCharge[pNum]} Force`;
+        badge.classList.toggle('full', rhoneCharge[pNum] >= 6);
+    }
+
+    function chargeHandOfRhone() {
+        if (rhoneChargedThisPhase) return;
+        const el = findLandmark(currentPlayer, 'Hand of Rhone');
+        if (!el) return;
+        rhoneChargedThisPhase = true;
+        if (rhoneCharge[currentPlayer] >= 6) return; // the counting die caps at 6
+        rhoneCharge[currentPlayer]++;
+        pulseLandmark(currentPlayer, 'Hand of Rhone');
+        floatValue(el, '+1 Force', 'gain');
+        updateRhoneBadge(currentPlayer);
+    }
+
+    // How a released charge splits between the two players (opponent is hit first).
+    function rhoneOutcome(charge) {
+        let opp = 0, self = 0;
+        for (let i = 0; i < charge; i++) { if (i % 2 === 0) opp++; else self++; }
+        return { opp, self };
+    }
+
+    function toggleRhoneContext() {
+        if (rhoneReleasing) return;
+        if (rhoneContextOpen) { closeRhoneContext(); return; }
+        const win = document.getElementById('landmark-context');
+        const title = document.getElementById('landmark-context-title');
+        const body = document.getElementById('landmark-context-body');
+        if (!win || !title || !body) return;
+        const charge = rhoneCharge[currentPlayer];
+        const full = charge >= 6;
+        const { opp, self } = rhoneOutcome(charge);
+        title.textContent = 'Hand of Rhone';
+        body.innerHTML = '';
+
+        const row = document.createElement('div');
+        row.className = 'landmark-context-row';
+        const label = document.createElement('div');
+        label.className = 'landmark-context-label';
+        label.textContent = `Charged: ${charge} Force${full ? ' (full)' : ''}`;
+        row.appendChild(label);
+        const btn = document.createElement('button');
+        btn.className = 'landmark-toggle-btn';
+        btn.textContent = 'Release Force';
+        if (charge <= 0) btn.disabled = true;
+        btn.onclick = () => releaseHandOfRhone();
+        row.appendChild(btn);
+        body.appendChild(row);
+
+        const preview = document.createElement('div');
+        preview.className = 'landmark-context-viewed';
+        preview.innerHTML = charge <= 0
+            ? '<span class="lc-viewed-hint">No Force charged yet — it charges each Construction Phase</span>'
+            : `<div class="lc-viewed-name">Opponent −${opp} TP · You ${full ? '+' : '−'}${self} TP</div>` +
+              `<div class="lc-viewed-cost">${full ? 'Full charge: you heal instead of taking damage' : 'The Force passes you too — charge to 6 to heal instead'}</div>`;
+        body.appendChild(preview);
+
+        rhoneContextOpen = true;
+        win.classList.remove('hidden');
+        pulseLandmark(currentPlayer, 'Hand of Rhone');
+    }
+
+    function closeRhoneContext() {
+        rhoneContextOpen = false;
+        closeLandmarkContext();
+    }
+
+    async function releaseHandOfRhone() {
+        const charge = rhoneCharge[currentPlayer];
+        if (charge <= 0 || rhoneReleasing) return;
+        rhoneReleasing = true;
+        const full = charge >= 6;
+        const owner = currentPlayer;
+        const opponent = (owner % activePlayerCount) + 1;
+        rhoneCharge[owner] = 0; // the counting Futory Die is removed
+        updateRhoneBadge(owner);
+        closeRhoneContext();
+        pulseLandmark(owner, 'Hand of Rhone');
+
+        for (let i = 0; i < charge; i++) {
+            const target = (i % 2 === 0) ? opponent : owner;
+            const board = document.getElementById(`player-${target}`);
+            if (target === owner && full) {
+                gainTimePoints(owner, 1);
+                if (board) floatValue(board.querySelector(activeDieSel(owner)), '+1 TP', 'gain');
+            } else {
+                const dieSel = activeDieSel(target); // read before the hit so the float lands right
+                resolveDamageDirectly(1, target);
+                if (board) floatValue(board.querySelector(dieSel), '-1 TP', 'damage');
+            }
+            await new Promise(r => setTimeout(r, 550));
+        }
+        rhoneReleasing = false;
     }
 
     // Laser Catalyst: LaserSteam, End Phase -> 1 unpreventable damage to the opponent.
@@ -4946,6 +5087,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
         // Changing phase closes any armed Landmark context (e.g. Lethargo's Temple).
         if (lethargoActive) deactivateLethargo();
+        if (rhoneContextOpen) closeRhoneContext();
         if (aetherlabActive) deactivateAetherlab();
 
         // Leaving the Creature Phase drops an unused Clone Factory priming (GoldSteam already spent).
@@ -4987,6 +5129,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function updatePhaseUI() {
+        if (currentPhase !== 1) rhoneChargedThisPhase = false; // Hand of Rhone charges once per Construction Phase
         const blocks = document.querySelectorAll('.phase-block');
         blocks.forEach((b, i) => {
             b.classList.toggle('active', i === currentPhase);
@@ -5002,7 +5145,7 @@ document.addEventListener('DOMContentLoaded', () => {
             } else {
                 btn.textContent = 'Next Phase';
                 endPhaseTriggered = false; // Reset for next cycle
-                if (currentPhase === 1) { aetherlabUsedThisPhase = false; timeBenderUsedThisPhase = false; } // Reset per-Construction effects
+                if (currentPhase === 1) { aetherlabUsedThisPhase = false; timeBenderUsedThisPhase = false; chargeHandOfRhone(); } // Reset per-Construction effects + auto-charge
             }
         }
 
@@ -6038,6 +6181,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     playersState[i].night = 12;
                     playersState[i].activeDie = 'day';
                     updateActiveDieGlow(i);
+                    rhoneCharge[i] = 0;
                 }
             }
             initAllActiveBoards();

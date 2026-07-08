@@ -1713,6 +1713,32 @@ body.dev-mode-on::after {
   50% { box-shadow: 0 0 26px rgba(0, 204, 255, 0.9), 0 0 40px rgba(0, 204, 255, 0.35), inset 0 0 12px rgba(0, 204, 255, 0.35); }
 }
 
+/* Hand of Rhone: Force charge counter (the counting Futory Die). Violet while
+   charging; gold once the full charge of 6 flips the owner's passes to heals. */
+.rhone-badge {
+  position: absolute;
+  bottom: 6px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 20;
+  padding: 2px 10px;
+  border-radius: 10px;
+  background: rgba(35, 15, 55, 0.9);
+  border: 1px solid rgba(190, 130, 255, 0.9);
+  color: #e2c6ff;
+  font-weight: 700;
+  font-size: 0.8rem;
+  letter-spacing: 1px;
+  white-space: nowrap;
+}
+
+.rhone-badge.full {
+  background: rgba(60, 40, 10, 0.92);
+  border-color: rgba(255, 210, 90, 0.95);
+  color: #ffe9a8;
+  box-shadow: 0 0 12px rgba(255, 200, 80, 0.5);
+}
+
 /* ================== Rules 3D Booklet ================== */
 .rules-book-panel {
   width: 900px;
