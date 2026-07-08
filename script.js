@@ -498,6 +498,7 @@ document.addEventListener('DOMContentLoaded', () => {
     };
 
     const devLogData = [
+        { date: '2026-07-08', msg: "Deactivation subsystem (face-down cards) + Hand of Rhone direction choice for 3-4p. Deactivation, per Simon's design: a deactivated card lies FACE DOWN as an actual card back in both cases — deactivated-in-place AND secret placement — for full mystery (cool-dimmed via .card-deactivated so it doesn't read as a Future pile). Two flags in the card data: `deactivated` renders the back and suppresses everything; `faceDownSecret` marks a hidden placement (a Sleep-Potioned Creature entering the zone) that only its owner may peek. Hover rules: your own face-down cards and an opponent's that were deactivated AFTER being shown reveal their front on hover in a dimmed, desaturated 'asleep' modal state (.asleep-preview); a secret placement shows an opponent nothing at all — the hover handler re-reads live slot data, so cards flip visibility correctly after binding. Effect suppression rides the existing chokepoints: findLandmark() treats deactivated Landmarks as absent (silencing Gravitas, Wasteland, Catalyst, Planetarium, Aetherlab, Clone Factory and Rhone's auto-charge — the printed 'unless deactivated' clause now real), all four Pandorama hand-limit checks and cabinBonus() check the flag, face-down Creatures can't block (human picker + AI heuristic), the AI won't attack with one, and stat badges vanish while asleep (refreshBoardAfterDeactivation re-syncs badges/hand limit whenever a card flips). Clicking your own face-down card offers Unveil (flip up + reactivate); an opponent's is not interactable. Atlantica and Razo are exempt via canBeDeactivated(). Until Sleep Potion lands, Dev Mode double-click is the toggle/test path. Rhone: the release now walks seats via rhoneSeat(owner, dir, step) instead of a 2-player alternation; at 3+ players the context window grows a Direction toggle ('→ Towards P2' / '← Towards P4') that live-updates the outcome preview — at 2 players it stays hidden since both directions hit the single opponent first. Verified live: full-charge release regression intact (Opponent −3/You +3, no Direction row at 2p); Dev-Mode flipping Meridia's Cabin face down dropped Ichor's badge 3→base and flipping back restored it with the scan art; owner hover-peek showed the dimmed front; a secret face-down card on the opponent's board showed nothing on hover while the same card without the secret flag showed the asleep preview; clicking your own face-down Ichor unveiled it. No console errors." },
         { date: '2026-07-08', msg: "Hand of Rhone (Duality L5) — implemented (active), per Simon's design: charging is AUTOMATIC — entering your Construction Phase adds +1 Force to the landmark's counting die (capped at 6, shown as a violet '⚡ N Force' badge that turns gold at full charge), hooked into updatePhaseUI's phase-1 branch with a once-per-phase guard, so the Computer's Rhone charges too. Releasing is the player's call: clicking the landmark in your Construction Phase opens the same docked 'Landmark in Use' context window Lethargo's Temple uses, showing the charge and a live outcome preview ('Opponent −2 TP · You −1 TP'), with a Release Force button. The Force travels around the table alternating opponent → you → opponent… for the charged distance, resolving one pass per beat (~550ms) with -1 TP floats on each active die — in 2-player either direction reaches the opponent first, so the direction choice waits for 3-4p. Under 6 it's the shot-in-the-knee trade (3 Force: opponent −2, you −1); at the FULL charge of 6 your own passes heal instead of damage (opponent −3, you +3), routed through gainTimePoints/resolveDamageDirectly so Time Bender's active die and the lost-die cap are respected. Releasing removes the die (charge to 0, badge gone); a destroyed landmark takes its charge with it, and Play Again resets all four counters. The 'unless deactivated' clause on charging is noted and will be wired when the face-down deactivation subsystem lands (needed for Atlantica/Sleep Potion/Razo/Masiota). Sim preset seeds 5 Force so the load-time auto-charge demonstrates itself by completing the full 6. Verified live both ways: at 3 Force the release hit Opponent 12→10 and You 9→8; at 6 the badge went gold, the preview read 'Opponent −3 TP · You +3 TP', and the release finished Opponent 12→9, You 9→12. No alerts, no console errors." },
         { date: '2026-07-08', msg: "Repo Station (Duality L4) — implemented (contextual), per Simon's rulings: 'defeat an opponent's Creature' means your ATTACK destroys their blocker — including mutual destruction, and including Meridia self-sacrificing to swallow your hit — while a repelled attack and defensive blocking give nothing; the sacrifice half is legal in your Construction AND Creature Phases. Auto half: applyRepoStationGain(attackerSlot) is hooked into all three blocker-destroyed branches of resolveCombat (outright defeat, mutual destruction, Meridia absorption); it resolves the owner from the attacker slot's board — not currentPlayer — so it also fires correctly when the Computer's attack defeats a human blocker, and only pays out if that owner actually has Repo Station in play. Active half: click the Station during your Construction or Creature Phase — one Creature in the zone sacrifices immediately; with several, every Creature-type card pulses with the red threat-target glow (Artifact cards lying in the zone via Lotus are excluded — you can't 'sacrifice' a Lotus) and a capture-phase click picks the victim, exactly the Threat/Wasteland picker pattern. Sacrifice = 'Sacrificed' float + clearSlot to your own History + landmark pulse + 1 TP via gainTimePoints (which respects both the 12 cap and Time Bender's active-die routing). Sim preset (Creature Phase, Day 10, Cravus + Vulcanem vs a weakened Ichor). Verified live: clicking the Station pulsed both creatures, picking Vulcanem moved it to History with Day 10→11; then attacking with Cravus into the blocking Ichor read 'Blocker Defeated! 1 Spillover Damage.' and Repo Station paid again, Day 11→12, with Ichor landing in P2's History. No alerts, no console errors." },
         { date: '2026-07-08', msg: "Meridia's Cabin (Duality L3) — implemented (auto), per Simon's ruling on the wording: the History Pile part counts the TOP CARD ONLY (an Artifact on top = +1, never more from History), and 'unoccupied in your Creature Zone' means Artifacts lying there without a Creature on them — today that can only be Lotus (A2, not yet implemented), so the zone half of cabinBonus() already counts Artifact-type cards in Creature-Zone slots and will light up the moment Lotus lands. Every Creature on the Cabin owner's board gains +N to its single HP value (both attack strength and block resistance — Meridia precedent), wired into all four consumers: the zone stat badge (updateCreatureVisuals, reusing the green 'buffed' styling), attack strength (calculateCurrentStrength), the human blocker's resistance in resolveCombat, and the Computer's block-decision heuristic (aiChooseBlocker), so the AI weighs the buff when choosing walls. The interesting part is liveness — the buff moves whenever the History top changes, so updateStackIndicator (the one chokepoint every History write already flows through) now refreshes the board's creature badges on any History change. That also fixes a latent staleness bug for Meridia's own badge, which previously only updated on placement. Sim preset: Cabin + Ichor in zone, Smoke (Artifact) on top of History. Verified live: Ichor's badge showed 3 (2 base + 1, buffed green); discarding a FireSteam onto History covered the Smoke and the badge dropped back to base (no badge) immediately, alert-free, no console errors." },
@@ -1027,6 +1028,16 @@ document.addEventListener('DOMContentLoaded', () => {
                 const isCreatureZone = slot.parentNode && slot.parentNode.classList.contains('creature-zone-main');
                 const isMyBoard = slot.closest('.player-zone') && slot.closest('.player-zone').id === `player-${currentPlayer}`;
 
+                // Deactivated cards lie face down: your own can be unveiled by clicking;
+                // an opponent's face-down card is not interactable at all.
+                if (!devMode && cardData.deactivated &&
+                    (isCreatureZone || (slot.parentNode && slot.parentNode.classList.contains('landmark-zone-main')))) {
+                    if (isMyBoard && confirm(`Unveil ${cardData.name}? It flips face up and reactivates.`)) {
+                        reactivateCard(slot);
+                    }
+                    return;
+                }
+
                 if (!devMode && isCreatureZone && isMyBoard && currentPhase === 2) {
                     // It's the Creature Phase and my creature - Try to attack
                     if (cardData.summonedOnTurn < totalTurns || cardData.name.includes("Cravus") || cardData.name.includes("Rampadon")) {
@@ -1084,6 +1095,21 @@ document.addEventListener('DOMContentLoaded', () => {
         
         slot.addEventListener('mouseenter', () => {
             if (slot.classList.contains('slot-empty')) clearTimeout(hoverTimer);
+        });
+
+        // Dev Mode: double-click a board card to flip it face down (deactivate) and back —
+        // the test path for the deactivation subsystem until Sleep Potion lands.
+        slot.addEventListener('dblclick', () => {
+            if (!devMode || slot.classList.contains('slot-empty') || !slot.dataset.cardData) return;
+            let c;
+            try { c = JSON.parse(slot.dataset.cardData); } catch (e) { return; }
+            if (Array.isArray(c)) return;
+            if (!c.deactivated && !canBeDeactivated(c)) { alert(`${c.name} cannot be deactivated.`); return; }
+            c.deactivated = !c.deactivated;
+            if (!c.deactivated) delete c.faceDownSecret;
+            slot.dataset.cardData = JSON.stringify(c);
+            syncFaceDownVisual(slot);
+            refreshBoardAfterDeactivation(slot);
         });
 
         return slot;
@@ -1636,6 +1662,63 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
+    // --- Deactivation subsystem: face-down cards ---
+    // A deactivated card lies FACE DOWN on the board (full mystery, per Simon's design) and
+    // grants no effects. card.deactivated = true renders the card back; card.faceDownSecret
+    // marks a secret placement (e.g. a Sleep-Potioned Creature entering the zone) that ONLY
+    // its owner may hover-peek. Without the secret flag the card was seen before it flipped
+    // (e.g. an opponent's Landmark), so anyone may hover-peek the front in a dimmed state.
+    // Atlantica and Razo can never be deactivated (printed rule).
+    function canBeDeactivated(card) {
+        return card && card.name !== 'Atlantica' && card.name !== 'Razo';
+    }
+
+    function syncFaceDownVisual(slot) {
+        if (!slot || slot.classList.contains('slot-empty') || !slot.dataset.cardData) return;
+        let card;
+        try { card = JSON.parse(slot.dataset.cardData); } catch (e) { return; }
+        if (Array.isArray(card)) return; // stacks render their own faces
+        if (card.deactivated) {
+            slot.classList.add('card-deactivated');
+            slot.style.backgroundImage = "url('assets/card_back.png')";
+            slot.style.backgroundColor = 'transparent';
+            slot.textContent = '';
+            slot.querySelectorAll('.creature-stat-badge, .health-badge, .str-marker, .rhone-badge').forEach(b => b.remove());
+        } else {
+            slot.classList.remove('card-deactivated');
+            const art = cardArtUrl(card);
+            if (art) {
+                slot.style.backgroundImage = `url('${art}')`;
+                slot.style.backgroundColor = 'transparent';
+                slot.textContent = '';
+            } else {
+                slot.style.backgroundImage = '';
+                slot.style.backgroundColor = 'rgba(255,255,255,0.1)';
+                slot.textContent = card.name;
+            }
+            updateCreatureVisuals(slot);
+        }
+    }
+
+    function reactivateCard(slot) {
+        let card;
+        try { card = JSON.parse(slot.dataset.cardData); } catch (e) { return; }
+        delete card.deactivated;
+        delete card.faceDownSecret;
+        slot.dataset.cardData = JSON.stringify(card);
+        syncFaceDownVisual(slot);
+        floatValue(slot, 'Unveiled', 'gain');
+        refreshBoardAfterDeactivation(slot);
+    }
+
+    // (De)activating a card can move board-wide state — a buffing Landmark's creature
+    // badges (Meridia's Cabin) or the hand limit (Pandorama). Re-sync both.
+    function refreshBoardAfterDeactivation(slot) {
+        const board = slot.closest('.player-zone');
+        if (board) board.querySelectorAll('.creature-zone-main .card:not(.slot-empty)').forEach(s => updateCreatureVisuals(s));
+        checkHandLimit();
+    }
+
     function finishSingleCardPlacement(targetSlot, card) {
         const isFuture = targetSlot.classList.contains('future-pile');
         const isHistory = targetSlot.classList.contains('history-pile');
@@ -1694,6 +1777,7 @@ document.addEventListener('DOMContentLoaded', () => {
         if (isStack) updateStackIndicator(targetSlot);
         bindHoverToElement(targetSlot, card);
         updateCreatureVisuals(targetSlot);
+        if (!isStack && card.deactivated) syncFaceDownVisual(targetSlot);
 
         if (!isStack && targetSlot.parentNode && targetSlot.parentNode.classList.contains('creature-zone-main')) {
             checkMeridiaZeroHp(targetSlot, card);
@@ -1705,7 +1789,26 @@ document.addEventListener('DOMContentLoaded', () => {
         el.onmouseenter = () => {
             clearTimeout(hoverTimer);
             hoverTimer = setTimeout(() => {
-                showCardDetails(cardData);
+                // Re-read live state — deactivation can change after binding.
+                let card = cardData;
+                if (el.dataset.cardData) {
+                    try {
+                        const live = JSON.parse(el.dataset.cardData);
+                        if (!Array.isArray(live)) card = live;
+                    } catch (e) {}
+                }
+                if (card && card.deactivated) {
+                    // Face down: your own cards always peek; an opponent's only when it was
+                    // deactivated after being shown (never for secret placements).
+                    const ownerZone = el.closest('.player-zone');
+                    const ownerNum = ownerZone ? parseInt(ownerZone.id.split('-')[1]) : 0;
+                    if (card.faceDownSecret && ownerNum !== currentPlayer && !devMode) return;
+                    cardModal.classList.add('asleep-preview');
+                    showCardDetails(card);
+                    return;
+                }
+                cardModal.classList.remove('asleep-preview');
+                showCardDetails(card);
             }, 750);
         };
         el.onmouseleave = () => {
@@ -2277,7 +2380,9 @@ document.addEventListener('DOMContentLoaded', () => {
         const slots = board.querySelectorAll('.landmark-zone-main .card:not(.slot-empty)');
         for (const s of slots) {
             try {
-                if (JSON.parse(s.dataset.cardData).name === cardName) return s;
+                // A deactivated (face-down) Landmark grants no effects — treat it as absent.
+                const d = JSON.parse(s.dataset.cardData);
+                if (d.name === cardName && !d.deactivated) return s;
             } catch (e) { /* skip */ }
         }
         return null;
@@ -2519,11 +2624,31 @@ document.addEventListener('DOMContentLoaded', () => {
         updateRhoneBadge(currentPlayer);
     }
 
-    // How a released charge splits between the two players (opponent is hit first).
-    function rhoneOutcome(charge) {
-        let opp = 0, self = 0;
-        for (let i = 0; i < charge; i++) { if (i % 2 === 0) opp++; else self++; }
-        return { opp, self };
+    // The Force walks the table seat by seat from its owner. dir +1 = towards the next
+    // player, -1 = towards the previous one. With 2 players both directions produce the
+    // same opponent → you alternation, so the direction choice only surfaces at 3+.
+    let rhoneDirection = 1;
+    function rhoneSeat(owner, dir, step) {
+        return ((owner - 1 + dir * step) % activePlayerCount + activePlayerCount) % activePlayerCount + 1;
+    }
+    // How a released charge splits across the seats it passes: { order, hits }.
+    function rhonePasses(charge, owner, dir) {
+        const hits = {};
+        const order = [];
+        for (let i = 1; i <= charge; i++) {
+            const p = rhoneSeat(owner, dir, i);
+            if (!(p in hits)) order.push(p);
+            hits[p] = (hits[p] || 0) + 1;
+        }
+        return { order, hits };
+    }
+    function rhonePreviewText(charge, owner, dir, full) {
+        const { order, hits } = rhonePasses(charge, owner, dir);
+        return order.map(p => {
+            const who = p === owner ? 'You' : (activePlayerCount === 2 ? 'Opponent' : `P${p}`);
+            const sign = (p === owner && full) ? '+' : '−';
+            return `${who} ${sign}${hits[p]} TP`;
+        }).join(' · ');
     }
 
     function toggleRhoneContext() {
@@ -2535,7 +2660,6 @@ document.addEventListener('DOMContentLoaded', () => {
         if (!win || !title || !body) return;
         const charge = rhoneCharge[currentPlayer];
         const full = charge >= 6;
-        const { opp, self } = rhoneOutcome(charge);
         title.textContent = 'Hand of Rhone';
         body.innerHTML = '';
 
@@ -2555,10 +2679,35 @@ document.addEventListener('DOMContentLoaded', () => {
 
         const preview = document.createElement('div');
         preview.className = 'landmark-context-viewed';
-        preview.innerHTML = charge <= 0
-            ? '<span class="lc-viewed-hint">No Force charged yet — it charges each Construction Phase</span>'
-            : `<div class="lc-viewed-name">Opponent −${opp} TP · You ${full ? '+' : '−'}${self} TP</div>` +
-              `<div class="lc-viewed-cost">${full ? 'Full charge: you heal instead of taking damage' : 'The Force passes you too — charge to 6 to heal instead'}</div>`;
+        const refreshPreview = () => {
+            preview.innerHTML = charge <= 0
+                ? '<span class="lc-viewed-hint">No Force charged yet — it charges each Construction Phase</span>'
+                : `<div class="lc-viewed-name">${rhonePreviewText(charge, currentPlayer, rhoneDirection, full)}</div>` +
+                  `<div class="lc-viewed-cost">${full ? 'Full charge: you heal instead of taking damage' : 'The Force passes you too — charge to 6 to heal instead'}</div>`;
+        };
+
+        // 3+ players: the owner chooses which way around the table the Force travels.
+        if (activePlayerCount > 2) {
+            const dirRow = document.createElement('div');
+            dirRow.className = 'landmark-context-row';
+            const dirLabel = document.createElement('div');
+            dirLabel.className = 'landmark-context-label';
+            dirLabel.textContent = 'Direction';
+            const dirBtn = document.createElement('button');
+            dirBtn.className = 'landmark-toggle-btn';
+            const syncDir = () => {
+                dirBtn.textContent = rhoneDirection === 1
+                    ? `→ Towards P${rhoneSeat(currentPlayer, 1, 1)}`
+                    : `← Towards P${rhoneSeat(currentPlayer, -1, 1)}`;
+            };
+            syncDir();
+            dirBtn.onclick = () => { rhoneDirection = -rhoneDirection; syncDir(); refreshPreview(); };
+            dirRow.appendChild(dirLabel);
+            dirRow.appendChild(dirBtn);
+            body.appendChild(dirRow);
+        }
+
+        refreshPreview();
         body.appendChild(preview);
 
         rhoneContextOpen = true;
@@ -2577,14 +2726,14 @@ document.addEventListener('DOMContentLoaded', () => {
         rhoneReleasing = true;
         const full = charge >= 6;
         const owner = currentPlayer;
-        const opponent = (owner % activePlayerCount) + 1;
+        const dir = activePlayerCount > 2 ? rhoneDirection : 1;
         rhoneCharge[owner] = 0; // the counting Futory Die is removed
         updateRhoneBadge(owner);
         closeRhoneContext();
         pulseLandmark(owner, 'Hand of Rhone');
 
-        for (let i = 0; i < charge; i++) {
-            const target = (i % 2 === 0) ? opponent : owner;
+        for (let i = 1; i <= charge; i++) {
+            const target = rhoneSeat(owner, dir, i);
             const board = document.getElementById(`player-${target}`);
             if (target === owner && full) {
                 gainTimePoints(owner, 1);
@@ -3622,7 +3771,7 @@ document.addEventListener('DOMContentLoaded', () => {
     function cabinBonus(board) {
         if (!board) return 0;
         const hasCabin = Array.from(board.querySelectorAll('.landmark-zone-main .card:not(.slot-empty)')).some(s => {
-            try { return JSON.parse(s.dataset.cardData).name === "Meridia's Cabin"; } catch (e) { return false; }
+            try { const d = JSON.parse(s.dataset.cardData); return d.name === "Meridia's Cabin" && !d.deactivated; } catch (e) { return false; }
         });
         if (!hasCabin) return 0;
         let n = 0;
@@ -3655,6 +3804,9 @@ document.addEventListener('DOMContentLoaded', () => {
             if (card.type !== 'Creature') return;
 
             slot.querySelectorAll('.creature-stat-badge, .health-badge, .str-marker').forEach(b => b.remove());
+
+            // Face-down cards show no stats — that's the mystery.
+            if (card.deactivated) return;
 
             // Calculate special buffs (e.g., Meridia, Meridia's Cabin)
             let bonus = 0;
@@ -4523,7 +4675,10 @@ document.addEventListener('DOMContentLoaded', () => {
 
     function resolveBlock(attacker, attackerSlot, defenderNum) {
         const defenderBoard = document.getElementById(`player-${defenderNum}`);
-        const availableCreatures = Array.from(defenderBoard.querySelectorAll('.creature-zone-main .card:not(.slot-empty)'));
+        // Face-down (deactivated) creatures are asleep — they can't block.
+        const availableCreatures = Array.from(defenderBoard.querySelectorAll('.creature-zone-main .card:not(.slot-empty)')).filter(s => {
+            try { const c = JSON.parse(s.dataset.cardData); return c.type === 'Creature' && !c.deactivated; } catch (e) { return false; }
+        });
         if (availableCreatures.length === 0) {
             resolveDamageDirectly(parseInt(attacker.baseStrength ?? attacker.baseHealth) || 0, defenderNum);
             return;
@@ -5118,7 +5273,7 @@ document.addEventListener('DOMContentLoaded', () => {
         landmarks.forEach(s => {
             try {
                 const data = JSON.parse(s.dataset.cardData);
-                if (data.name === 'Pandorama') maxHand += 2;
+                if (data.name === 'Pandorama' && !data.deactivated) maxHand += 2;
             } catch(e) {}
         });
 
@@ -5180,7 +5335,7 @@ document.addEventListener('DOMContentLoaded', () => {
     function getMaxHand(board) {
         let maxHand = 5;
         board.querySelectorAll('.landmark-zone-main .card:not(.slot-empty)').forEach(s => {
-            try { if (JSON.parse(s.dataset.cardData).name === 'Pandorama') maxHand += 2; } catch (e) {}
+            try { const d = JSON.parse(s.dataset.cardData); if (d.name === 'Pandorama' && !d.deactivated) maxHand += 2; } catch (e) {}
         });
         return maxHand;
     }
@@ -5221,7 +5376,7 @@ document.addEventListener('DOMContentLoaded', () => {
         landmarks.forEach(s => {
             try {
                 const data = JSON.parse(s.dataset.cardData);
-                if (data.name === 'Pandorama') maxHand += 2;
+                if (data.name === 'Pandorama' && !data.deactivated) maxHand += 2;
             } catch(e) {}
         });
 
@@ -5250,7 +5405,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 landmarks.forEach(s => {
                     try {
                         const data = JSON.parse(s.dataset.cardData);
-                        if (data.name === 'Pandorama') maxHand += 2;
+                        if (data.name === 'Pandorama' && !data.deactivated) maxHand += 2;
                     } catch(e) {}
                 });
                 const handSlots = Array.from(board.querySelectorAll('.hand-slot'));
@@ -5927,7 +6082,7 @@ document.addEventListener('DOMContentLoaded', () => {
             let data;
             try { data = JSON.parse(slot.dataset.cardData); } catch (e) { continue; }
             const canAct = (data.summonedOnTurn < totalTurns) || data.name.includes('Cravus') || data.name.includes('Rampadon');
-            if (!canAct) continue;
+            if (!canAct || data.deactivated || data.type !== 'Creature') continue;
             if (calculateCurrentStrength(data, slot) <= 0 && !data.name.includes('Entrophy')) continue;
             aiLog(`${data.name} attacks you!`, 'combat');
             beginAttack(data, slot, 1);
@@ -6016,6 +6171,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const options = availableCreatures.map(slot => {
             let c;
             try { c = JSON.parse(slot.dataset.cardData); } catch (e) { return null; }
+            if (c.deactivated || c.type !== 'Creature') return null; // asleep cards can't block
             const res = (parseInt(c.baseResistance ?? c.baseHealth ?? c.resistance ?? c.health) || 0) + cabinBonus(slot.closest('.player-zone')) - (c.damageTaken || 0);
             return { slot, name: c.name, res };
         }).filter(Boolean);

@@ -1713,6 +1713,20 @@ body.dev-mode-on::after {
   50% { box-shadow: 0 0 26px rgba(0, 204, 255, 0.9), 0 0 40px rgba(0, 204, 255, 0.35), inset 0 0 12px rgba(0, 204, 255, 0.35); }
 }
 
+/* Deactivation: a deactivated card lies FACE DOWN on the board (full mystery) —
+   cool-dimmed so the back reads as "asleep" rather than a Future pile. */
+.card-deactivated {
+  filter: saturate(0.55) brightness(0.8);
+  box-shadow: inset 0 0 18px rgba(0, 0, 0, 0.6), 0 0 10px rgba(80, 140, 220, 0.15);
+}
+
+/* Hover-peek of a face-down card you're allowed to see: the front shows dimmed,
+   desaturated and sleek, so a peek never reads as the card being awake. */
+#card-modal.asleep-preview .card-modal-content {
+  opacity: 0.78;
+  filter: saturate(0.55) brightness(0.9);
+}
+
 /* Hand of Rhone: Force charge counter (the counting Futory Die). Violet while
    charging; gold once the full charge of 6 flips the owner's passes to heals. */
 .rhone-badge {
