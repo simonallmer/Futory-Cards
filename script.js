@@ -284,7 +284,7 @@ document.addEventListener('DOMContentLoaded', () => {
         };
     }
 
-    const implementedCards = ["Pandorama", "Fountain of Youth", "Laser Catalyst", "Dragura's Wasteland", "Planetarium", "Lethargo's Temple", "Clone Factory", "Aetherlab", "Entrophy", "Meridius", "Meridia", "Time Thief", "Ichor", "Vulcanem", "Cravus", "Rampadon", "Smoke", "Dark Matter", "Reflector", "Talisman", "Reversal", "Faith", "Threat", "Confiscation", "Gravitas", "Time Bender", "Meridia's Cabin", "Repo Station", "Hand of Rhone"];
+    const implementedCards = ["Pandorama", "Fountain of Youth", "Laser Catalyst", "Dragura's Wasteland", "Planetarium", "Lethargo's Temple", "Clone Factory", "Aetherlab", "Entrophy", "Meridius", "Meridia", "Time Thief", "Ichor", "Vulcanem", "Cravus", "Rampadon", "Smoke", "Dark Matter", "Reflector", "Talisman", "Reversal", "Faith", "Threat", "Confiscation", "Gravitas", "Time Bender", "Meridia's Cabin", "Repo Station", "Hand of Rhone", "Atlantica"];
 
     // --- Intent Classification ---
     // auto: fires on its own when condition is met
@@ -320,6 +320,7 @@ document.addEventListener('DOMContentLoaded', () => {
         "Meridia's Cabin": 'auto',
         'Repo Station': 'contextual',
         'Hand of Rhone': 'active',
+        'Atlantica': 'contextual',
     };
 
     // --- Simulation Presets ---
@@ -495,9 +496,16 @@ document.addEventListener('DOMContentLoaded', () => {
             desc: "Hand of Rhone at full charge (5 + auto +1 on entering Construction = 6 Force). Click it and Release: the Force alternates ×6 — Opponent -3 TP, You +3 TP (full-charge heal).",
             landmarks: ['Hand of Rhone'],
         },
+        'Atlantica': {
+            phase: 1,
+            desc: "Atlantica + Pandorama in play — the extended-hand row appears below the Landmark Zone. Park a card behind each active Landmark (1 each, doesn't count against Hand Limit); parked Steam still pays for buys. Dev-Mode double-click Pandorama: its parked card is discarded.",
+            hand: ['FireSteam', 'GoldSteam', 'LaserSteam'],
+            landmarks: ['Atlantica', 'Pandorama'],
+        },
     };
 
     const devLogData = [
+        { date: '2026-07-08', msg: "Atlantica (Duality L6) — implemented (contextual), per Simon's ruling that parked cards are 'an extension of the hand and work just like the hand': a contextual third row (.atlantica-zone, sea-blue dashed slots) appears below the Landmark Zone the moment Atlantica lands and hides when it leaves. One slot sits behind each Landmark position; while holding a card in your Construction Phase, the empty slots behind ACTIVE Landmarks light up as drop targets (usableAtlanticaSlots() — face-down Landmarks don't qualify), enforcing the printed 1-card-per-Landmark limit by geometry. Parked cards are deliberately NOT .hand-slot (so the Hand Limit, End-Phase draws, discard counter and hand fan never see them — that's the point of the card) but every hand-as-resource path now scans '.hand-slot, .atlantica-slot': autoPayCost, the Bazaar affordability lighting (updateBazaarLighting — found live when a parked FireSteam didn't light an FGL Artifact), Lethargo's steam counting + spending, Aetherlab's upgrade targets, and Clone Factory's GoldSteam. Grabbing a parked card back works through the ordinary click-to-grab flow, so 'just like the hand' holds for replays too. The connected-card rule rides one reconciler, syncAtlanticaZone(): called from clearSlot (Landmark destroyed, e.g. Threat), finishSingleCardPlacement (Landmark arrives) and refreshBoardAfterDeactivation (Landmark flips face down) — any parked card whose Landmark is gone or asleep is discarded to History with a float; if Atlantica itself leaves, the whole row discards and hides. Atlantica can't be deactivated (canBeDeactivated already exempts it). Verified live via sim (Atlantica + Pandorama, 3 Steam in hand): row appeared with exactly 2 slots lit; parking FireSteam dropped hand 3→2 without touching the Hand Limit; buying Dark Matter (FGL) spent the PARKED FireSteam plus hand G+L — the Bazaar tile only unlocked after the affordability fix; parking GoldSteam behind Pandorama and Dev-Mode flipping Pandorama face down discarded the parked card to History while the row (and Atlantica) stayed put. No console errors." },
         { date: '2026-07-08', msg: "Deactivation subsystem (face-down cards) + Hand of Rhone direction choice for 3-4p. Deactivation, per Simon's design: a deactivated card lies FACE DOWN as an actual card back in both cases — deactivated-in-place AND secret placement — for full mystery (cool-dimmed via .card-deactivated so it doesn't read as a Future pile). Two flags in the card data: `deactivated` renders the back and suppresses everything; `faceDownSecret` marks a hidden placement (a Sleep-Potioned Creature entering the zone) that only its owner may peek. Hover rules: your own face-down cards and an opponent's that were deactivated AFTER being shown reveal their front on hover in a dimmed, desaturated 'asleep' modal state (.asleep-preview); a secret placement shows an opponent nothing at all — the hover handler re-reads live slot data, so cards flip visibility correctly after binding. Effect suppression rides the existing chokepoints: findLandmark() treats deactivated Landmarks as absent (silencing Gravitas, Wasteland, Catalyst, Planetarium, Aetherlab, Clone Factory and Rhone's auto-charge — the printed 'unless deactivated' clause now real), all four Pandorama hand-limit checks and cabinBonus() check the flag, face-down Creatures can't block (human picker + AI heuristic), the AI won't attack with one, and stat badges vanish while asleep (refreshBoardAfterDeactivation re-syncs badges/hand limit whenever a card flips). Clicking your own face-down card offers Unveil (flip up + reactivate); an opponent's is not interactable. Atlantica and Razo are exempt via canBeDeactivated(). Until Sleep Potion lands, Dev Mode double-click is the toggle/test path. Rhone: the release now walks seats via rhoneSeat(owner, dir, step) instead of a 2-player alternation; at 3+ players the context window grows a Direction toggle ('→ Towards P2' / '← Towards P4') that live-updates the outcome preview — at 2 players it stays hidden since both directions hit the single opponent first. Verified live: full-charge release regression intact (Opponent −3/You +3, no Direction row at 2p); Dev-Mode flipping Meridia's Cabin face down dropped Ichor's badge 3→base and flipping back restored it with the scan art; owner hover-peek showed the dimmed front; a secret face-down card on the opponent's board showed nothing on hover while the same card without the secret flag showed the asleep preview; clicking your own face-down Ichor unveiled it. No console errors." },
         { date: '2026-07-08', msg: "Hand of Rhone (Duality L5) — implemented (active), per Simon's design: charging is AUTOMATIC — entering your Construction Phase adds +1 Force to the landmark's counting die (capped at 6, shown as a violet '⚡ N Force' badge that turns gold at full charge), hooked into updatePhaseUI's phase-1 branch with a once-per-phase guard, so the Computer's Rhone charges too. Releasing is the player's call: clicking the landmark in your Construction Phase opens the same docked 'Landmark in Use' context window Lethargo's Temple uses, showing the charge and a live outcome preview ('Opponent −2 TP · You −1 TP'), with a Release Force button. The Force travels around the table alternating opponent → you → opponent… for the charged distance, resolving one pass per beat (~550ms) with -1 TP floats on each active die — in 2-player either direction reaches the opponent first, so the direction choice waits for 3-4p. Under 6 it's the shot-in-the-knee trade (3 Force: opponent −2, you −1); at the FULL charge of 6 your own passes heal instead of damage (opponent −3, you +3), routed through gainTimePoints/resolveDamageDirectly so Time Bender's active die and the lost-die cap are respected. Releasing removes the die (charge to 0, badge gone); a destroyed landmark takes its charge with it, and Play Again resets all four counters. The 'unless deactivated' clause on charging is noted and will be wired when the face-down deactivation subsystem lands (needed for Atlantica/Sleep Potion/Razo/Masiota). Sim preset seeds 5 Force so the load-time auto-charge demonstrates itself by completing the full 6. Verified live both ways: at 3 Force the release hit Opponent 12→10 and You 9→8; at 6 the badge went gold, the preview read 'Opponent −3 TP · You +3 TP', and the release finished Opponent 12→9, You 9→12. No alerts, no console errors." },
         { date: '2026-07-08', msg: "Repo Station (Duality L4) — implemented (contextual), per Simon's rulings: 'defeat an opponent's Creature' means your ATTACK destroys their blocker — including mutual destruction, and including Meridia self-sacrificing to swallow your hit — while a repelled attack and defensive blocking give nothing; the sacrifice half is legal in your Construction AND Creature Phases. Auto half: applyRepoStationGain(attackerSlot) is hooked into all three blocker-destroyed branches of resolveCombat (outright defeat, mutual destruction, Meridia absorption); it resolves the owner from the attacker slot's board — not currentPlayer — so it also fires correctly when the Computer's attack defeats a human blocker, and only pays out if that owner actually has Repo Station in play. Active half: click the Station during your Construction or Creature Phase — one Creature in the zone sacrifices immediately; with several, every Creature-type card pulses with the red threat-target glow (Artifact cards lying in the zone via Lotus are excluded — you can't 'sacrifice' a Lotus) and a capture-phase click picks the victim, exactly the Threat/Wasteland picker pattern. Sacrifice = 'Sacrificed' float + clearSlot to your own History + landmark pulse + 1 TP via gainTimePoints (which respects both the 12 cap and Time Bender's active-die routing). Sim preset (Creature Phase, Day 10, Cravus + Vulcanem vs a weakened Ichor). Verified live: clicking the Station pulsed both creatures, picking Vulcanem moved it to History with Day 10→11; then attacking with Cravus into the blocking Ichor read 'Blocker Defeated! 1 Spillover Damage.' and Repo Station paid again, Day 11→12, with Ichor landing in P2's History. No alerts, no console errors." },
@@ -783,6 +791,13 @@ document.addEventListener('DOMContentLoaded', () => {
             creatureZoneMain.appendChild(createSlot('creature', i === 2));
         }
 
+        // Atlantica (Duality L6): contextual extended-hand row below the Landmark Zone.
+        // One slot behind each Landmark position; only shown while Atlantica is in play.
+        const atlanticaZone = document.createElement('div');
+        atlanticaZone.className = 'board-main-slots atlantica-zone hidden';
+        for (let i = 0; i < 5; i++) atlanticaZone.appendChild(createSlot('atlantica'));
+        landmarkZoneMain.parentNode.insertAdjacentElement('afterend', atlanticaZone);
+
         // Populate stacks
         const futureSlot = createStackSlot('Future', 'future-pile');
         const historySlot = createStackSlot('History', 'history-pile');
@@ -1016,6 +1031,7 @@ document.addEventListener('DOMContentLoaded', () => {
         slot.className = 'card slot-empty' + (isMiddle ? ' middle-slot' : '');
         slot.dataset.type = type;
         if (type === 'hand') slot.classList.add('hand-slot');
+        if (type === 'atlantica') slot.classList.add('atlantica-slot');
         
         slot.addEventListener('click', (e) => {
             e.stopPropagation();
@@ -1131,6 +1147,12 @@ document.addEventListener('DOMContentLoaded', () => {
         if (board) {
             const pNum = board.id.split('-')[1];
             updateHandLayout(pNum);
+
+            // Removing a Landmark discards its Atlantica-connected card (and hides
+            // the extended-hand row when Atlantica itself leaves play).
+            if (slot.parentNode && slot.parentNode.classList.contains('landmark-zone-main')) {
+                syncAtlanticaZone(parseInt(pNum));
+            }
         }
 
         checkHandLimit();
@@ -1429,6 +1451,14 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         }
 
+        // Atlantica: empty extended-hand slots behind your active Landmarks accept any
+        // card that could sit in Hand (Construction Phase, like the parking action itself).
+        if (card.type !== 'Spark' && card.type !== 'Landmark' && currentPhase === 1) {
+            usableAtlanticaSlots(currentPlayer)
+                .filter(s => s.classList.contains('slot-empty'))
+                .forEach(s => { if (!targets.includes(s)) targets.push(s); });
+        }
+
         // EVERY non-spark, non-steam card can now be added to Future or History as requested
         if (card.type !== 'Spark' && card.type !== 'Steam') {
             const universalTargets = Array.from(activeBoard.querySelectorAll('.future-pile, .history-pile'));
@@ -1511,6 +1541,8 @@ document.addEventListener('DOMContentLoaded', () => {
             return;
         }
 
+        const isAtlantica = targetSlot.classList.contains('atlantica-slot');
+
         let isValid = false;
         if (topCard.type === 'Spark') {
             isValid = isAbyss; // ONLY Abyss for Spark
@@ -1520,7 +1552,10 @@ document.addEventListener('DOMContentLoaded', () => {
                       (topCard.type === 'Landmark' && isLandmarkZone) ||
                       (topCard.type === 'Artifact' && (isHistory || isHandAction)) ||
                       (topCard.type === 'Creature' && (isHandAction || isCreatureZone)) ||
-                      (topCard.type === 'Steam' && isHandAction);
+                      (topCard.type === 'Steam' && isHandAction) ||
+                      // Atlantica: park behind an active Landmark (extended hand, 1 per Landmark)
+                      (topCard.type !== 'Landmark' && isAtlantica &&
+                       usableAtlanticaSlots(currentPlayer).includes(targetSlot));
         }
 
         // Dev Mode allows any non-Bazaar slot as a valid target
@@ -1535,6 +1570,7 @@ document.addEventListener('DOMContentLoaded', () => {
         // Phase specific restrictions for zones (bypassed in Dev Mode)
         if (!devMode && isCreatureZone && (currentPhase !== 1 && currentPhase !== 2)) return;
         if (!devMode && isLandmarkZone && currentPhase !== 1) return;
+        if (!devMode && isAtlantica && currentPhase !== 1) return;
 
         if (isAutoDrop) {
             const handSlotsContainer = targetSlot.closest('.player-zone').querySelector('.hand-slots');
@@ -1715,8 +1751,61 @@ document.addEventListener('DOMContentLoaded', () => {
     // badges (Meridia's Cabin) or the hand limit (Pandorama). Re-sync both.
     function refreshBoardAfterDeactivation(slot) {
         const board = slot.closest('.player-zone');
-        if (board) board.querySelectorAll('.creature-zone-main .card:not(.slot-empty)').forEach(s => updateCreatureVisuals(s));
+        if (board) {
+            board.querySelectorAll('.creature-zone-main .card:not(.slot-empty)').forEach(s => updateCreatureVisuals(s));
+            syncAtlanticaZone(parseInt(board.id.split('-')[1]));
+        }
         checkHandLimit();
+    }
+
+    // --- Atlantica (Duality L6): an extended hand behind your Landmarks ---
+    // While Atlantica is active you may park 1 Hand card face up behind each active
+    // Landmark (the contextual .atlantica-zone row below the Landmark Zone). Parked cards
+    // work just like Hand cards (they pay costs, can be grabbed and played) but don't
+    // count against the Hand Limit. If the connected Landmark leaves play or flips face
+    // down — or Atlantica itself does — the parked card is discarded to History.
+    function usableAtlanticaSlots(pNum) {
+        const board = document.getElementById(`player-${pNum}`);
+        if (!board || !findLandmark(pNum, 'Atlantica')) return [];
+        const lSlots = Array.from(board.querySelectorAll('.landmark-zone-main .card'));
+        return Array.from(board.querySelectorAll('.atlantica-slot')).filter((s, i) => {
+            const lm = lSlots[i];
+            if (!lm || lm.classList.contains('slot-empty')) return false;
+            try { return !JSON.parse(lm.dataset.cardData).deactivated; } catch (e) { return false; }
+        });
+    }
+
+    // Reconcile the row with reality: discard parked cards whose Landmark is gone or
+    // asleep, and show the row only while Atlantica itself is active.
+    function syncAtlanticaZone(pNum) {
+        const board = document.getElementById(`player-${pNum}`);
+        if (!board) return;
+        const zone = board.querySelector('.atlantica-zone');
+        if (!zone) return;
+        const lSlots = Array.from(board.querySelectorAll('.landmark-zone-main .card'));
+        const hist = board.querySelector('.history-pile');
+        const atlanticaActive = !!findLandmark(pNum, 'Atlantica');
+
+        Array.from(zone.querySelectorAll('.atlantica-slot')).forEach((aSlot, i) => {
+            if (aSlot.classList.contains('slot-empty')) return;
+            let keep = atlanticaActive;
+            if (keep) {
+                const lm = lSlots[i];
+                try {
+                    keep = !!lm && !lm.classList.contains('slot-empty') && !JSON.parse(lm.dataset.cardData).deactivated;
+                } catch (e) { keep = false; }
+            }
+            if (!keep) {
+                let card;
+                try { card = JSON.parse(aSlot.dataset.cardData); } catch (e) { card = null; }
+                clearSlot(aSlot);
+                if (card && hist) {
+                    finishSingleCardPlacement(hist, card);
+                    floatValue(hist, `${card.name} Discarded`, 'damage');
+                }
+            }
+        });
+        zone.classList.toggle('hidden', !atlanticaActive);
     }
 
     function finishSingleCardPlacement(targetSlot, card) {
@@ -1781,6 +1870,12 @@ document.addEventListener('DOMContentLoaded', () => {
 
         if (!isStack && targetSlot.parentNode && targetSlot.parentNode.classList.contains('creature-zone-main')) {
             checkMeridiaZeroHp(targetSlot, card);
+        }
+
+        // A Landmark arriving (e.g. Atlantica itself) may reveal the extended-hand row.
+        if (!isStack && targetSlot.parentNode && targetSlot.parentNode.classList.contains('landmark-zone-main')) {
+            const bd = targetSlot.closest('.player-zone');
+            if (bd) syncAtlanticaZone(parseInt(bd.id.split('-')[1]));
         }
     }
 
@@ -1950,7 +2045,8 @@ document.addEventListener('DOMContentLoaded', () => {
         if (!myBoard) return;
 
         let mySteams = { F: 0, G: 0, L: 0, A: 0 };
-        const handSlots = Array.from(myBoard.querySelectorAll('.hand-slot'));
+        // Atlantica-parked cards count as Hand for affordability too.
+        const handSlots = Array.from(myBoard.querySelectorAll('.hand-slot, .atlantica-slot'));
         handSlots.forEach(s => {
             if (!s.classList.contains('slot-empty') && s.dataset.cardData) {
                 try {
@@ -2426,7 +2522,7 @@ document.addEventListener('DOMContentLoaded', () => {
         if (!board) return;
 
         // Need a GoldSteam in hand to spend.
-        const goldSlot = Array.from(board.querySelectorAll('.hand-slot:not(.slot-empty)')).find(s => {
+        const goldSlot = Array.from(board.querySelectorAll('.hand-slot:not(.slot-empty), .atlantica-slot:not(.slot-empty)')).find(s => {
             try { return JSON.parse(s.dataset.cardData).name === 'GoldSteam'; } catch (e) { return false; }
         });
         if (!goldSlot) {
@@ -3171,7 +3267,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const board = document.getElementById(`player-${pNum}`);
         const counts = { F: 0, G: 0, L: 0 };
         if (!board) return counts;
-        board.querySelectorAll('.hand-slot:not(.slot-empty)').forEach(s => {
+        board.querySelectorAll('.hand-slot:not(.slot-empty), .atlantica-slot:not(.slot-empty)').forEach(s => {
             try {
                 const d = JSON.parse(s.dataset.cardData);
                 if (d.number === 'STM1') counts.F++;
@@ -3302,7 +3398,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const used = new Set();
         plan.steamTypes.forEach((type, idx) => {
             const num = type === 'F' ? 'STM1' : type === 'G' ? 'STM2' : 'STM3';
-            const slot = Array.from(board.querySelectorAll('.hand-slot:not(.slot-empty)')).find(s => {
+            const slot = Array.from(board.querySelectorAll('.hand-slot:not(.slot-empty), .atlantica-slot:not(.slot-empty)')).find(s => {
                 if (used.has(s)) return false;
                 try { return JSON.parse(s.dataset.cardData).number === num; } catch (e) { return false; }
             });
@@ -3666,7 +3762,8 @@ document.addEventListener('DOMContentLoaded', () => {
         const activeBoard = document.getElementById(`player-${currentPlayer}`);
         if (!activeBoard) return;
 
-        const handSlots = Array.from(activeBoard.querySelectorAll('.hand-slot'));
+        // Atlantica-parked cards spend just like Hand cards.
+        const handSlots = Array.from(activeBoard.querySelectorAll('.hand-slot, .atlantica-slot'));
         const historySlot = activeBoard.querySelector('.history-pile');
         if (!historySlot) return;
 
@@ -3873,7 +3970,7 @@ document.addEventListener('DOMContentLoaded', () => {
     function eligibleHandSteams() {
         const board = document.getElementById(`player-${currentPlayer}`);
         if (!board) return [];
-        return Array.from(board.querySelectorAll('.hand-slot:not(.slot-empty)')).filter(s => {
+        return Array.from(board.querySelectorAll('.hand-slot:not(.slot-empty), .atlantica-slot:not(.slot-empty)')).filter(s => {
             try {
                 const d = JSON.parse(s.dataset.cardData);
                 const spec = AETHERLAB_UPGRADE[d.number];

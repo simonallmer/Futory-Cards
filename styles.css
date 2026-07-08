@@ -1713,6 +1713,20 @@ body.dev-mode-on::after {
   50% { box-shadow: 0 0 26px rgba(0, 204, 255, 0.9), 0 0 40px rgba(0, 204, 255, 0.35), inset 0 0 12px rgba(0, 204, 255, 0.35); }
 }
 
+/* Atlantica: the contextual extended-hand row below the Landmark Zone. One slot
+   behind each Landmark position; sea-blue tint to read as Atlantica's water. */
+.atlantica-zone {
+  margin-top: 8px;
+  min-height: 96px;
+  border-color: rgba(0, 170, 255, 0.35);
+  background: linear-gradient(to right, rgba(0, 140, 255, 0.06), transparent);
+}
+
+.atlantica-zone .atlantica-slot.slot-empty {
+  border-style: dashed;
+  border-color: rgba(0, 170, 255, 0.25);
+}
+
 /* Deactivation: a deactivated card lies FACE DOWN on the board (full mystery) —
    cool-dimmed so the back reads as "asleep" rather than a Future pile. */
 .card-deactivated {
