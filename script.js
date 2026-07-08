@@ -284,7 +284,7 @@ document.addEventListener('DOMContentLoaded', () => {
         };
     }
 
-    const implementedCards = ["Pandorama", "Fountain of Youth", "Laser Catalyst", "Dragura's Wasteland", "Planetarium", "Lethargo's Temple", "Clone Factory", "Aetherlab", "Entrophy", "Meridius", "Meridia", "Time Thief", "Ichor", "Vulcanem", "Cravus", "Rampadon", "Smoke", "Dark Matter", "Reflector", "Talisman", "Reversal", "Faith", "Threat", "Confiscation", "Gravitas", "Time Bender", "Meridia's Cabin"];
+    const implementedCards = ["Pandorama", "Fountain of Youth", "Laser Catalyst", "Dragura's Wasteland", "Planetarium", "Lethargo's Temple", "Clone Factory", "Aetherlab", "Entrophy", "Meridius", "Meridia", "Time Thief", "Ichor", "Vulcanem", "Cravus", "Rampadon", "Smoke", "Dark Matter", "Reflector", "Talisman", "Reversal", "Faith", "Threat", "Confiscation", "Gravitas", "Time Bender", "Meridia's Cabin", "Repo Station"];
 
     // --- Intent Classification ---
     // auto: fires on its own when condition is met
@@ -318,6 +318,7 @@ document.addEventListener('DOMContentLoaded', () => {
         'Gravitas': 'auto',
         'Time Bender': 'active',
         "Meridia's Cabin": 'auto',
+        'Repo Station': 'contextual',
     };
 
     // --- Simulation Presets ---
@@ -478,9 +479,18 @@ document.addEventListener('DOMContentLoaded', () => {
             p1creatures: [{ name: 'Ichor', damageTaken: 0 }],
             p1history: ['GoldSteam', 'Smoke'],
         },
+        'Repo Station': {
+            phase: 2,
+            day: 10,
+            desc: "Repo Station in play, Cravus + Vulcanem in zone, P2 has a weakened Ichor blocker. Attack and defeat it for +1 TP, or click the Station and pick one of your own to sacrifice for +1 TP.",
+            landmarks: ['Repo Station'],
+            p1creatures: [{ name: 'Cravus', damageTaken: 0 }, { name: 'Vulcanem', damageTaken: 0 }],
+            p2creatures: [{ name: 'Ichor', damageTaken: 1 }],
+        },
     };
 
     const devLogData = [
+        { date: '2026-07-08', msg: "Repo Station (Duality L4) — implemented (contextual), per Simon's rulings: 'defeat an opponent's Creature' means your ATTACK destroys their blocker — including mutual destruction, and including Meridia self-sacrificing to swallow your hit — while a repelled attack and defensive blocking give nothing; the sacrifice half is legal in your Construction AND Creature Phases. Auto half: applyRepoStationGain(attackerSlot) is hooked into all three blocker-destroyed branches of resolveCombat (outright defeat, mutual destruction, Meridia absorption); it resolves the owner from the attacker slot's board — not currentPlayer — so it also fires correctly when the Computer's attack defeats a human blocker, and only pays out if that owner actually has Repo Station in play. Active half: click the Station during your Construction or Creature Phase — one Creature in the zone sacrifices immediately; with several, every Creature-type card pulses with the red threat-target glow (Artifact cards lying in the zone via Lotus are excluded — you can't 'sacrifice' a Lotus) and a capture-phase click picks the victim, exactly the Threat/Wasteland picker pattern. Sacrifice = 'Sacrificed' float + clearSlot to your own History + landmark pulse + 1 TP via gainTimePoints (which respects both the 12 cap and Time Bender's active-die routing). Sim preset (Creature Phase, Day 10, Cravus + Vulcanem vs a weakened Ichor). Verified live: clicking the Station pulsed both creatures, picking Vulcanem moved it to History with Day 10→11; then attacking with Cravus into the blocking Ichor read 'Blocker Defeated! 1 Spillover Damage.' and Repo Station paid again, Day 11→12, with Ichor landing in P2's History. No alerts, no console errors." },
         { date: '2026-07-08', msg: "Meridia's Cabin (Duality L3) — implemented (auto), per Simon's ruling on the wording: the History Pile part counts the TOP CARD ONLY (an Artifact on top = +1, never more from History), and 'unoccupied in your Creature Zone' means Artifacts lying there without a Creature on them — today that can only be Lotus (A2, not yet implemented), so the zone half of cabinBonus() already counts Artifact-type cards in Creature-Zone slots and will light up the moment Lotus lands. Every Creature on the Cabin owner's board gains +N to its single HP value (both attack strength and block resistance — Meridia precedent), wired into all four consumers: the zone stat badge (updateCreatureVisuals, reusing the green 'buffed' styling), attack strength (calculateCurrentStrength), the human blocker's resistance in resolveCombat, and the Computer's block-decision heuristic (aiChooseBlocker), so the AI weighs the buff when choosing walls. The interesting part is liveness — the buff moves whenever the History top changes, so updateStackIndicator (the one chokepoint every History write already flows through) now refreshes the board's creature badges on any History change. That also fixes a latent staleness bug for Meridia's own badge, which previously only updated on placement. Sim preset: Cabin + Ichor in zone, Smoke (Artifact) on top of History. Verified live: Ichor's badge showed 3 (2 base + 1, buffed green); discarding a FireSteam onto History covered the Smoke and the badge dropped back to base (no badge) immediately, alert-free, no console errors." },
         { date: '2026-07-08', msg: "Time Bender (Duality L2) — implemented (active): 'Once per Construction Phase, you may switch your active Time Die.' This needed a concept the engine didn't have — until now 'damage comes off the Day die first' was hardcoded in resolveDamageDirectly, gainTimePoints, Fountain of Youth's Skip-Turn grant, and seven scattered float-position ternaries. All of it now routes through one shared pair: playersState gains an activeDie field ('day' default, reset on Play Again) and activeDieType(pNum) resolves which die TP changes hit first — with a built-in fallback, since a die at 0 is permanently lost and can't be active. This is groundwork Duality reuses: Aromeas (C5) reads 'your active Time Die' too. The landmark follows the Clone Factory click pattern: click Time Bender during your Construction Phase (once per phase, reset alongside Aetherlab's flag) to flip the active die — persistent across turns until switched again. Visual language: the landmark pulses, 'Night Active'/'Day Active' floats over the newly active die, and while Night is the active die its counter wears a pulsing cyan marker ring (new .active-die-marker CSS riding the existing blue-die palette; Day-active is the default state and stays unmarked, so the board only glows when something unusual is true). Sim preset: Time Bender in play at Day 10 / Night 8 with Faith + payment in hand. Verified live: clicking the landmark set the marker ring with no alert; a second click correctly refused ('already switched this Construction Phase'); playing Faith then put its +3 TP on the NIGHT die (8→11) while Day stayed at 10 — proof the routing actually moved, since day-first would have gone 10→12 with the remainder spilling to Night. No console errors." },
         { date: '2026-07-08', msg: "Gravitas (Duality L1) — first Duality effect implemented (auto): 'Whenever you shuffle your History Pile to form a new Future Pile, draw Cards until you reach your Hand Limit.' The game has exactly one reshuffle site — the History→Future fold inside drawCards() (the same branch that already handles Meridia's Abyss exile) — so a `reshuffled` flag set there feeds a post-loop hook, resolveGravitasRefill(): it waits 400ms for the in-flight deal animations to actually fill their slots (a dealt slot only becomes occupied ~600ms after its flight starts, while the draw loop waits just 500ms — counting earlier would misread the hand), then measures the deficit against the LIVE hand limit via getMaxHand() (so Pandorama's +2 raises the refill target to 7), pulses the landmark with the shared landmark-triggered glow and floats 'Draw N' over it, and draws the missing cards through the same drawCards() it hooked — safely recursive, since a hand at its limit yields deficit 0 and stops. Fires for whichever player's pile reshuffles (including the Computer's End Phase), which is correct for an auto-intent Landmark. New sim preset (phase 3: 1 card in hand, 1 in Future, 6 in History): the End Phase draw of 2 forces the reshuffle mid-draw. Verified live via sim: draw 1 took the last Future card (hand 2), draw 2 reshuffled all 6 History cards and dealt one (hand 3), then Gravitas pulsed 'Draw 2' and refilled to exactly 5 — Future left holding the 3 undrawn reshuffled cards, History empty, no console errors." },
@@ -1027,6 +1037,12 @@ document.addEventListener('DOMContentLoaded', () => {
                 // Time Bender: switch your active Time Die (Construction Phase, once per phase).
                 if (!devMode && isLandmarkZone && isMyBoard && currentPhase === 1 && cardData.name === 'Time Bender') {
                     activateTimeBender();
+                    return;
+                }
+
+                // Repo Station: sacrifice one of your Creatures for 1 TP (Construction or Creature Phase).
+                if (!devMode && isLandmarkZone && isMyBoard && (currentPhase === 1 || currentPhase === 2) && cardData.name === 'Repo Station') {
+                    activateRepoStation();
                     return;
                 }
 
@@ -2382,6 +2398,64 @@ document.addEventListener('DOMContentLoaded', () => {
         updateActiveDieGlow(currentPlayer);
         const board = document.getElementById(`player-${currentPlayer}`);
         if (board) floatValue(board.querySelector(activeDieSel(currentPlayer)), next === 'night' ? 'Night Active' : 'Day Active', 'gain');
+    }
+
+    // --- Repo Station (Duality L4): 1 TP per defeated opponent Creature, or sacrifice your own ---
+    // Auto half: whenever your attack defeats an opponent's Creature (blocker destroyed,
+    // including mutual destruction; a repelled attack gives nothing), gain 1 Time Point.
+    // Active half: click the landmark in your Construction or Creature Phase to sacrifice
+    // one of your own Creatures from the zone for 1 Time Point.
+    function applyRepoStationGain(attackerSlot) {
+        const board = attackerSlot.closest('.player-zone');
+        if (!board) return;
+        const pNum = parseInt(board.id.split('-')[1]);
+        if (!findLandmark(pNum, 'Repo Station')) return;
+        gainTimePoints(pNum, 1);
+        pulseLandmark(pNum, 'Repo Station');
+        floatValue(board.querySelector(activeDieSel(pNum)), '+1 TP', 'gain');
+    }
+
+    function activateRepoStation() {
+        const board = document.getElementById(`player-${currentPlayer}`);
+        if (!board) return;
+        const creatures = Array.from(board.querySelectorAll('.creature-zone-main .card:not(.slot-empty)')).filter(s => {
+            try { return JSON.parse(s.dataset.cardData).type === 'Creature'; } catch (e) { return false; }
+        });
+        if (!creatures.length) {
+            alert('Repo Station: you have no Creature in your Creature Zone to sacrifice.');
+            return;
+        }
+        if (creatures.length === 1) { repoSacrifice(creatures[0]); return; }
+        // Several candidates — pulse them red (same picker pattern as Threat/Wasteland)
+        // and let the player click which one to sacrifice.
+        const cleanup = () => creatures.forEach(s => {
+            s.classList.remove('threat-target');
+            if (s._repoHandler) s.removeEventListener('click', s._repoHandler, true);
+            delete s._repoHandler;
+        });
+        creatures.forEach(s => {
+            s.classList.add('threat-target');
+            const handler = (e) => {
+                e.stopPropagation();
+                e.preventDefault();
+                cleanup();
+                repoSacrifice(s);
+            };
+            s._repoHandler = handler;
+            s.addEventListener('click', handler, true); // capture: preempt the normal creature click
+        });
+    }
+
+    function repoSacrifice(slot) {
+        const board = document.getElementById(`player-${currentPlayer}`);
+        let card;
+        try { card = JSON.parse(slot.dataset.cardData); } catch (e) { return; }
+        floatValue(slot, 'Sacrificed', 'damage');
+        clearSlot(slot);
+        finishSingleCardPlacement(board.querySelector('.history-pile'), card);
+        pulseLandmark(currentPlayer, 'Repo Station');
+        gainTimePoints(currentPlayer, 1);
+        floatValue(board.querySelector(activeDieSel(currentPlayer)), '+1 TP', 'gain');
     }
 
     // Laser Catalyst: LaserSteam, End Phase -> 1 unpreventable damage to the opponent.
@@ -4247,6 +4321,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 feedbackEl.textContent = "Meridia Sacrificed! All Damage Prevented.";
                 clearSlot(blockerSlot);
                 finishSingleCardPlacement(blockerHistory, blockerData);
+                applyRepoStationGain(attackerSlot);
             } else {
                 feedbackEl.textContent = "Attacker Repelled! Defender Survives.";
             }
@@ -4262,6 +4337,7 @@ document.addEventListener('DOMContentLoaded', () => {
             
             clearSlot(blockerSlot);
             finishSingleCardPlacement(blockerHistory, blockerData);
+            applyRepoStationGain(attackerSlot);
             resolveDamageDirectly(overflow, defenderNum);
         } else if (attackerStr < blockerStr) {
             feedbackEl.textContent = "Attacker Repelled! Defender Survives.";
@@ -4272,6 +4348,7 @@ document.addEventListener('DOMContentLoaded', () => {
             feedbackEl.textContent = "Mutual Destruction! Both cards to History.";
             clearSlot(blockerSlot);
             finishSingleCardPlacement(blockerHistory, blockerData);
+            applyRepoStationGain(attackerSlot);
         }
 
         // Cleanup Attacker - move to history (unless Clone Factory keeps it for a 2nd strike)
