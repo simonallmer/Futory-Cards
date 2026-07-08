@@ -46,13 +46,20 @@ document.addEventListener('DOMContentLoaded', () => {
 
         const count = data.length;
 
+        // History changes can move creature stat buffs (Meridia's Artifact count,
+        // Meridia's Cabin's top-of-History Artifact) — refresh this board's badges.
+        if (isHistory) {
+            const board = slot.closest('.player-zone');
+            if (board) board.querySelectorAll('.creature-zone-main .card:not(.slot-empty)').forEach(s => updateCreatureVisuals(s));
+        }
+
         // If empty, reset visuals completely
         if (count === 0) {
             slot.classList.add('slot-empty');
             slot.style.backgroundImage = '';
             slot.style.backgroundColor = '';
             slot.textContent = '';
-            
+
             const label = document.createElement('div');
             label.className = 'pile-label tech-font';
             label.textContent = isHistory ? 'History' : 'Future';
@@ -277,7 +284,7 @@ document.addEventListener('DOMContentLoaded', () => {
         };
     }
 
-    const implementedCards = ["Pandorama", "Fountain of Youth", "Laser Catalyst", "Dragura's Wasteland", "Planetarium", "Lethargo's Temple", "Clone Factory", "Aetherlab", "Entrophy", "Meridius", "Meridia", "Time Thief", "Ichor", "Vulcanem", "Cravus", "Rampadon", "Smoke", "Dark Matter", "Reflector", "Talisman", "Reversal", "Faith", "Threat", "Confiscation", "Gravitas", "Time Bender"];
+    const implementedCards = ["Pandorama", "Fountain of Youth", "Laser Catalyst", "Dragura's Wasteland", "Planetarium", "Lethargo's Temple", "Clone Factory", "Aetherlab", "Entrophy", "Meridius", "Meridia", "Time Thief", "Ichor", "Vulcanem", "Cravus", "Rampadon", "Smoke", "Dark Matter", "Reflector", "Talisman", "Reversal", "Faith", "Threat", "Confiscation", "Gravitas", "Time Bender", "Meridia's Cabin"];
 
     // --- Intent Classification ---
     // auto: fires on its own when condition is met
@@ -310,6 +317,7 @@ document.addEventListener('DOMContentLoaded', () => {
         'Confiscation': 'active',
         'Gravitas': 'auto',
         'Time Bender': 'active',
+        "Meridia's Cabin": 'auto',
     };
 
     // --- Simulation Presets ---
@@ -462,9 +470,18 @@ document.addEventListener('DOMContentLoaded', () => {
             hand: ['GoldSteam', 'GoldSteam', 'GoldSteam', 'Faith'],
             landmarks: ['Time Bender'],
         },
+        "Meridia's Cabin": {
+            phase: 1,
+            desc: "Cabin in play, Smoke (Artifact) on top of History, Ichor in zone — badge should show 3 (2+1). Discard a Steam onto History (covering Smoke) and the buff drops off.",
+            hand: ['FireSteam'],
+            landmarks: ["Meridia's Cabin"],
+            p1creatures: [{ name: 'Ichor', damageTaken: 0 }],
+            p1history: ['GoldSteam', 'Smoke'],
+        },
     };
 
     const devLogData = [
+        { date: '2026-07-08', msg: "Meridia's Cabin (Duality L3) — implemented (auto), per Simon's ruling on the wording: the History Pile part counts the TOP CARD ONLY (an Artifact on top = +1, never more from History), and 'unoccupied in your Creature Zone' means Artifacts lying there without a Creature on them — today that can only be Lotus (A2, not yet implemented), so the zone half of cabinBonus() already counts Artifact-type cards in Creature-Zone slots and will light up the moment Lotus lands. Every Creature on the Cabin owner's board gains +N to its single HP value (both attack strength and block resistance — Meridia precedent), wired into all four consumers: the zone stat badge (updateCreatureVisuals, reusing the green 'buffed' styling), attack strength (calculateCurrentStrength), the human blocker's resistance in resolveCombat, and the Computer's block-decision heuristic (aiChooseBlocker), so the AI weighs the buff when choosing walls. The interesting part is liveness — the buff moves whenever the History top changes, so updateStackIndicator (the one chokepoint every History write already flows through) now refreshes the board's creature badges on any History change. That also fixes a latent staleness bug for Meridia's own badge, which previously only updated on placement. Sim preset: Cabin + Ichor in zone, Smoke (Artifact) on top of History. Verified live: Ichor's badge showed 3 (2 base + 1, buffed green); discarding a FireSteam onto History covered the Smoke and the badge dropped back to base (no badge) immediately, alert-free, no console errors." },
         { date: '2026-07-08', msg: "Time Bender (Duality L2) — implemented (active): 'Once per Construction Phase, you may switch your active Time Die.' This needed a concept the engine didn't have — until now 'damage comes off the Day die first' was hardcoded in resolveDamageDirectly, gainTimePoints, Fountain of Youth's Skip-Turn grant, and seven scattered float-position ternaries. All of it now routes through one shared pair: playersState gains an activeDie field ('day' default, reset on Play Again) and activeDieType(pNum) resolves which die TP changes hit first — with a built-in fallback, since a die at 0 is permanently lost and can't be active. This is groundwork Duality reuses: Aromeas (C5) reads 'your active Time Die' too. The landmark follows the Clone Factory click pattern: click Time Bender during your Construction Phase (once per phase, reset alongside Aetherlab's flag) to flip the active die — persistent across turns until switched again. Visual language: the landmark pulses, 'Night Active'/'Day Active' floats over the newly active die, and while Night is the active die its counter wears a pulsing cyan marker ring (new .active-die-marker CSS riding the existing blue-die palette; Day-active is the default state and stays unmarked, so the board only glows when something unusual is true). Sim preset: Time Bender in play at Day 10 / Night 8 with Faith + payment in hand. Verified live: clicking the landmark set the marker ring with no alert; a second click correctly refused ('already switched this Construction Phase'); playing Faith then put its +3 TP on the NIGHT die (8→11) while Day stayed at 10 — proof the routing actually moved, since day-first would have gone 10→12 with the remainder spilling to Night. No console errors." },
         { date: '2026-07-08', msg: "Gravitas (Duality L1) — first Duality effect implemented (auto): 'Whenever you shuffle your History Pile to form a new Future Pile, draw Cards until you reach your Hand Limit.' The game has exactly one reshuffle site — the History→Future fold inside drawCards() (the same branch that already handles Meridia's Abyss exile) — so a `reshuffled` flag set there feeds a post-loop hook, resolveGravitasRefill(): it waits 400ms for the in-flight deal animations to actually fill their slots (a dealt slot only becomes occupied ~600ms after its flight starts, while the draw loop waits just 500ms — counting earlier would misread the hand), then measures the deficit against the LIVE hand limit via getMaxHand() (so Pandorama's +2 raises the refill target to 7), pulses the landmark with the shared landmark-triggered glow and floats 'Draw N' over it, and draws the missing cards through the same drawCards() it hooked — safely recursive, since a hand at its limit yields deficit 0 and stops. Fires for whichever player's pile reshuffles (including the Computer's End Phase), which is correct for an auto-intent Landmark. New sim preset (phase 3: 1 card in hand, 1 in Future, 6 in History): the End Phase draw of 2 forces the reshuffle mid-draw. Verified live via sim: draw 1 took the last Future card (hand 2), draw 2 reshuffled all 6 History cards and dealt one (hand 3), then Gravitas pulsed 'Draw 2' and refilled to exactly 5 — Future left holding the 3 undrawn reshuffled cards, History empty, no console errors." },
         { date: '2026-07-07', msg: "Duality set — all 24 Bazaar cards now have their printed prototype scans (assets/cards/duality/, slug-named copies of the drop-in duallity/ folder) and the whole set is playable next to Unity. cardData.js was reconciled against the printed cards, which are the source of truth: the Bazaar order now follows each card's printed position footer (e.g. Gravitas is '1/8 Landmark' → L1, Time Bender L2 … Mines of Pyralos L8; Masiota/Aromeas swapped to C4/C5; Sparks reordered to Alchemy S1, Tame Beast S2, Tele Control S3, Burden of Wealth S4) and numbers 049–072 were reassigned to match. Missing/incorrect costs filled from the scans: Chrona FG, Namandi FGGG, Alchemy FGGG (was AGGG — the printed pip is Fire, not AllSteam). Two names updated to the printed cards: 'Pyralos' → 'Mines of Pyralos' and 'Aqualon' → 'Sea Lord'. All art rendering now routes through one cardArtUrl(card) helper (Steam → assets/, Unity → assets/cards/, Duality → assets/cards/duality/, Destiny/placeholders → none), replacing nine copy-pasted set-gated branches, so Duality cards show their scan everywhere a Unity card would: Bazaar tiles, hand, zones, History top, drag ghosts, AI ghosts, hover modal and Location preview (the HTML PDF mock-up template is kept only for art-less Duality cards, i.e. Destiny and 'Coming soon'). Fusion Play: with both sets active, every non-Steam Bazaar pile is shuffled (shuffleBazaarPilesForFusion(), re-run on every set toggle), so each position shows a random top card from either set and selling it reveals the next random one — verified live: Duality-only shows all 24 correct positions; toggling Unity back on doubled the piles (6-deep Landmarks, 12-deep Creatures) with mixed tops, and a game started in Fusion mode ran the Steam-phase buy normally. Duality card effects remain unimplemented (checklist unchanged, honest)." },
@@ -3383,6 +3400,25 @@ document.addEventListener('DOMContentLoaded', () => {
         } catch(e) { return 0; }
     }
 
+    // Meridia's Cabin (Duality L3): all of this board's Creatures gain +1 HP for each
+    // qualifying Artifact — the TOP card of the History Pile if it's an Artifact (top card
+    // only, so History contributes at most +1), plus each Artifact lying unoccupied in the
+    // Creature Zone (a Lotus with no Creature on it, once Lotus is implemented).
+    function cabinBonus(board) {
+        if (!board) return 0;
+        const hasCabin = Array.from(board.querySelectorAll('.landmark-zone-main .card:not(.slot-empty)')).some(s => {
+            try { return JSON.parse(s.dataset.cardData).name === "Meridia's Cabin"; } catch (e) { return false; }
+        });
+        if (!hasCabin) return 0;
+        let n = 0;
+        const top = getTopCard(board.querySelector('.history-pile'));
+        if (top && top.type === 'Artifact') n++;
+        board.querySelectorAll('.creature-zone-main .card:not(.slot-empty)').forEach(s => {
+            try { if (JSON.parse(s.dataset.cardData).type === 'Artifact') n++; } catch (e) {}
+        });
+        return n;
+    }
+
     // Meridia is dead on arrival with no Artifacts in History (0 base HP). Sacrifice her
     // straight to History the moment she's placed in the Creature Zone with 0 effective HP.
     function checkMeridiaZeroHp(slot, card) {
@@ -3405,11 +3441,12 @@ document.addEventListener('DOMContentLoaded', () => {
 
             slot.querySelectorAll('.creature-stat-badge, .health-badge, .str-marker').forEach(b => b.remove());
 
-            // Calculate special buffs (e.g., Meridia)
+            // Calculate special buffs (e.g., Meridia, Meridia's Cabin)
             let bonus = 0;
             if (card.name === 'Meridia') {
                 bonus = meridiaArtifactBonus(slot.closest('.player-zone').querySelector('.history-pile'));
             }
+            bonus += cabinBonus(slot.closest('.player-zone'));
             // Meridius's +Strength is attack-only and target-dependent, so it is NOT shown on the
             // zone badge (that would misread as block strength / be ambiguous with 3+ players).
             // His buff is surfaced only in the Creature Attack screen — see decorateCombatScreen.
@@ -4186,6 +4223,7 @@ document.addEventListener('DOMContentLoaded', () => {
         if (attacker.name === 'Meridia') {
             bonus = meridiaArtifactBonus(attackerSlot.closest('.player-zone').querySelector('.history-pile'));
         }
+        bonus += cabinBonus(attackerSlot.closest('.player-zone'));
         let base = (parseInt(attacker.baseStrength ?? attacker.baseHealth) || 0) + bonus - (attacker.damageTaken || 0);
         return Math.max(0, base - activeStrDebuff);
     }
@@ -4216,7 +4254,7 @@ document.addEventListener('DOMContentLoaded', () => {
             return;
         }
 
-        const blockerStr = (parseInt(blockerData.baseResistance ?? blockerData.baseHealth) || 0) - (blockerData.damageTaken || 0);
+        const blockerStr = (parseInt(blockerData.baseResistance ?? blockerData.baseHealth) || 0) + cabinBonus(blockerSlot.closest('.player-zone')) - (blockerData.damageTaken || 0);
 
         if (attackerStr > blockerStr) {
             const overflow = attackerStr - blockerStr;
@@ -5758,7 +5796,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const options = availableCreatures.map(slot => {
             let c;
             try { c = JSON.parse(slot.dataset.cardData); } catch (e) { return null; }
-            const res = (parseInt(c.baseResistance ?? c.baseHealth ?? c.resistance ?? c.health) || 0) - (c.damageTaken || 0);
+            const res = (parseInt(c.baseResistance ?? c.baseHealth ?? c.resistance ?? c.health) || 0) + cabinBonus(slot.closest('.player-zone')) - (c.damageTaken || 0);
             return { slot, name: c.name, res };
         }).filter(Boolean);
         if (!options.length) return null;
