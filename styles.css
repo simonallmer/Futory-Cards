@@ -1701,6 +1701,18 @@ body.dev-mode-on::after {
   text-shadow: 0 0 8px rgba(0, 204, 255, 0.5);
 }
 
+/* Time Bender: the Night die wears a pulsing ring while it's the active Time Die
+   (damage and Time Point gains hit it first). Day-active is the default — no marker. */
+.night-die-group.active-die-marker .circle-counter {
+  border-width: 2px;
+  animation: active-die-pulse 1.8s ease-in-out infinite;
+}
+
+@keyframes active-die-pulse {
+  0%, 100% { box-shadow: 0 0 15px rgba(0, 204, 255, 0.4), inset 0 0 10px rgba(0, 204, 255, 0.2); }
+  50% { box-shadow: 0 0 26px rgba(0, 204, 255, 0.9), 0 0 40px rgba(0, 204, 255, 0.35), inset 0 0 12px rgba(0, 204, 255, 0.35); }
+}
+
 /* ================== Rules 3D Booklet ================== */
 .rules-book-panel {
   width: 900px;
@@ -1794,57 +1806,6 @@ body.dev-mode-on::after {
   background: var(--accent-color);
   color: #000;
   box-shadow: 0 0 15px rgba(0, 255, 255, 0.3);
-}
-
-/* ================== Sets Modal ================== */
-.sets-modal-content {
-  width: 400px;
-  padding: 30px;
-}
-.sets-container {
-  display: flex;
-  flex-direction: column;
-  gap: 15px;
-  margin-top: 20px;
-}
-.set-btn {
-  background: rgba(10, 15, 25, 0.5);
-  border: 1px solid rgba(100, 200, 255, 0.3);
-  color: #aaa;
-  padding: 15px;
-  font-size: 20px;
-  border-radius: 8px;
-  cursor: pointer;
-  transition: all 0.3s ease;
-  text-transform: uppercase;
-  position: relative;
-}
-.set-btn:hover:not(.disabled) {
-  background: rgba(10, 15, 25, 0.8);
-  border-color: cyan;
-  color: #fff;
-  box-shadow: 0 0 15px rgba(0, 255, 255, 0.2);
-}
-.set-btn.active {
-  background: rgba(0, 255, 255, 0.15);
-  border-color: cyan;
-  color: #fff;
-  box-shadow: 0 0 20px rgba(0, 255, 255, 0.4);
-  text-shadow: 0 0 8px cyan;
-}
-.set-btn.disabled {
-  cursor: not-allowed;
-  opacity: 0.4;
-  border-color: #555;
-  background: rgba(0,0,0,0.5);
-}
-.coming-soon {
-  font-size: 12px;
-  color: #ffaa00;
-  position: absolute;
-  top: 50%; right: 15px;
-  transform: translateY(-50%);
-  text-shadow: none;
 }
 
 /* ================== Options Modal ================== */
@@ -3012,4 +2973,161 @@ body.dev-mode-on::after {
   color: #00ff88;
   border-color: #00ff88;
   box-shadow: 0 0 15px rgba(0, 255, 136, 0.4);
+}
+
+/* ==================== COMPUTER OPPONENT ==================== */
+
+/* Live action feed — mirrors the phase panel on the right edge. Purely
+   informational: the game never waits for a click here. */
+#ai-feed {
+  position: fixed;
+  top: 80px;
+  right: 20px;
+  z-index: 5000;
+  width: 240px;
+  background: rgba(0, 0, 0, 0.4);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 12px;
+  backdrop-filter: blur(15px);
+  box-shadow: 0 10px 30px rgba(0,0,0,0.5), inset 0 0 20px rgba(255,255,255,0.02);
+  overflow: hidden;
+  animation: slideInRight 0.6s cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+@keyframes slideInRight {
+  from { opacity: 0; transform: translateX(40px); }
+  to { opacity: 1; transform: translateX(0); }
+}
+
+#ai-feed-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 14px;
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 2px;
+  cursor: pointer;
+  user-select: none;
+  border-bottom: 1px solid rgba(255,255,255,0.08);
+}
+
+.ai-feed-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: rgba(255,255,255,0.25);
+  flex-shrink: 0;
+  transition: background 0.3s;
+}
+
+/* Pulses while the Computer is taking its turn */
+body.ai-turn .ai-feed-dot {
+  background: #ff5f6d;
+  animation: aiDotPulse 1.2s ease-in-out infinite;
+}
+
+@keyframes aiDotPulse {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(255, 95, 109, 0.7); }
+  50% { box-shadow: 0 0 0 6px rgba(255, 95, 109, 0); }
+}
+
+.ai-feed-collapse { margin-left: auto; opacity: 0.6; font-size: 16px; }
+
+#ai-feed-list {
+  max-height: 38vh;
+  overflow-y: auto;
+  padding: 8px 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+
+#ai-feed.collapsed #ai-feed-list { display: none; }
+
+.ai-feed-entry {
+  display: flex;
+  align-items: baseline;
+  gap: 7px;
+  font-size: 12px;
+  line-height: 1.35;
+  color: rgba(255,255,255,0.85);
+  opacity: 0;
+  transform: translateX(14px);
+  transition: opacity 0.35s, transform 0.35s;
+}
+
+.ai-feed-entry.shown { opacity: 1; transform: translateX(0); }
+.ai-feed-entry:nth-child(n+8) { opacity: 0.45; }
+
+.ai-feed-tag {
+  flex-shrink: 0;
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 1px;
+  padding: 1px 5px;
+  border-radius: 4px;
+  background: rgba(255,255,255,0.08);
+  color: rgba(255,255,255,0.6);
+}
+
+.ai-feed-buy .ai-feed-tag { color: #ffd76a; background: rgba(255, 215, 106, 0.12); }
+.ai-feed-play .ai-feed-tag { color: #6ad2ff; background: rgba(106, 210, 255, 0.12); }
+.ai-feed-combat .ai-feed-tag { color: #ff5f6d; background: rgba(255, 95, 109, 0.12); }
+.ai-feed-draw .ai-feed-tag { color: #9effa5; background: rgba(158, 255, 165, 0.12); }
+
+.ai-feed-turn {
+  justify-content: center;
+  font-size: 10px;
+  letter-spacing: 2px;
+  text-transform: uppercase;
+  color: rgba(255,255,255,0.5);
+  padding: 3px 0;
+  border-top: 1px solid rgba(255,255,255,0.06);
+}
+.ai-feed-turn .ai-feed-tag { display: none; }
+
+/* While the Computer is playing, the board is watch-only. The phase panel
+   stays visible (it narrates the Computer's progress) but can't be driven. */
+body.ai-turn #game-field { pointer-events: none; }
+body.ai-turn #next-phase-btn,
+body.ai-turn #skip-turn-btn {
+  pointer-events: none;
+  opacity: 0.45;
+}
+
+/* Exception: the defender picking artifacts mid-combat needs the board back */
+body.ai-turn.artifact-selection-active #game-field { pointer-events: auto; }
+
+/* Overlays whose decision belongs to the Computer: visible (so you can watch
+   the choice being made) but not clickable. */
+.ai-controlled button { pointer-events: none; }
+.ai-controlled .defense-options button:not(:disabled) { opacity: 0.75; }
+
+#active-player-label.ai-active {
+  color: #ff5f6d;
+  text-shadow: 0 0 10px rgba(255, 95, 109, 0.6);
+}
+
+/* Ghost cards for Computer moves reuse the held-card ghost, tinted red */
+.held-card-ghost.ai-ghost {
+  border-color: #ff5f6d;
+  box-shadow: 0 0 20px rgba(255, 95, 109, 0.8), 0 10px 40px rgba(0,0,0,0.8);
+}
+
+/* Dynamic opponent hand fan: one card back per card in hand, so the hand
+   visibly grows and shrinks as the Computer draws, buys and plays. */
+.mini-card-icon.dynamic {
+  background: url('assets/card_back.png') center / cover, linear-gradient(135deg, #444, #222);
+  transition: transform 0.4s cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+.hand-card-count.pulse-update {
+  animation: countPulse 0.5s ease;
+}
+
+@keyframes countPulse {
+  0% { transform: scale(1); }
+  40% { transform: scale(1.35); }
+  100% { transform: scale(1); }
 }

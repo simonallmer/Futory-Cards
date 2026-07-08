@@ -71,11 +71,9 @@ document.addEventListener('DOMContentLoaded', () => {
 
         if (isHistory) {
             const topCard = data[data.length - 1];
-            const slug = slugify(topCard.name);
-            if (topCard.type === 'Steam') {
-                slot.style.backgroundImage = `url('assets/${slug}.png')`;
-            } else if (topCard.set === 'Unity' && slug) {
-                slot.style.backgroundImage = `url('assets/cards/${slug}.png')`;
+            const art = cardArtUrl(topCard);
+            if (art) {
+                slot.style.backgroundImage = `url('${art}')`;
             } else {
                 slot.style.backgroundImage = '';
                 slot.style.backgroundColor = 'rgba(255,255,255,0.1)';
@@ -124,11 +122,8 @@ document.addEventListener('DOMContentLoaded', () => {
     const keywordTitle = document.getElementById('keyword-title');
     const keywordDesc = document.getElementById('keyword-desc');
 
-    // Sets Modal Elements
-    const btnSets = document.getElementById('btn-sets');
-    const setsModal = document.getElementById('sets-modal');
-    const closeSetsModalBtn = document.getElementById('close-sets-modal');
-    const setBtns = document.querySelectorAll('.set-btn:not(.disabled)');
+    // Card Sets toggle (inline in the Options modal)
+    const setBtns = document.querySelectorAll('#sets-toggle .toggle-btn[data-set]:not(.disabled)');
 
     // Location Modal Elements
     const locationModal = document.getElementById('location-modal');
@@ -264,11 +259,8 @@ document.addEventListener('DOMContentLoaded', () => {
                 });
 
                 if (hasFountain) {
-                    // Priority: Day (left) die first. If Day is out (0), Night (right) die.
-                    let targetDie = 'day';
-                    if (playersState[currentPlayer].day <= 0) {
-                        targetDie = 'night';
-                    }
+                    // Lands on the active die (Day by default; Time Bender can switch it).
+                    const targetDie = activeDieType(currentPlayer);
                     adjustPlayerDie(currentPlayer, targetDie, 1);
 
                     // Feedback: pulse the landmark and float "+1 TP" over the gaining die.
@@ -285,7 +277,7 @@ document.addEventListener('DOMContentLoaded', () => {
         };
     }
 
-    const implementedCards = ["Pandorama", "Fountain of Youth", "Laser Catalyst", "Dragura's Wasteland", "Planetarium", "Lethargo's Temple", "Clone Factory", "Aetherlab", "Entrophy", "Meridius", "Meridia", "Time Thief", "Ichor", "Vulcanem", "Cravus", "Rampadon", "Smoke", "Dark Matter", "Reflector", "Talisman", "Reversal", "Faith", "Threat", "Confiscation"];
+    const implementedCards = ["Pandorama", "Fountain of Youth", "Laser Catalyst", "Dragura's Wasteland", "Planetarium", "Lethargo's Temple", "Clone Factory", "Aetherlab", "Entrophy", "Meridius", "Meridia", "Time Thief", "Ichor", "Vulcanem", "Cravus", "Rampadon", "Smoke", "Dark Matter", "Reflector", "Talisman", "Reversal", "Faith", "Threat", "Confiscation", "Gravitas", "Time Bender"];
 
     // --- Intent Classification ---
     // auto: fires on its own when condition is met
@@ -316,6 +308,8 @@ document.addEventListener('DOMContentLoaded', () => {
         'Faith': 'active',
         'Threat': 'active',
         'Confiscation': 'active',
+        'Gravitas': 'auto',
+        'Time Bender': 'active',
     };
 
     // --- Simulation Presets ---
@@ -452,9 +446,29 @@ document.addEventListener('DOMContentLoaded', () => {
             hand: ['GoldSteam', 'GoldSteam', 'LaserSteam', 'LaserSteam'],
             p2hand: ['Ichor', 'Cravus', 'Smoke'],
         },
+        'Gravitas': {
+            phase: 3,
+            desc: "Gravitas in play, 1 card in hand, 1 in Future, 6 in History. End Phase draws 2 — the reshuffle fires Gravitas, refilling your hand to the limit (5).",
+            hand: ['FireSteam'],
+            landmarks: ['Gravitas'],
+            p1future: ['GoldSteam'],
+            p1history: ['Ichor', 'Cravus', 'Smoke', 'FireSteam', 'GoldSteam', 'LaserSteam'],
+        },
+        'Time Bender': {
+            phase: 1,
+            day: 10,
+            night: 8,
+            desc: "Time Bender in play (Day 10, Night 8). Click it to make Night your active die (marker ring appears), then play Faith from hand — the +3 TP lands on the Night die.",
+            hand: ['GoldSteam', 'GoldSteam', 'GoldSteam', 'Faith'],
+            landmarks: ['Time Bender'],
+        },
     };
 
     const devLogData = [
+        { date: '2026-07-08', msg: "Time Bender (Duality L2) — implemented (active): 'Once per Construction Phase, you may switch your active Time Die.' This needed a concept the engine didn't have — until now 'damage comes off the Day die first' was hardcoded in resolveDamageDirectly, gainTimePoints, Fountain of Youth's Skip-Turn grant, and seven scattered float-position ternaries. All of it now routes through one shared pair: playersState gains an activeDie field ('day' default, reset on Play Again) and activeDieType(pNum) resolves which die TP changes hit first — with a built-in fallback, since a die at 0 is permanently lost and can't be active. This is groundwork Duality reuses: Aromeas (C5) reads 'your active Time Die' too. The landmark follows the Clone Factory click pattern: click Time Bender during your Construction Phase (once per phase, reset alongside Aetherlab's flag) to flip the active die — persistent across turns until switched again. Visual language: the landmark pulses, 'Night Active'/'Day Active' floats over the newly active die, and while Night is the active die its counter wears a pulsing cyan marker ring (new .active-die-marker CSS riding the existing blue-die palette; Day-active is the default state and stays unmarked, so the board only glows when something unusual is true). Sim preset: Time Bender in play at Day 10 / Night 8 with Faith + payment in hand. Verified live: clicking the landmark set the marker ring with no alert; a second click correctly refused ('already switched this Construction Phase'); playing Faith then put its +3 TP on the NIGHT die (8→11) while Day stayed at 10 — proof the routing actually moved, since day-first would have gone 10→12 with the remainder spilling to Night. No console errors." },
+        { date: '2026-07-08', msg: "Gravitas (Duality L1) — first Duality effect implemented (auto): 'Whenever you shuffle your History Pile to form a new Future Pile, draw Cards until you reach your Hand Limit.' The game has exactly one reshuffle site — the History→Future fold inside drawCards() (the same branch that already handles Meridia's Abyss exile) — so a `reshuffled` flag set there feeds a post-loop hook, resolveGravitasRefill(): it waits 400ms for the in-flight deal animations to actually fill their slots (a dealt slot only becomes occupied ~600ms after its flight starts, while the draw loop waits just 500ms — counting earlier would misread the hand), then measures the deficit against the LIVE hand limit via getMaxHand() (so Pandorama's +2 raises the refill target to 7), pulses the landmark with the shared landmark-triggered glow and floats 'Draw N' over it, and draws the missing cards through the same drawCards() it hooked — safely recursive, since a hand at its limit yields deficit 0 and stops. Fires for whichever player's pile reshuffles (including the Computer's End Phase), which is correct for an auto-intent Landmark. New sim preset (phase 3: 1 card in hand, 1 in Future, 6 in History): the End Phase draw of 2 forces the reshuffle mid-draw. Verified live via sim: draw 1 took the last Future card (hand 2), draw 2 reshuffled all 6 History cards and dealt one (hand 3), then Gravitas pulsed 'Draw 2' and refilled to exactly 5 — Future left holding the 3 undrawn reshuffled cards, History empty, no console errors." },
+        { date: '2026-07-07', msg: "Duality set — all 24 Bazaar cards now have their printed prototype scans (assets/cards/duality/, slug-named copies of the drop-in duallity/ folder) and the whole set is playable next to Unity. cardData.js was reconciled against the printed cards, which are the source of truth: the Bazaar order now follows each card's printed position footer (e.g. Gravitas is '1/8 Landmark' → L1, Time Bender L2 … Mines of Pyralos L8; Masiota/Aromeas swapped to C4/C5; Sparks reordered to Alchemy S1, Tame Beast S2, Tele Control S3, Burden of Wealth S4) and numbers 049–072 were reassigned to match. Missing/incorrect costs filled from the scans: Chrona FG, Namandi FGGG, Alchemy FGGG (was AGGG — the printed pip is Fire, not AllSteam). Two names updated to the printed cards: 'Pyralos' → 'Mines of Pyralos' and 'Aqualon' → 'Sea Lord'. All art rendering now routes through one cardArtUrl(card) helper (Steam → assets/, Unity → assets/cards/, Duality → assets/cards/duality/, Destiny/placeholders → none), replacing nine copy-pasted set-gated branches, so Duality cards show their scan everywhere a Unity card would: Bazaar tiles, hand, zones, History top, drag ghosts, AI ghosts, hover modal and Location preview (the HTML PDF mock-up template is kept only for art-less Duality cards, i.e. Destiny and 'Coming soon'). Fusion Play: with both sets active, every non-Steam Bazaar pile is shuffled (shuffleBazaarPilesForFusion(), re-run on every set toggle), so each position shows a random top card from either set and selling it reveals the next random one — verified live: Duality-only shows all 24 correct positions; toggling Unity back on doubled the piles (6-deep Landmarks, 12-deep Creatures) with mixed tops, and a game started in Fusion mode ran the Steam-phase buy normally. Duality card effects remain unimplemented (checklist unchanged, honest)." },
+        { date: '2026-07-07', msg: "Computer Opponent — Player 2 can now be driven by a built-in AI at three difficulties (Options → Opponent: Computer, then Easy / Normal / Hard; choice persists via localStorage). The Computer plays through the exact same engine paths a human uses — aiPayCost mirrors autoPayCost, purchases go through the real Bazaar inventory (removeTopFromBazaar), placements use finishSingleCardPlacement, attacks use beginAttack, and phases advance via progressPhase — so every rule the engine knows applies to it identically. Turn shape: Steam Phase picks a Steam buy (Easy: random and sometimes forgets; Normal/Hard: prefers Laser > Gold upgrades but takes the free FireSteam when a good Construction buy is already affordable this turn), Construction buys Creatures/Landmarks per a difficulty profile (buy count + chance; scores Creatures by HP, skips duplicate Landmarks, respects the hand limit), Creature Phase summons its strongest Creature and attacks with everything legal (summoning-sickness check identical to the human path; Cravus/Rampadon instant), End Phase draws 2 and auto-discards to the limit. V1 scope: it does not buy Artifacts or Sparks (interactive targeting) — but it does answer prompts aimed at it: block-or-take on the defense screen (survivor > even-trade > chump-block heuristics, TP-aware), Dark Matter (discards its cheapest card or takes the 2 TP), Threat (pays to keep only when cheap and healthy), Talisman response, and its own Entrophy wheel auto-resolves. Presentation: the view never flips — Player 1 stays anchored at the bottom, no PASS DEVICE screen in Computer mode; the opponent's hand renders as a fan of card backs that grows/shrinks live (syncMiniHandFan + count pulse), its buys/summons fly across the board as red ghost cards, the phase bar narrates its progress under a COMPUTER label, and a collapsible live action feed (top right) logs every move with BUY/PLAY/FIGHT/DRAW tags — watching is optional, and the only hard stop for the human is the existing block/artifact decision when its creature attacks. Board input is pointer-locked during its turn (with an exception for the mid-combat artifact picker). Verified live: full Computer turn (FireSteam buy → Pandorama build paying AA → Ichor summon → draw 2 → hand-off), its Ichor attack pausing on my defense screen and resolving 2 damage Day-die-first after CONTINUE, and the reverse direction — my Cravus attack locked the defense screen with 'Computer is deciding…', it correctly declined the 2-for-2 even trade on Normal, took 2 TP (24→22), and the overlay closed itself." },
         { date: '2026-07-07', msg: "Confiscation (S4) — implemented (active): 'Look at target Opponent's Hand and take one Card to your Hand.' In 2-player V1 the opponent is automatic (resolveConfiscation() picks the other seat directly); with 3-4 players it reuses the exact same #target-player-overlay/#target-player-list pattern the Creature Attack flow and Dark Matter already use to ask which opponent, rather than inventing a new targeting UI — so adding more seats later needs no new Confiscation-specific code. Once the target is settled, showConfiscationPicker() reveals their Hand: auto-takes the card if they only have one, otherwise opens a 'Confiscation — P{n}'s Hand' list (same overlay styling as Reversal's History picker) naming every card so the caster can actually look before choosing; picking one moves it via the standard clearSlot()+finishSingleCardPlacement() into the caster's Hand (opening a temporary slot if full). A no-op if the target's Hand is empty. Preset updated to buy Confiscation from Bazaar S4 directly (matching the Reversal/Threat convention) instead of pre-seeding it in Hand. Verified via sim: P2 has Ichor/Cravus/Smoke — buying Confiscation opened the P2 Hand list showing all three, and picking Smoke moved it into P1's Hand while Ichor/Cravus stayed put and Confiscation itself landed in the Abyss." },
         { date: '2026-07-07', msg: "Threat (S3) — implemented (active): 'Send an active Landmark of your choice to the Abyss, unless its owner pays 2 TP for each Landmark they own.' Targeting is cross-board and deliberately unrestricted — allLandmarksInPlay() collects every occupied Landmark slot from BOTH players' boards (tagged with its owner), so the caster can pick an opponent's Landmark OR their own on purpose (e.g. torching your own Meridius-boosting Landmark once it's done its job). Auto-resolves straight to the owner's choice screen if there's only one Landmark in play; otherwise promptThreatTarget() pulses every eligible Landmark on both boards with a red 'threat-target' glow (new CSS, styled like the existing green heal-target pulse) and a capture-phase click handler picks the target. beginThreatChoice() then computes the live cost via the existing countLandmarks(owner) helper (2 × however many Landmarks that owner owns right now, including the threatened one) and shows a small two-button PAY / SEND TO ABYSS overlay (same visual pattern as the Landmark discard conflict chooser) — PAY is grayed out if totalTimePoints(owner) can't cover it. Paying spends TP via the existing resolveDamageDirectly(cost, owner) (Day die first, same as combat); declining (or being unable to pay) discards the Landmark straight to the Abyss via clearSlot()+finishSingleCardPlacement(), same as any other Landmark removal. Extended the Threat sim preset with a Landmark on each board (P1: Fountain of Youth, P2: Pandorama + Clone Factory) instead of a pre-seeded Hand copy, since Threat now buys instantly from the Bazaar like the other Sparks. Verified via sim: bought Threat from Bazaar S3 with 3 Landmarks in play — all three glowed as valid targets; picking your own Fountain of Youth (P1, owns 1) correctly priced it at 2 TP and choosing Send to Abyss discarded it immediately; picking the opponent's Clone Factory (P2, owns 2) priced it at 4 TP and paying dropped P2's Day die 12→8 while the Landmark stayed in play." },
         { date: '2026-07-07', msg: "Reversal (S1) / Faith (S2) — reworked how Sparks get played, per feedback that the grab-from-Bazaar-then-drop-on-Abyss gesture was confusing (you'd grab the card and then not know what to do with it). Sparks now buy-and-play in a single click: clicking a Spark's Bazaar tile pays its cost, resolves the effect immediately, and sends the card straight to the Abyss — it never passes through Hand. New logic lives in the Bazaar click handler (checked right after the 'unavailable' gate, before the old allSame-grab branch): copies the top card, calls the existing autoPayCost(), splices it out of activeBazaar, then reuses finishSingleCardPlacement() + resolveSparkEffect() to land it in the Abyss and fire its effect, exactly like the old drop-on-Abyss path did. The old grab-then-drop-on-Abyss mechanic (highlightValidZones' Spark branch, the click-to-place special-case on the Abyss tile, resolveSparkEffect's call inside placeCard) is left in place as a fallback — it's still what the Dev Log sim presets use (they seed Sparks directly into Hand for isolated single-card testing) and covers any future case where a Spark legitimately ends up in Hand. Verified via sim: loaded the Reversal preset (Ichor+Smoke in History, FireSteam+2 GoldSteam in Hand), then clicked the Bazaar's S1 tile directly (not the preset's Hand copy) — payment cards were spent from Hand, a fresh Reversal went straight to the Abyss, and the 'Take Which Card?' picker opened immediately with no grab step; picking Ichor moved it to Hand and left Smoke in History. Confirmed non-Spark buys (e.g. Landmarks) are unaffected — still gated by the existing 'unavailable'/afford checks and still use the grab/drop flow." },
@@ -900,7 +914,13 @@ document.addEventListener('DOMContentLoaded', () => {
 
     function animateCardDeal(sourceEl, targetSlot, cardData) {
         const sourceRect = sourceEl.getBoundingClientRect();
-        const targetRect = targetSlot.getBoundingClientRect();
+        let targetRect = targetSlot.getBoundingClientRect();
+        // Hidden hand slots (an inactive board's hand) have no layout box —
+        // aim the flight at the board's card-back fan instead.
+        if (!targetRect.width && !targetRect.height) {
+            const fan = targetSlot.closest('.player-zone')?.querySelector('.inactive-hand-display');
+            if (fan) targetRect = fan.getBoundingClientRect();
+        }
         
         const ghost = document.createElement('div');
         ghost.className = 'held-card-ghost';
@@ -927,11 +947,9 @@ document.addEventListener('DOMContentLoaded', () => {
             targetSlot.classList.remove('slot-empty');
             targetSlot.dataset.cardData = JSON.stringify(cardData);
             
-            const slug = slugify(cardData.name);
-            if (cardData.type === 'Steam') {
-                targetSlot.style.backgroundImage = `url('assets/${slug}.png')`;
-            } else if (cardData.set === 'Unity' && slug) {
-                targetSlot.style.backgroundImage = `url('assets/cards/${slug}.png')`;
+            const art = cardArtUrl(cardData);
+            if (art) {
+                targetSlot.style.backgroundImage = `url('${art}')`;
             } else {
                 targetSlot.style.backgroundImage = '';
                 targetSlot.style.backgroundColor = 'rgba(255,255,255,0.1)';
@@ -986,6 +1004,12 @@ document.addEventListener('DOMContentLoaded', () => {
                 // Lethargo's Temple: toggle TP-buy mode (Construction Phase only, once per phase)
                 if (!devMode && isLandmarkZone && isMyBoard && currentPhase === 1 && cardData.name === "Lethargo's Temple") {
                     toggleLethargo();
+                    return;
+                }
+
+                // Time Bender: switch your active Time Die (Construction Phase, once per phase).
+                if (!devMode && isLandmarkZone && isMyBoard && currentPhase === 1 && cardData.name === 'Time Bender') {
+                    activateTimeBender();
                     return;
                 }
 
@@ -1058,11 +1082,9 @@ document.addEventListener('DOMContentLoaded', () => {
                         // Update visual to new top card (for History) or maintain back (for Future)
                         const newTop = data[data.length - 1];
                         if (slot.classList.contains('history-pile')) {
-                            const slug = slugify(newTop.name);
-                            if (newTop.type === 'Steam') {
-                                slot.style.backgroundImage = `url('assets/${slug}.png')`;
-                            } else if (newTop.set === 'Unity' && slug) {
-                                slot.style.backgroundImage = `url('assets/cards/${slug}.png')`;
+                            const art = cardArtUrl(newTop);
+                            if (art) {
+                                slot.style.backgroundImage = `url('${art}')`;
                             } else {
                                 slot.style.backgroundImage = '';
                                 slot.style.backgroundColor = 'rgba(255,255,255,0.1)';
@@ -1190,13 +1212,10 @@ document.addEventListener('DOMContentLoaded', () => {
             layer.style.transform = `translate(${i * 6}px, ${i * -6}px)`;
             layer.style.zIndex = visualCount - i;
             
-            const slug = slugify(card.name);
             const backImg = (card.type === 'Destiny' || card.location === 'D' || card.location === 'DA') ? 'destiny_back.png' : 'card_back.png';
-            
-            if (card.type === 'Steam') {
-                layer.style.backgroundImage = `url('assets/${slug}.png')`;
-            } else if (card.set === 'Unity' && slug) {
-                layer.style.backgroundImage = `url('assets/cards/${slug}.png')`;
+            const art = cardArtUrl(card);
+            if (art) {
+                layer.style.backgroundImage = `url('${art}')`;
             } else {
                 layer.style.backgroundImage = `url('assets/${backImg}')`;
                 layer.style.backgroundColor = 'rgba(255,255,255,0.1)';
@@ -1228,9 +1247,8 @@ document.addEventListener('DOMContentLoaded', () => {
                 tempGhost.style.left = (heldGhost.offsetLeft + idx * 6) + 'px';
                 tempGhost.style.top = (heldGhost.offsetTop - idx * 6) + 'px';
                 
-                const slug = slugify(card.name);
-                if (card.type === 'Steam') tempGhost.style.backgroundImage = `url('assets/${slug}.png')`;
-                else if (card.set === 'Unity' && slug) tempGhost.style.backgroundImage = `url('assets/cards/${slug}.png')`;
+                const cancelArt = cardArtUrl(card);
+                if (cancelArt) tempGhost.style.backgroundImage = `url('${cancelArt}')`;
                 else tempGhost.style.backgroundImage = `url('assets/card_back.png')`;
 
                 document.body.appendChild(tempGhost);
@@ -1249,9 +1267,8 @@ document.addEventListener('DOMContentLoaded', () => {
                         sourceEl.classList.remove('slot-empty');
                         sourceEl.dataset.cardData = JSON.stringify(card);
                         if (sourceEl.classList.contains('hand-slot')) {
-                            const slug = slugify(card.name);
-                            if (card.type === 'Steam') sourceEl.style.backgroundImage = `url('assets/${slug}.png')`;
-                            else if (card.set === 'Unity' && slug) sourceEl.style.backgroundImage = `url('assets/cards/${slug}.png')`;
+                            const art = cardArtUrl(card);
+                            if (art) sourceEl.style.backgroundImage = `url('${art}')`;
                             else {
                                 sourceEl.style.backgroundImage = '';
                                 sourceEl.style.backgroundColor = 'rgba(255,255,255,0.1)';
@@ -1600,7 +1617,7 @@ document.addEventListener('DOMContentLoaded', () => {
             targetSlot.dataset.cardData = JSON.stringify(card);
         }
 
-        const slug = slugify(card.name);
+        const art = cardArtUrl(card);
         const label = targetSlot.querySelector('.pile-label');
         if (label) label.style.display = 'none';
 
@@ -1609,12 +1626,8 @@ document.addEventListener('DOMContentLoaded', () => {
             targetSlot.style.backgroundImage = `url('assets/${backImg}')`;
             targetSlot.style.backgroundColor = 'transparent';
             targetSlot.textContent = '';
-        } else if (card.type === 'Steam') {
-            targetSlot.style.backgroundImage = `url('assets/${slug}.png')`;
-            targetSlot.style.backgroundColor = 'transparent';
-            targetSlot.textContent = '';
-        } else if (card.set === 'Unity' && slug) {
-            targetSlot.style.backgroundImage = `url('assets/cards/${slug}.png')`;
+        } else if (art) {
+            targetSlot.style.backgroundImage = `url('${art}')`;
             targetSlot.style.backgroundColor = 'transparent';
             targetSlot.textContent = '';
         } else {
@@ -1687,6 +1700,23 @@ document.addEventListener('DOMContentLoaded', () => {
                 activeBazaar[card.location].push({ ...card });
             }
         });
+        shuffleBazaarPilesForFusion();
+    }
+
+    // Fusion Play: with more than one set active, each Bazaar position holds the
+    // same-slot cards of every selected set shuffled together, so the top card
+    // shown (and sold) is random — Unity or Duality alike. Single-set piles are
+    // uniform per slot, so shuffling them is harmless.
+    function shuffleBazaarPilesForFusion() {
+        if (selectedSets.length < 2) return;
+        Object.keys(activeBazaar).forEach(loc => {
+            if (loc === 'D' || loc === 'DA' || loc === 'AB' || loc.startsWith('ST')) return;
+            const pile = activeBazaar[loc];
+            for (let i = pile.length - 1; i > 0; i--) {
+                const j = Math.floor(Math.random() * (i + 1));
+                [pile[i], pile[j]] = [pile[j], pile[i]];
+            }
+        });
     }
     initBazaarInventory();
 
@@ -1718,7 +1748,6 @@ document.addEventListener('DOMContentLoaded', () => {
                 card.classList.remove('empty-pile');
 
                 const topCard = availableCards[availableCards.length - 1];
-                const isSingleSet = selectedSets.length === 1;
                 const isDestiny = topCard.type === 'Destiny' || loc === 'D' || loc === 'DA';
                 const isAbyss = isAbyssLoc;
                 const isSteam = topCard.type === 'Steam';
@@ -1733,9 +1762,11 @@ document.addEventListener('DOMContentLoaded', () => {
                     card.appendChild(indicator);
                 }
 
-                if (isSingleSet && !isDestiny && !isAbyss && !isSteam) {
-                    const slug = slugify(topCard.name);
-                    card.style.backgroundImage = `url('assets/cards/${slug}.png')`;
+                // With multiple sets active the piles are shuffled, so the top card
+                // (and its art) can come from any selected set.
+                const art = (!isDestiny && !isAbyss && !isSteam) ? cardArtUrl(topCard) : null;
+                if (art) {
+                    card.style.backgroundImage = `url('${art}')`;
                     card.style.backgroundColor = 'transparent';
                     card.style.border = 'none';
                 } else {
@@ -2039,16 +2070,6 @@ document.addEventListener('DOMContentLoaded', () => {
         locationModal.classList.add('hidden');
     });
 
-    closeSetsModalBtn.addEventListener('click', () => {
-        setsModal.classList.add('hidden');
-        optionsModal.classList.remove('hidden');
-    });
-
-    btnSets.addEventListener('click', () => {
-        optionsModal.classList.add('hidden');
-        setsModal.classList.remove('hidden');
-    });
-
     btnRules.addEventListener('click', () => {
         rulesModal.classList.remove('hidden');
     });
@@ -2088,11 +2109,34 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 
     const playersState = {
-        1: { day: 12, night: 12 },
-        2: { day: 12, night: 12 },
-        3: { day: 12, night: 12 },
-        4: { day: 12, night: 12 }
+        1: { day: 12, night: 12, activeDie: 'day' },
+        2: { day: 12, night: 12, activeDie: 'day' },
+        3: { day: 12, night: 12, activeDie: 'day' },
+        4: { day: 12, night: 12, activeDie: 'day' }
     };
+
+    // Which die a player's Time Point changes hit first. Day by default; Time Bender
+    // switches it. A die at 0 is permanently lost and can't be active — fall back to
+    // the other one so damage/gains always land on a live die.
+    function activeDieType(pNum) {
+        const st = playersState[pNum];
+        if (!st) return 'day';
+        const pref = st.activeDie === 'night' ? 'night' : 'day';
+        const other = pref === 'night' ? 'day' : 'night';
+        return st[pref] > 0 ? pref : other;
+    }
+    function activeDieSel(pNum) {
+        return activeDieType(pNum) === 'night' ? '.night-die-group' : '.day-die-group';
+    }
+
+    // Time Bender: the switched die gets a marker ring so both players can see whose
+    // clock is running. Day-active is the default and shows no marker.
+    function updateActiveDieGlow(pNum) {
+        const board = document.getElementById(`player-${pNum}`);
+        if (!board) return;
+        const night = board.querySelector('.night-die-group');
+        if (night) night.classList.toggle('active-die-marker', playersState[pNum].activeDie === 'night');
+    }
 
     function updatePlayerDieUI(pNum, type) {
         const playerEl = document.getElementById(`player-${pNum}`);
@@ -2130,7 +2174,11 @@ document.addEventListener('DOMContentLoaded', () => {
         if (alivePlayers.length === 1) {
             gameWon = true;
             const winnerNum = alivePlayers[0];
-            if (winnerTitle) winnerTitle.textContent = `PLAYER ${winnerNum} WON!`;
+            if (winnerTitle) {
+                winnerTitle.textContent = vsComputer
+                    ? (winnerNum === AI_PLAYER ? 'COMPUTER WON' : 'YOU WON!')
+                    : `PLAYER ${winnerNum} WON!`;
+            }
             gameOverOverlay.classList.remove('hidden');
             
             // Add "Switch View" button for post-game inspection
@@ -2295,6 +2343,30 @@ document.addEventListener('DOMContentLoaded', () => {
     // fires automatically; when two are eligible (Wasteland + Planetarium on a FireSteam
     // in Construction) the player is asked which to use.
 
+    // --- Time Bender (Duality L2): once per Construction Phase, switch your active Time Die ---
+    // Click the landmark during your Construction Phase. The switch is persistent: damage and
+    // TP gains hit the chosen die first from then on, until it's switched again (or the die is
+    // lost). The Night die wears a marker ring while it's the active one.
+    let timeBenderUsedThisPhase = false;
+    function activateTimeBender() {
+        if (timeBenderUsedThisPhase) {
+            alert('Time Bender has already switched your active Time Die this Construction Phase.');
+            return;
+        }
+        const st = playersState[currentPlayer];
+        const next = activeDieType(currentPlayer) === 'day' ? 'night' : 'day';
+        if (st[next] <= 0) {
+            alert(`Your ${next === 'night' ? 'Night' : 'Day'} Die is already lost — there is nothing to switch to.`);
+            return;
+        }
+        st.activeDie = next;
+        timeBenderUsedThisPhase = true;
+        pulseLandmark(currentPlayer, 'Time Bender');
+        updateActiveDieGlow(currentPlayer);
+        const board = document.getElementById(`player-${currentPlayer}`);
+        if (board) floatValue(board.querySelector(activeDieSel(currentPlayer)), next === 'night' ? 'Night Active' : 'Day Active', 'gain');
+    }
+
     // Laser Catalyst: LaserSteam, End Phase -> 1 unpreventable damage to the opponent.
     function catalystEligible(card) {
         return !devMode && card && card.name === 'LaserSteam'
@@ -2304,7 +2376,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const opponent = (currentPlayer % activePlayerCount) + 1;
         // Determine which die takes the hit BEFORE applying damage, so the float lands
         // on the correct die even when this point empties the Day die.
-        const dieSel = playersState[opponent].day > 0 ? '.day-die-group' : '.night-die-group';
+        const dieSel = activeDieSel(opponent);
         resolveDamageDirectly(1, opponent);
         pulseLandmark(currentPlayer, 'Laser Catalyst');
         const oppBoard = document.getElementById(`player-${opponent}`);
@@ -2406,7 +2478,7 @@ document.addEventListener('DOMContentLoaded', () => {
         gainTimePoints(pNum, 3);
         const board = document.getElementById(`player-${pNum}`);
         if (board) {
-            const dieSel = playersState[pNum].day > 0 ? '.day-die-group' : '.night-die-group';
+            const dieSel = activeDieSel(pNum);
             floatValue(board.querySelector(dieSel), '+3 TP', 'gain');
         }
     }
@@ -2431,11 +2503,9 @@ document.addEventListener('DOMContentLoaded', () => {
             } else {
                 historyPile.dataset.cardData = JSON.stringify(history);
                 const newTop = history[history.length - 1];
-                const slug = slugify(newTop.name);
-                if (newTop.type === 'Steam') {
-                    historyPile.style.backgroundImage = `url('assets/${slug}.png')`;
-                } else if (newTop.set === 'Unity' && slug) {
-                    historyPile.style.backgroundImage = `url('assets/cards/${slug}.png')`;
+                const art = cardArtUrl(newTop);
+                if (art) {
+                    historyPile.style.backgroundImage = `url('${art}')`;
                 } else {
                     historyPile.style.backgroundImage = '';
                     historyPile.style.backgroundColor = 'rgba(255,255,255,0.1)';
@@ -2573,6 +2643,11 @@ document.addEventListener('DOMContentLoaded', () => {
 
         overlay.appendChild(panel);
         document.body.appendChild(overlay);
+
+        // Threat aimed at the Computer's Landmark: it decides pay-or-lose itself.
+        if (vsComputer && owner === AI_PLAYER) {
+            aiHandleThreat({ overlay, btnPay, btnDecline, canPay, cost, cardName: cardData.name });
+        }
     }
 
     // Confiscation: Look at target Opponent's Hand and take one Card to your Hand.
@@ -2860,7 +2935,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
         // Spend Time Points (Day die first) with a floating readout on the dice.
         if (plan.tp > 0) {
-            const dieSel = playersState[currentPlayer].day > 0 ? '.day-die-group' : '.night-die-group';
+            const dieSel = activeDieSel(currentPlayer);
             resolveDamageDirectly(plan.tp, currentPlayer);
             floatValue(board.querySelector(dieSel), `-${plan.tp} TP`, 'damage');
         }
@@ -3107,6 +3182,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 selectedSets.push(setName);
                 btn.classList.add('active');
             }
+            shuffleBazaarPilesForFusion();
             renderBazaar();
         });
     });
@@ -3122,7 +3198,7 @@ document.addEventListener('DOMContentLoaded', () => {
                             e.target.closest('.keyword-link');
         
         if (!isInteractive) {
-            [cardModal, keywordModal, setsModal, locationModal, optionsModal, keywordsListModal, rulesModal].forEach(m => {
+            [cardModal, keywordModal, locationModal, optionsModal, keywordsListModal, rulesModal].forEach(m => {
                 if(m) m.classList.add('hidden');
             });
         }
@@ -3136,7 +3212,6 @@ document.addEventListener('DOMContentLoaded', () => {
             }
             cardModal.classList.add('hidden');
             keywordModal.classList.add('hidden');
-            setsModal.classList.add('hidden');
             locationModal.classList.add('hidden');
             optionsModal.classList.add('hidden');
             keywordsListModal.classList.add('hidden');
@@ -3264,11 +3339,9 @@ document.addEventListener('DOMContentLoaded', () => {
             ghost.style.top = sourceRect.top + 'px';
             ghost.style.zIndex = '2000';
             
-            const slug = slugify(cardData.name);
-            if (cardData.type === 'Steam') {
-                ghost.style.backgroundImage = `url('assets/${slug}.png')`;
-            } else if (cardData.set === 'Unity' && slug) {
-                ghost.style.backgroundImage = `url('assets/cards/${slug}.png')`;
+            const art = cardArtUrl(cardData);
+            if (art) {
+                ghost.style.backgroundImage = `url('${art}')`;
             } else {
                 ghost.style.backgroundImage = "url('assets/card_back.png')";
             }
@@ -3679,12 +3752,17 @@ document.addEventListener('DOMContentLoaded', () => {
         btnTp.onclick = () => {
             if (resolved) return;
             resolveDamageDirectly(2, defenderNum);
-            const dieSel = playersState[defenderNum].day > 0 ? '.day-die-group' : '.night-die-group';
+            const dieSel = activeDieSel(defenderNum);
             floatValue(defenderBoard.querySelector(dieSel), '-2 TP', 'damage');
             finish('Lost 2 Time Points.');
         };
 
         overlay.classList.remove('hidden');
+
+        // Dark Matter aimed at the Computer: it picks its own poison.
+        if (vsComputer && defenderNum === AI_PLAYER) {
+            aiHandleDarkMatter({ overlay, btnSac, btnDisc, btnTp, creatures, handCards, feedbackEl });
+        }
     }
 
     // The defender is now chosen. Most creatures go straight to the defense step; Entrophy first
@@ -3803,6 +3881,13 @@ document.addEventListener('DOMContentLoaded', () => {
                 applyEntrophyOutcome(outcome.id, attacker, attackerSlot, defenderNum);
             };
             footer.appendChild(btn);
+
+            // Computer's Entrophy: let the result sink in, then resolve itself.
+            if (aiTurnInProgress) {
+                panel.classList.add('ai-controlled');
+                aiLog(`Entrophy rolls: ${outcome.label}`, 'combat');
+                setTimeout(() => { if (document.body.contains(btn)) btn.onclick(); }, 1600);
+            }
         }
 
         tick();
@@ -3816,13 +3901,16 @@ document.addEventListener('DOMContentLoaded', () => {
         return a;
     }
 
-    // Add Time Points to a player (Day die first, up to 12 each; a lost die stays lost).
+    // Add Time Points to a player (active die first — Day by default, Time Bender can
+    // switch it — up to 12 each; a lost die stays lost).
     function gainTimePoints(pNum, amount) {
         const st = playersState[pNum];
         if (!st) return;
+        const first = activeDieType(pNum);
+        const second = first === 'day' ? 'night' : 'day';
         let rem = amount;
-        if (st.day > 0) { const add = Math.min(12 - st.day, rem); adjustPlayerDie(pNum, 'day', add); rem -= add; }
-        if (rem > 0 && st.night > 0) adjustPlayerDie(pNum, 'night', rem);
+        if (st[first] > 0) { const add = Math.min(12 - st[first], rem); adjustPlayerDie(pNum, first, add); rem -= add; }
+        if (rem > 0 && st[second] > 0) adjustPlayerDie(pNum, second, rem);
     }
 
     function applyEntrophyOutcome(outcomeId, base, slot, defenderNum) {
@@ -3835,7 +3923,7 @@ document.addEventListener('DOMContentLoaded', () => {
             case 'tp4': {
                 gainTimePoints(currentPlayer, 4);
                 const board = document.getElementById(`player-${currentPlayer}`);
-                const dieSel = playersState[currentPlayer].day > 0 ? '.day-die-group' : '.night-die-group';
+                const dieSel = activeDieSel(currentPlayer);
                 if (board) floatValue(board.querySelector(dieSel), '+4 TP', 'gain');
                 initiateDefense(entrophyAttacker(base, 'none'), slot, defenderNum); // attack still lands with 2
                 break;
@@ -3853,7 +3941,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 // Attacks its own controller for 2, then to History.
                 resolveDamageDirectly(2, currentPlayer);
                 const board = document.getElementById(`player-${currentPlayer}`);
-                const dieSel = playersState[currentPlayer].day > 0 ? '.day-die-group' : '.night-die-group';
+                const dieSel = activeDieSel(currentPlayer);
                 if (board) floatValue(board.querySelector(dieSel), '-2 TP', 'damage');
                 const hist = slot.closest('.player-zone').querySelector('.history-pile');
                 clearSlot(slot);
@@ -4053,6 +4141,12 @@ document.addEventListener('DOMContentLoaded', () => {
         };
 
         defenseOverlay.classList.remove('hidden');
+
+        // The defender is the Computer: it decides block-or-take on this same
+        // screen (visible to you, buttons locked) after a short "thinking" beat.
+        if (vsComputer && defenderNum === AI_PLAYER) {
+            aiHandleDefense({ attacker, attackerSlot, availableCreatures, isUnblockable, btnBlock, btnContinue, feedbackEl, defenseOverlay });
+        }
     }
 
     // Automatic blocking logic - selectBlocker removed as per user request
@@ -4083,7 +4177,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const ownerBoard = attackerSlot.closest('.player-zone');
         const ownerNum = parseInt(ownerBoard.id.split('-')[1]);
         gainTimePoints(ownerNum, damageDealt);
-        const dieSel = playersState[ownerNum].day > 0 ? '.day-die-group' : '.night-die-group';
+        const dieSel = activeDieSel(ownerNum);
         floatValue(ownerBoard.querySelector(dieSel), `+${damageDealt} TP`, 'gain');
     }
 
@@ -4151,14 +4245,16 @@ document.addEventListener('DOMContentLoaded', () => {
         if (!state) return;
         
         let remain = damage;
-        // Reduce leftmost (Day) die first
-        if (state.day > 0) {
-            const dec = Math.min(state.day, remain);
-            state.day -= dec;
+        // Reduce the active die first (Day by default; Time Bender can switch it).
+        const first = activeDieType(playerNum);
+        const second = first === 'day' ? 'night' : 'day';
+        if (state[first] > 0) {
+            const dec = Math.min(state[first], remain);
+            state[first] -= dec;
             remain -= dec;
         }
-        if (remain > 0 && state.night > 0) {
-            state.night = Math.max(0, state.night - remain);
+        if (remain > 0 && state[second] > 0) {
+            state[second] = Math.max(0, state[second] - remain);
         }
         
         updatePlayerDieUI(playerNum, 'day');
@@ -4181,6 +4277,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
 
     function passDevice(toPlayer, callback, customBtnText = "START TURN") {
+        // Vs Computer there is only one human at the device — no hand-off needed.
+        if (vsComputer) { if (callback) callback(); return; }
         const overlay = document.getElementById('pass-device-overlay');
         const hint = document.getElementById('next-player-hint');
         const btn = document.getElementById('start-turn-btn');
@@ -4308,6 +4406,26 @@ document.addEventListener('DOMContentLoaded', () => {
     // first so hand contents stay hidden from whoever currently holds it; if they don't have
     // Talisman there's nothing to decide, so the effect proceeds automatically.
     function offerTalismanResponse(targetPlayerNum, sourceCardName, { onPrevented, onProceed }) {
+        // The Computer responds by itself: it plays Talisman whenever it holds one
+        // (a prevented targeted effect is nearly always worth the card).
+        if (vsComputer && targetPlayerNum === AI_PLAYER) {
+            const aiBoardEl = document.getElementById(`player-${AI_PLAYER}`);
+            const talisman = Array.from(aiBoardEl.querySelectorAll('.hand-slot:not(.slot-empty)')).find(s => {
+                try { return JSON.parse(s.dataset.cardData).name === 'Talisman'; } catch (e) { return false; }
+            });
+            if (!talisman) { onProceed(); return; }
+            setTimeout(() => {
+                const talismanData = JSON.parse(talisman.dataset.cardData);
+                const history = aiBoardEl.querySelector('.history-pile');
+                clearSlot(talisman);
+                finishSingleCardPlacement(history, talismanData);
+                updateHandLayout(AI_PLAYER);
+                aiLog(`Plays Talisman — ${sourceCardName} prevented!`, 'combat');
+                onPrevented();
+            }, 1100);
+            return;
+        }
+
         const gameField = document.getElementById('game-field');
         const originalClass = gameField.className;
         const originallyActive = document.querySelector('.player-zone.active-player');
@@ -4435,19 +4553,21 @@ document.addEventListener('DOMContentLoaded', () => {
         pdfTemplate.classList.add('hidden');
         pdfTemplate.style.display = 'none';
 
-        if (card.set === 'Duality') {
+        // Duality Bazaar cards now have prototype scans (cardArtUrl), so only the
+        // art-less ones (Destiny, placeholders) still render via the PDF template.
+        if (card.set === 'Duality' && !cardArtUrl(card)) {
             // Render Duality using PDF Template
             renderCardInTemplate(card, pdfTemplate);
             pdfTemplate.classList.remove('hidden');
             pdfTemplate.style.display = 'flex';
             pdfTemplate.classList.add('duality-card');
-            
+
             if (card.type === 'Destiny') {
                 pdfTemplate.classList.add('destiny-duality');
             } else {
                 pdfTemplate.classList.remove('destiny-duality');
             }
-            
+
             if (card.name === '(Coming soon)') {
                 pdfTemplate.querySelector('.pdf-name').textContent = 'Coming Soon';
                 pdfTemplate.querySelector('.pdf-desc').textContent = 'This card is currently under development.';
@@ -4492,8 +4612,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 cardImg.src = 'assets/destiny_back.png';
                 cardImg.style.display = 'none';
             } else {
-                const slug = slugify(card.name);
-                cardImg.src = `assets/cards/${slug}.png`;
+                cardImg.src = cardArtUrl(card) || 'assets/card_back.png';
             }
         }
 
@@ -4529,6 +4648,19 @@ document.addEventListener('DOMContentLoaded', () => {
         return name.toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_+|_+$/g, '');
     }
 
+    // Resolves a card's art image, or null when no art exists (Destiny, placeholders).
+    // Unity art lives in assets/cards/, Duality prototype scans in assets/cards/duality/.
+    function cardArtUrl(card) {
+        if (!card || !card.name || card.name === '(Coming soon)') return null;
+        const slug = slugify(card.name);
+        if (!slug) return null;
+        if (card.type === 'Steam') return `assets/${slug}.png`;
+        if (card.type === 'Destiny' || card.type === 'Destiny Abyss') return null;
+        if (card.set === 'Unity') return `assets/cards/${slug}.png`;
+        if (card.set === 'Duality') return `assets/cards/duality/${slug}.png`;
+        return null;
+    }
+
     function showPreviewDetails(card) {
         const cardImg = document.getElementById('preview-card-img');
         const pdfCard = document.getElementById('pdf-card-template');
@@ -4539,22 +4671,22 @@ document.addEventListener('DOMContentLoaded', () => {
         pdfCard.classList.add('hidden');
         pdfCard.style.display = 'none';
 
-        if (card.set === 'Duality') {
+        if (card.set === 'Duality' && !cardArtUrl(card)) {
             renderCardInTemplate(card, pdfCard);
             pdfCard.classList.remove('hidden');
             pdfCard.style.display = 'flex';
             pdfCard.classList.add('duality-card');
-            
+
             if (card.type === 'Destiny') {
                 pdfCard.classList.add('destiny-duality');
             } else {
                 pdfCard.classList.remove('destiny-duality');
             }
         } else {
-            // Unity or Steam
+            // Unity, Steam, or Duality with prototype art
             pdfCard.classList.remove('duality-card');
             pdfCard.classList.remove('destiny-duality');
-            
+
             // Path logic
             cardImg.classList.remove('hidden');
             cardImg.style.display = 'block';
@@ -4570,8 +4702,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     cardImg.style.display = 'none';
                 }
             } else {
-                const slug = slugify(card.name);
-                cardImg.src = `assets/cards/${slug}.png`;
+                cardImg.src = cardArtUrl(card) || 'assets/card_back.png';
             }
         }
 
@@ -4673,6 +4804,7 @@ document.addEventListener('DOMContentLoaded', () => {
             const passOverlay = document.getElementById('pass-device-overlay');
             
             if (e.code === 'Space') {
+                if (aiTurnInProgress) { e.preventDefault(); return; }
                 if (!gameStarted) {
                     e.preventDefault();
                     if (window.handleStartGame) window.handleStartGame();
@@ -4690,6 +4822,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
     function progressPhase() {
         if (gameWon) return; // Disable all phase interaction if game won
+        // While the Computer plays, only the Computer itself may advance phases.
+        if (aiTurnInProgress && !aiDriving) return;
 
         // Safety net: leaving Construction with uncommitted Planetarium discards still
         // grants the owed draws, so a forgotten click never eats your cards.
@@ -4753,7 +4887,7 @@ document.addEventListener('DOMContentLoaded', () => {
             } else {
                 btn.textContent = 'Next Phase';
                 endPhaseTriggered = false; // Reset for next cycle
-                if (currentPhase === 1) aetherlabUsedThisPhase = false; // Reset Aetherlab trade
+                if (currentPhase === 1) { aetherlabUsedThisPhase = false; timeBenderUsedThisPhase = false; } // Reset per-Construction effects
             }
         }
 
@@ -4956,6 +5090,7 @@ document.addEventListener('DOMContentLoaded', () => {
         }
 
         // Use a loop instead of simple forEach to handle async reshuffle if needed
+        let reshuffled = false;
         for (let i = 0; i < targets.length; i++) {
             const targetSlot = targets[i];
 
@@ -4966,6 +5101,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 if (currentHistory.length > 0) {
                     // PERFORM VISUAL RESHUFFLE
                     await animateReshuffle(pNum);
+                    reshuffled = true;
 
                     // Meridia can't survive being folded back into a new Future Pile —
                     // she's discarded to the Abyss instead when History reshuffles.
@@ -4998,6 +5134,31 @@ document.addEventListener('DOMContentLoaded', () => {
             // Wait for card animation to finish before next draw
             await new Promise(r => setTimeout(r, 500));
         }
+
+        // Gravitas (Duality L1): whenever your History Pile is shuffled into a new
+        // Future Pile, draw Cards until you reach your Hand Limit. Resolved after the
+        // pending draws land so the deficit is measured against the final hand.
+        if (reshuffled) await resolveGravitasRefill(pNum);
+    }
+
+    // Gravitas — counts the hand after the in-flight deal animations settle (a dealt
+    // slot only fills ~600ms after its flight starts, and the draw loop waits 500ms),
+    // then pulses the landmark and draws the missing cards. Hand Limit is read live
+    // via getMaxHand, so Pandorama's +2 raises the refill target too.
+    async function resolveGravitasRefill(pNum) {
+        if (!findLandmark(pNum, 'Gravitas')) return;
+        await new Promise(r => setTimeout(r, 400));
+
+        const board = document.getElementById(`player-${pNum}`);
+        if (!board) return;
+        const handSlots = Array.from(board.querySelectorAll('.hand-slot'));
+        const occupied = handSlots.filter(s => !s.classList.contains('slot-empty')).length;
+        const deficit = getMaxHand(board) - occupied;
+        if (deficit <= 0) return;
+
+        const landmark = pulseLandmark(pNum, 'Gravitas');
+        if (landmark) floatValue(landmark, `Draw ${deficit}`, 'gain');
+        await drawCards(pNum, deficit);
     }
 
     function shuffleArray(array) {
@@ -5046,13 +5207,9 @@ document.addEventListener('DOMContentLoaded', () => {
             slot.classList.remove('slot-empty');
             slot.dataset.cardData = JSON.stringify(card);
 
-            const slug = slugify(card.name);
-            if (card.type === 'Steam') {
-                slot.style.backgroundImage = `url('assets/${slug}.png')`;
-                slot.style.backgroundColor = 'transparent';
-                slot.textContent = '';
-            } else if (card.set === 'Unity' && slug) {
-                slot.style.backgroundImage = `url('assets/cards/${slug}.png')`;
+            const art = cardArtUrl(card);
+            if (art) {
+                slot.style.backgroundImage = `url('${art}')`;
                 slot.style.backgroundColor = 'transparent';
                 slot.textContent = '';
             } else {
@@ -5118,7 +5275,13 @@ document.addEventListener('DOMContentLoaded', () => {
         const countLabel = board.querySelector('.hand-card-count');
         if (countLabel) {
             const occupiedCount = handSlots.filter(s => !s.classList.contains('slot-empty')).length;
-            countLabel.textContent = occupiedCount;
+            if (countLabel.textContent !== String(occupiedCount)) {
+                countLabel.textContent = occupiedCount;
+                countLabel.classList.remove('pulse-update');
+                void countLabel.offsetWidth; // restart the pulse animation
+                countLabel.classList.add('pulse-update');
+            }
+            syncMiniHandFan(board, occupiedCount);
         }
 
         checkHandLimit();
@@ -5167,6 +5330,24 @@ document.addEventListener('DOMContentLoaded', () => {
         const phaseDisplay = document.getElementById('game-phase-display');
         if (phaseDisplay) phaseDisplay.classList.add('hidden');
 
+        if (vsComputer) {
+            // Vs Computer: no pass screen, and the view never flips — Player 1
+            // stays anchored at the bottom while the Computer plays above.
+            // Player 1's board keeps the .active-player class throughout so the
+            // Computer's hand is only ever shown as card backs.
+            if (gameField) gameField.className = `players-${activePlayerCount} turn-p1`;
+            document.querySelectorAll('.player-zone').forEach(z => z.classList.remove('active-player'));
+            const p1Board = document.getElementById('player-1');
+            if (p1Board) p1Board.classList.add('active-player');
+            if (label) {
+                label.textContent = currentPlayer === AI_PLAYER ? 'COMPUTER' : 'PLAYER 1';
+                label.classList.toggle('ai-active', currentPlayer === AI_PLAYER);
+            }
+            startTurn();
+            if (currentPlayer === AI_PLAYER) beginComputerTurn();
+            return;
+        }
+
         const overlay = document.getElementById('pass-device-overlay');
         if (overlay) overlay.classList.remove('hidden');
     }
@@ -5183,6 +5364,553 @@ document.addEventListener('DOMContentLoaded', () => {
         consolidateHand(currentPlayer);
     }
 
+    // ==================== COMPUTER OPPONENT ====================
+    // Player 2 can be driven by a built-in opponent ("Computer") at three
+    // difficulty levels. The Computer plays through the same engine paths a
+    // human uses (pay cost → Bazaar removal → placement → beginAttack →
+    // progressPhase), so every rule the engine knows applies to it too.
+    //
+    // Presentation: the view never flips. Player 1 stays anchored at the
+    // bottom; the Computer's hand shows only as a fan of card backs that grows
+    // and shrinks. Its moves play out in real time — ghost-card animations on
+    // the board plus the live action feed on the right — so watching is
+    // optional. The only time the game waits for you is a decision that is
+    // yours by the rules: block or take the hit when its creature attacks.
+    //
+    // V1 scope: the Computer buys Steam, Creatures and Landmarks. Artifacts
+    // and Sparks are skipped for now (their effects need interactive
+    // targeting); it still answers Dark Matter, Threat and Talisman prompts.
+
+    const AI_PLAYER = 2;
+    let vsComputer = false;
+    let aiLevel = 'normal';
+    let aiTurnInProgress = false;
+    let aiDriving = false; // true only while the Computer itself calls progressPhase
+
+    const AI_PROFILES = {
+        easy:   { pace: 1300, buyChance: 0.55, maxBuys: 1 },
+        normal: { pace: 1000, buyChance: 0.9,  maxBuys: 2 },
+        hard:   { pace: 800,  buyChance: 1,    maxBuys: 4 }
+    };
+    const aiProfile = () => AI_PROFILES[aiLevel] || AI_PROFILES.normal;
+    const aiSleep = (ms) => new Promise(r => setTimeout(r, ms));
+    const aiThink = () => aiSleep(aiProfile().pace + Math.random() * 500);
+    const aiBoard = () => document.getElementById(`player-${AI_PLAYER}`);
+
+    // --- Live action feed ---
+    const AI_FEED_TAGS = { buy: 'BUY', play: 'PLAY', combat: 'FIGHT', draw: 'DRAW', turn: '', system: 'SYS', info: '•' };
+
+    function aiLog(text, kind = 'info') {
+        const list = document.getElementById('ai-feed-list');
+        const feed = document.getElementById('ai-feed');
+        if (!list || !feed) return;
+        feed.classList.remove('hidden');
+        const entry = document.createElement('div');
+        entry.className = `ai-feed-entry ai-feed-${kind}`;
+        const tag = AI_FEED_TAGS[kind] ?? AI_FEED_TAGS.info;
+        entry.innerHTML = `<span class="ai-feed-tag">${tag}</span><span>${text}</span>`;
+        list.prepend(entry); // newest on top
+        requestAnimationFrame(() => entry.classList.add('shown'));
+        while (list.childElementCount > 30) list.lastElementChild.remove();
+    }
+
+    // Dynamic opponent hand fan — one card back per card in hand.
+    function syncMiniHandFan(board, count) {
+        const fan = board.querySelector('.hand-fan-icon');
+        if (!fan) return;
+        const shown = Math.max(0, Math.min(count, 9));
+        if (fan.dataset.fanCount == shown) return;
+        fan.dataset.fanCount = shown;
+        fan.innerHTML = '';
+        for (let i = 0; i < shown; i++) {
+            const mini = document.createElement('div');
+            mini.className = 'mini-card-icon dynamic';
+            const spread = (shown - 1) / 2;
+            mini.style.transform = `translateX(${(i - spread) * 9}px) rotate(${(i - spread) * 8}deg)`;
+            fan.appendChild(mini);
+        }
+    }
+
+    // Ghost-card flight so the Computer's moves are visible on the board.
+    function aiAnimateCard(sourceEl, targetEl, card, faceUp = true) {
+        if (!sourceEl || !targetEl) return Promise.resolve();
+        const s = sourceEl.getBoundingClientRect();
+        const t = targetEl.getBoundingClientRect();
+        if ((!s.width && !s.height) || (!t.width && !t.height)) return Promise.resolve();
+        const ghost = document.createElement('div');
+        ghost.className = 'held-card-ghost ai-ghost tech-font';
+        ghost.style.left = s.left + 'px';
+        ghost.style.top = s.top + 'px';
+        const art = cardArtUrl(card);
+        if (!faceUp) {
+            ghost.style.backgroundImage = "url('assets/card_back.png')";
+        } else if (art) {
+            ghost.style.backgroundImage = `url('${art}')`;
+        } else {
+            ghost.style.backgroundColor = 'rgba(40,40,40,0.9)';
+            ghost.style.display = 'flex';
+            ghost.style.alignItems = 'center';
+            ghost.style.justifyContent = 'center';
+            ghost.style.fontSize = '10px';
+            ghost.textContent = card.name;
+        }
+        document.body.appendChild(ghost);
+        ghost.offsetHeight;
+        ghost.style.transition = 'all 0.65s cubic-bezier(0.2, 0.8, 0.2, 1)';
+        ghost.style.left = t.left + 'px';
+        ghost.style.top = t.top + 'px';
+        return new Promise(res => setTimeout(() => { ghost.remove(); res(); }, 700));
+    }
+
+    // --- Reading the Computer's own state ---
+    function aiHandCards() {
+        return Array.from(aiBoard().querySelectorAll('.hand-slot:not(.slot-empty)')).map(slot => {
+            try { return { slot, card: JSON.parse(slot.dataset.cardData) }; } catch (e) { return null; }
+        }).filter(Boolean);
+    }
+
+    function aiSteamCounts() {
+        const counts = { F: 0, G: 0, L: 0 };
+        aiHandCards().forEach(({ card }) => {
+            if (card.type !== 'Steam') return;
+            if (card.number === 'STM1') counts.F++;
+            else if (card.number === 'STM2') counts.G++;
+            else if (card.number === 'STM3') counts.L++;
+        });
+        return counts;
+    }
+
+    // Same affordability math the Bazaar lighting uses, against an explicit pool.
+    function aiCanAfford(cost, steams) {
+        if (!cost || cost === '-') return true;
+        const need = { F: 0, G: 0, L: 0, A: 0 };
+        for (const ch of cost) if (need[ch] !== undefined) need[ch]++;
+        let { F, G, L } = steams;
+        if (F < need.F || G < need.G || L < need.L) return false;
+        return (F - need.F) + (G - need.G) + (L - need.L) >= need.A;
+    }
+
+    // Pay a cost by moving matching Steam from the Computer's (hidden) hand to
+    // History. Mirrors autoPayCost, minus the on-screen animation — the source
+    // slots aren't visible, so a ghost flight would start from nowhere.
+    function aiPayCost(card) {
+        if (!card.cost || card.cost === '-') return;
+        const board = aiBoard();
+        const historySlot = board.querySelector('.history-pile');
+        if (!historySlot) return;
+        const pool = aiHandCards().filter(h => h.card.type === 'Steam');
+        const used = new Set();
+        const matches = (ch, c) =>
+            (ch === 'F' && c.number === 'STM1') ||
+            (ch === 'G' && c.number === 'STM2') ||
+            (ch === 'L' && c.number === 'STM3') ||
+            (ch === 'A' && ['STM1', 'STM2', 'STM3'].includes(c.number));
+        // Colored pips first so an 'A' never steals a color that's still needed.
+        const chars = card.cost.split('').sort((a, b) => (a === 'A') - (b === 'A'));
+        for (const ch of chars) {
+            const hit = pool.find(h => !used.has(h) && matches(ch, h.card));
+            if (!hit) return; // can't satisfy — caller checked affordability first
+            used.add(hit);
+        }
+        used.forEach(h => {
+            clearSlot(h.slot);
+            finishSingleCardPlacement(historySlot, h.card);
+        });
+        updateHandLayout(AI_PLAYER);
+    }
+
+    function bazaarTop(loc) {
+        const pile = (activeBazaar[loc] || []).filter(c => selectedSets.includes(c.set));
+        return pile.length ? pile[pile.length - 1] : null;
+    }
+    const bazaarElFor = (loc) => document.querySelector(`.bazaar-area .card[data-loc="${loc}"]`);
+
+    function removeTopFromBazaar(loc, card) {
+        const pile = activeBazaar[loc];
+        const idx = pile ? pile.findIndex(c => c.name === card.name) : -1;
+        if (idx !== -1) pile.splice(idx, 1);
+        renderBazaar();
+        if (window.updateBazaarLighting) window.updateBazaarLighting();
+    }
+
+    function aiFirstEmptyHandSlot() {
+        const board = aiBoard();
+        let slot = board.querySelector('.hand-slot.slot-empty');
+        if (!slot) {
+            slot = createSlot('hand');
+            slot.classList.add('temporary-slot');
+            board.querySelector('.hand-slots').appendChild(slot);
+        }
+        return slot;
+    }
+
+    function aiOwnsLandmark(name) {
+        return Array.from(aiBoard().querySelectorAll('.landmark-zone-main .card:not(.slot-empty)')).some(s => {
+            try { return JSON.parse(s.dataset.cardData).name === name; } catch (e) { return false; }
+        });
+    }
+
+    // --- Decision making ---
+    function aiScoreCard(card) {
+        const pips = (card.cost || '').replace('-', '').length;
+        if (card.type === 'Creature') {
+            const hp = parseInt(card.health);
+            let score = (Number.isNaN(hp) ? 2 : hp) * 12 + pips * 2;
+            const hasCreature = aiHandCards().some(h => h.card.type === 'Creature') ||
+                aiBoard().querySelector('.creature-zone-main .card:not(.slot-empty)');
+            if (!hasCreature) score += 20; // never sit without a body on the board
+            return score;
+        }
+        // Landmarks: passive effects the Computer benefits from automatically rank higher.
+        let score = pips * 9;
+        if (card.name === 'Pandorama' || card.name === 'Fountain of Youth') score += 14;
+        return score;
+    }
+
+    function aiConstructionCandidates() {
+        const steams = aiSteamCounts();
+        const board = aiBoard();
+        const maxHand = getMaxHand(board);
+        const handCount = aiHandCards().length;
+        const hasEmptyLandmarkSlot = !!board.querySelector('.landmark-zone-main .card.slot-empty');
+        const locs = ['L1','L2','L3','L4','L5','L6','L7','L8','C1','C2','C3','C4','C5','C6','C7','C8'];
+        const list = [];
+        for (const loc of locs) {
+            const card = bazaarTop(loc);
+            if (!card) continue;
+            if (card.type === 'Landmark' && (!hasEmptyLandmarkSlot || aiOwnsLandmark(card.name))) continue;
+            if (card.type === 'Creature' && handCount >= maxHand) continue;
+            if (!aiCanAfford(card.cost, steams)) continue;
+            list.push({ loc, card, score: aiScoreCard(card) });
+        }
+        return list.sort((a, b) => b.score - a.score);
+    }
+
+    function aiChooseSteamBuy() {
+        const steams = aiSteamCounts();
+        const options = [];
+        const fire = bazaarTop('ST1');
+        const gold = bazaarTop('ST2');
+        const laser = bazaarTop('ST3');
+        if (fire) options.push({ loc: 'ST1', card: fire, rank: 1 });
+        if (gold && aiCanAfford(gold.cost, steams)) options.push({ loc: 'ST2', card: gold, rank: 2 });
+        if (laser && aiCanAfford(laser.cost, steams)) options.push({ loc: 'ST3', card: laser, rank: 3 });
+        if (!options.length) return null;
+
+        if (aiLevel === 'easy') {
+            if (Math.random() < 0.15) return null; // sometimes forgets the Steam Phase entirely
+            return options[Math.floor(Math.random() * options.length)];
+        }
+        // Normal/Hard: an upgrade buy spends the same Steam a good Construction
+        // buy needs this turn — if one is already lined up, take the free Fire.
+        const bestBuild = aiConstructionCandidates()[0];
+        if (bestBuild && bestBuild.score >= 30) {
+            return options.find(o => o.rank === 1) || null;
+        }
+        options.sort((a, b) => b.rank - a.rank);
+        return options[0];
+    }
+
+    // --- Executing moves ---
+    async function aiBuyFromBazaar(loc, card) {
+        const src = bazaarElFor(loc);
+        const cardCopy = { ...card };
+        let targetEl, place, logText, logKind;
+
+        if (cardCopy.type === 'Landmark') {
+            const slot = aiBoard().querySelector('.landmark-zone-main .card.slot-empty');
+            if (!slot) return;
+            targetEl = slot;
+            place = () => finishSingleCardPlacement(slot, cardCopy);
+            logText = `Builds ${cardCopy.name}`;
+            logKind = 'play';
+        } else {
+            // Steam and Creatures go to the hand — the flight lands on the card-back fan.
+            targetEl = aiBoard().querySelector('.inactive-hand-display') || aiBoard();
+            place = () => {
+                finishSingleCardPlacement(aiFirstEmptyHandSlot(), cardCopy);
+                updateHandLayout(AI_PLAYER);
+            };
+            logText = `Buys ${cardCopy.name}`;
+            logKind = 'buy';
+        }
+
+        aiPayCost(cardCopy);
+        removeTopFromBazaar(loc, cardCopy);
+        if (cardCopy.type === 'Steam') steamBoughtThisTurn = true;
+        const costTxt = cardCopy.cost && cardCopy.cost !== '-' ? ` (${cardCopy.cost})` : '';
+        aiLog(logText + costTxt, logKind);
+        await aiAnimateCard(src, targetEl, cardCopy, true);
+        place();
+    }
+
+    async function aiCreaturePhase() {
+        const board = aiBoard();
+
+        // 1) Summon: strongest Creature in hand into an empty zone slot (one per turn).
+        const emptyZone = board.querySelector('.creature-zone-main .card.slot-empty');
+        const creaturesInHand = aiHandCards().filter(h => h.card.type === 'Creature');
+        if (emptyZone && creaturesInHand.length) {
+            creaturesInHand.sort((a, b) => (parseInt(b.card.health) || 0) - (parseInt(a.card.health) || 0));
+            const pick = creaturesInHand[0];
+            const data = { ...pick.card };
+            clearSlot(pick.slot);
+            updateHandLayout(AI_PLAYER);
+            aiLog(`Summons ${data.name}${data.health ? ` — ${data.health} HP` : ''}`, 'play');
+            await aiAnimateCard(board.querySelector('.inactive-hand-display'), emptyZone, data, true);
+            finishSingleCardPlacement(emptyZone, data);
+            await aiThink();
+        }
+
+        // 2) Attack with every Creature that's allowed to act.
+        const zoneSlots = Array.from(board.querySelectorAll('.creature-zone-main .card:not(.slot-empty)'));
+        for (const slot of zoneSlots) {
+            if (gameWon) return;
+            let data;
+            try { data = JSON.parse(slot.dataset.cardData); } catch (e) { continue; }
+            const canAct = (data.summonedOnTurn < totalTurns) || data.name.includes('Cravus') || data.name.includes('Rampadon');
+            if (!canAct) continue;
+            if (calculateCurrentStrength(data, slot) <= 0 && !data.name.includes('Entrophy')) continue;
+            aiLog(`${data.name} attacks you!`, 'combat');
+            beginAttack(data, slot, 1);
+            await aiWaitForCombat();
+            await aiThink();
+        }
+    }
+
+    // Wait until all combat UI (defense screen, Entrophy wheel, Threat choice)
+    // has been resolved and closed — the human decides blocks at their own pace.
+    async function aiWaitForCombat() {
+        const combatOpen = () => {
+            const d = document.getElementById('defense-overlay');
+            return (d && !d.classList.contains('hidden')) ||
+                !!document.querySelector('.entrophy-overlay') ||
+                !!document.querySelector('.landmark-choice-overlay');
+        };
+        await aiSleep(700);
+        while (combatOpen()) await aiSleep(300);
+        await aiSleep(300);
+    }
+
+    function aiAdvancePhase() {
+        aiDriving = true;
+        try { progressPhase(); } finally { aiDriving = false; }
+    }
+
+    // --- The Computer's full turn ---
+    async function beginComputerTurn() {
+        if (aiTurnInProgress || gameWon || !vsComputer || !gameStarted) return;
+        aiTurnInProgress = true;
+        document.body.classList.add('ai-turn');
+        aiLog("Computer's turn", 'turn');
+        try {
+            await aiThink();
+
+            // Steam Phase — up to one Steam purchase (free FireSteam included).
+            if (!gameWon) {
+                const steamPick = aiChooseSteamBuy();
+                if (steamPick) await aiBuyFromBazaar(steamPick.loc, steamPick.card);
+                else aiLog('Skips its Steam buy', 'info');
+            }
+            await aiThink();
+            aiAdvancePhase(); // → Construction
+
+            // Construction Phase — buy per difficulty profile.
+            const prof = aiProfile();
+            let buys = 0;
+            while (buys < prof.maxBuys && !gameWon) {
+                if (Math.random() > prof.buyChance) break;
+                const candidates = aiConstructionCandidates();
+                if (!candidates.length) break;
+                const choice = aiLevel === 'easy'
+                    ? candidates[Math.floor(Math.random() * candidates.length)]
+                    : candidates[0];
+                await aiBuyFromBazaar(choice.loc, choice.card);
+                buys++;
+                await aiThink();
+            }
+            aiAdvancePhase(); // → Creature
+            await aiThink();
+
+            if (!gameWon) await aiCreaturePhase();
+
+            aiAdvancePhase(); // → End (draws 2 automatically)
+            if (!gameWon) {
+                aiLog('Draws 2 cards', 'draw');
+                await aiSleep(3000); // covers both deal animations plus a possible reshuffle
+                if (!canEndTurn()) {
+                    aiLog('Discards down to the hand limit', 'info');
+                    aiAdvancePhase(); // auto-discards the cheapest, stays in End Phase
+                    await aiSleep(800);
+                }
+                aiAdvancePhase(); // → finishTurn, back to Player 1
+            }
+        } finally {
+            aiTurnInProgress = false;
+            document.body.classList.remove('ai-turn');
+        }
+        if (!gameWon) aiLog('Your turn', 'turn');
+    }
+
+    // --- Reactions to the human's plays ---
+    function aiChooseBlocker(attackerStr, availableCreatures, isUnblockable) {
+        if (isUnblockable || !availableCreatures.length) return null;
+        const options = availableCreatures.map(slot => {
+            let c;
+            try { c = JSON.parse(slot.dataset.cardData); } catch (e) { return null; }
+            const res = (parseInt(c.baseResistance ?? c.baseHealth ?? c.resistance ?? c.health) || 0) - (c.damageTaken || 0);
+            return { slot, name: c.name, res };
+        }).filter(Boolean);
+        if (!options.length) return null;
+
+        if (aiLevel === 'easy') {
+            return Math.random() < 0.5 ? options[Math.floor(Math.random() * options.length)] : null;
+        }
+
+        const myTP = totalTimePoints(AI_PLAYER);
+        // Cheapest wall that survives the hit.
+        const survivors = options.filter(o => o.res > attackerStr).sort((a, b) => a.res - b.res);
+        if (survivors.length) return survivors[0];
+        // Even trade: worth it against real damage.
+        const trade = options.find(o => o.res === attackerStr);
+        if (trade && attackerStr >= (aiLevel === 'hard' ? 2 : 3)) return trade;
+        // Chump block when the hit is big or threatens the dice.
+        const biggest = [...options].sort((a, b) => b.res - a.res)[0];
+        if (attackerStr >= myTP) return biggest;
+        if (aiLevel === 'hard' && attackerStr >= 4) return biggest;
+        return null;
+    }
+
+    function aiHandleDefense({ attacker, attackerSlot, availableCreatures, isUnblockable, btnBlock, btnContinue, feedbackEl, defenseOverlay }) {
+        defenseOverlay.classList.add('ai-controlled');
+        feedbackEl.textContent = 'Computer is deciding…';
+        const attackerStr = calculateCurrentStrength(attacker, attackerSlot);
+
+        setTimeout(() => {
+            const choice = aiChooseBlocker(attackerStr, availableCreatures, isUnblockable);
+            if (choice) {
+                btnBlock.onclick();
+                if (availableCreatures.length > 1) {
+                    const pickBtn = Array.from(document.querySelectorAll('#blocker-picker button'))
+                        .find(b => b.textContent === choice.name);
+                    if (pickBtn) pickBtn.click();
+                }
+                aiLog(`Blocks with ${choice.name}`, 'combat');
+            } else {
+                aiLog(isUnblockable ? `Can't block — takes ${attackerStr} damage` : `Takes ${attackerStr} damage`, 'combat');
+            }
+            setTimeout(() => {
+                btnContinue.onclick(); // resolve
+                setTimeout(() => {
+                    btnContinue.onclick(); // close
+                    defenseOverlay.classList.remove('ai-controlled');
+                }, 2000);
+            }, 900);
+        }, 1200);
+    }
+
+    function aiHandleDarkMatter({ overlay, btnDisc, btnTp, handCards, feedbackEl }) {
+        overlay.classList.add('ai-controlled');
+        feedbackEl.textContent = 'Computer is deciding…';
+        setTimeout(() => {
+            let pickName = null;
+            if (handCards.length) {
+                const ranked = handCards.map(s => {
+                    let c;
+                    try { c = JSON.parse(s.dataset.cardData); } catch (e) { c = {}; }
+                    return { name: c.name, val: cardCostValue(c) };
+                }).sort((a, b) => a.val - b.val);
+                // Shed a cheap card (Fire/AllSteam tier) rather than pay Time Points;
+                // pay TP instead of discarding anything Gold-tier or better while healthy.
+                if (ranked[0].val < 1e4 || totalTimePoints(AI_PLAYER) <= 8) pickName = ranked[0].name;
+            }
+            if (pickName) {
+                aiLog(`Dark Matter: discards ${pickName}`, 'combat');
+                btnDisc.onclick();
+                setTimeout(() => {
+                    const pickBtn = Array.from(document.querySelectorAll('#dm-picker button'))
+                        .find(b => b.textContent === pickName);
+                    if (pickBtn) pickBtn.click();
+                    overlay.classList.remove('ai-controlled');
+                }, 400);
+            } else {
+                aiLog('Dark Matter: loses 2 Time Points', 'combat');
+                btnTp.onclick();
+                overlay.classList.remove('ai-controlled');
+            }
+        }, 1300);
+    }
+
+    function aiHandleThreat({ overlay, btnPay, btnDecline, canPay, cost, cardName }) {
+        overlay.classList.add('ai-controlled');
+        setTimeout(() => {
+            const keep = canPay && cost <= 4 && (totalTimePoints(AI_PLAYER) - cost) >= 8;
+            if (keep) {
+                aiLog(`Pays ${cost} TP to keep ${cardName}`, 'combat');
+                btnPay.onclick();
+            } else {
+                aiLog(`Lets ${cardName} fall to the Abyss`, 'combat');
+                btnDecline.onclick();
+            }
+        }, 1300);
+    }
+
+    // --- Options wiring & persistence ---
+    (function initOpponentControls() {
+        let saved = {};
+        try { saved = JSON.parse(localStorage.getItem('futoryOpponent') || '{}'); } catch (e) {}
+        if (saved.vsComputer) vsComputer = true;
+        if (saved.level && AI_PROFILES[saved.level]) aiLevel = saved.level;
+
+        const oppButtons = document.querySelectorAll('#opponent-toggle .toggle-btn');
+        const diffRow = document.getElementById('difficulty-row');
+        const diffButtons = document.querySelectorAll('#difficulty-toggle .toggle-btn');
+
+        const syncUI = () => {
+            oppButtons.forEach(b => b.classList.toggle('active', (b.dataset.opponent === 'computer') === vsComputer));
+            diffButtons.forEach(b => b.classList.toggle('active', b.dataset.difficulty === aiLevel));
+            if (diffRow) diffRow.classList.toggle('hidden', !vsComputer);
+            const feed = document.getElementById('ai-feed');
+            if (feed) feed.classList.toggle('hidden', !vsComputer);
+        };
+        const persist = () => localStorage.setItem('futoryOpponent', JSON.stringify({ vsComputer, level: aiLevel }));
+
+        oppButtons.forEach(b => b.addEventListener('click', () => {
+            vsComputer = b.dataset.opponent === 'computer';
+            persist();
+            syncUI();
+            if (!vsComputer) return;
+            aiLog(`Computer opponent ready — ${aiLevel}`, 'system');
+            // If the pass screen is already waiting on Player 2, take over now.
+            const passOverlay = document.getElementById('pass-device-overlay');
+            if (gameStarted && currentPlayer === AI_PLAYER && passOverlay && !passOverlay.classList.contains('hidden') && !aiTurnInProgress) {
+                passOverlay.classList.add('hidden');
+                const gf = document.getElementById('game-field');
+                if (gf) gf.className = `players-${activePlayerCount} turn-p1`;
+                document.querySelectorAll('.player-zone').forEach(z => z.classList.remove('active-player'));
+                document.getElementById('player-1')?.classList.add('active-player');
+                const label = document.getElementById('active-player-label');
+                if (label) { label.textContent = 'COMPUTER'; label.classList.add('ai-active'); }
+                startTurn();
+                beginComputerTurn();
+            }
+        }));
+
+        diffButtons.forEach(b => b.addEventListener('click', () => {
+            aiLevel = b.dataset.difficulty;
+            persist();
+            syncUI();
+            if (vsComputer) aiLog(`Difficulty set to ${aiLevel}`, 'system');
+        }));
+
+        const feedHeader = document.getElementById('ai-feed-header');
+        if (feedHeader) feedHeader.addEventListener('click', () => {
+            document.getElementById('ai-feed')?.classList.toggle('collapsed');
+        });
+
+        syncUI();
+    })();
+
     // --- Game Over Button Handlers ---
     if (btnPlayAgain) {
         btnPlayAgain.addEventListener('click', () => {
@@ -5193,6 +5921,8 @@ document.addEventListener('DOMContentLoaded', () => {
                 if (playersState[i]) {
                     playersState[i].day = 12;
                     playersState[i].night = 12;
+                    playersState[i].activeDie = 'day';
+                    updateActiveDieGlow(i);
                 }
             }
             initAllActiveBoards();

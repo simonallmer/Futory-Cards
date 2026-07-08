@@ -45,6 +45,16 @@
         <div id="landmark-context-body" class="tech-font"></div>
     </div>
 
+    <!-- Computer Opponent: live action feed (watch the moves, no clicking required) -->
+    <div id="ai-feed" class="hidden">
+        <div id="ai-feed-header" class="tech-font">
+            <span class="ai-feed-dot"></span>
+            <span class="ai-feed-title">COMPUTER</span>
+            <span class="ai-feed-collapse">&ndash;</span>
+        </div>
+        <div id="ai-feed-list" class="tech-font"></div>
+    </div>
+
     <!-- Pass Device Overlay -->
     <div id="pass-device-overlay" class="hidden">
         <div class="overlay-backdrop"></div>
@@ -262,22 +272,6 @@
         </div>
     </div>
 
-    <!-- Sets Modal -->
-    <div id="sets-modal" class="modal hidden">
-        <div class="modal-content glass-panel sets-modal-content">
-            <button id="close-sets-modal" class="close-btn">&times;</button>
-            <h2 class="modal-title fantasy-font">Active Sets</h2>
-            <div class="sets-container tech-font">
-                <button class="set-btn active" data-set="Unity">Unity</button>
-                <button class="set-btn" data-set="Duality">Duality</button>
-                <div class="set-btn disabled" title="Coming 2028">
-                    Trinity
-                    <div class="coming-soon">Coming 2028</div>
-                </div>
-            </div>
-        </div>
-    </div>
-
     <!-- Options Modal -->
     <div id="options-modal" class="modal hidden">
         <div class="modal-content glass-panel options-modal-content">
@@ -294,13 +288,32 @@
                 </div>
                 <div class="option-row">
                     <span class="option-label">Card Sets:</span>
-                    <button class="menu-btn" id="btn-sets" style="width: 100%; margin: 0;">Manage Sets</button>
+                    <div class="option-toggle" id="sets-toggle">
+                        <button class="toggle-btn active" data-set="Unity">Unity</button>
+                        <button class="toggle-btn" data-set="Duality">Duality</button>
+                        <button class="toggle-btn disabled" data-set="Trinity" title="Coming 2028">Trinity</button>
+                    </div>
                 </div>
                 <div class="option-row">
                     <span class="option-label">Rule Enforcement:</span>
                     <div class="option-toggle">
                         <button class="toggle-btn active" id="mode-manual">Manual</button>
                         <button class="toggle-btn disabled" id="mode-auto" title="Coming Soon">Automatic</button>
+                    </div>
+                </div>
+                <div class="option-row">
+                    <span class="option-label">Opponent:</span>
+                    <div class="option-toggle" id="opponent-toggle">
+                        <button class="toggle-btn active" data-opponent="human">Human</button>
+                        <button class="toggle-btn" data-opponent="computer">Computer</button>
+                    </div>
+                </div>
+                <div class="option-row hidden" id="difficulty-row">
+                    <span class="option-label">Difficulty:</span>
+                    <div class="option-toggle" id="difficulty-toggle">
+                        <button class="toggle-btn" data-difficulty="easy">Easy</button>
+                        <button class="toggle-btn active" data-difficulty="normal">Normal</button>
+                        <button class="toggle-btn" data-difficulty="hard">Hard</button>
                     </div>
                 </div>
             </div>
