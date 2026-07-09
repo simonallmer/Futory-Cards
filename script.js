@@ -284,7 +284,7 @@ document.addEventListener('DOMContentLoaded', () => {
         };
     }
 
-    const implementedCards = ["Pandorama", "Fountain of Youth", "Laser Catalyst", "Dragura's Wasteland", "Planetarium", "Lethargo's Temple", "Clone Factory", "Aetherlab", "Entrophy", "Meridius", "Meridia", "Time Thief", "Ichor", "Vulcanem", "Cravus", "Rampadon", "Smoke", "Dark Matter", "Reflector", "Talisman", "Reversal", "Faith", "Threat", "Confiscation", "Gravitas", "Time Bender", "Meridia's Cabin", "Repo Station", "Hand of Rhone", "Atlantica", "Hyperscope", "Mines of Pyralos", "Chrona", "Razo", "Looper", "Masiota", "Aromeas", "General Wave", "Namandi", "Sea Lord"];
+    const implementedCards = ["Pandorama", "Fountain of Youth", "Laser Catalyst", "Dragura's Wasteland", "Planetarium", "Lethargo's Temple", "Clone Factory", "Aetherlab", "Entrophy", "Meridius", "Meridia", "Time Thief", "Ichor", "Vulcanem", "Cravus", "Rampadon", "Smoke", "Dark Matter", "Reflector", "Talisman", "Reversal", "Faith", "Threat", "Confiscation", "Gravitas", "Time Bender", "Meridia's Cabin", "Repo Station", "Hand of Rhone", "Atlantica", "Hyperscope", "Mines of Pyralos", "Chrona", "Razo", "Looper", "Masiota", "Aromeas", "General Wave", "Namandi", "Sea Lord", "Sleep Potion"];
 
     // --- Intent Classification ---
     // auto: fires on its own when condition is met
@@ -331,6 +331,7 @@ document.addEventListener('DOMContentLoaded', () => {
         'General Wave': 'auto',
         'Namandi': 'active',
         'Sea Lord': 'active',
+        'Sleep Potion': 'active',
     };
 
     // --- Simulation Presets ---
@@ -570,9 +571,18 @@ document.addEventListener('DOMContentLoaded', () => {
             p1history: ['Smoke', 'Ichor'],
             p1future: ['FireSteam', 'GoldSteam'],
         },
+        'Sleep Potion': {
+            phase: 1,
+            desc: "Two Sleep Potions in hand (Construction Phase). Click one → cyan targets glow on both boards. Deactivate the opponent's Ichor (it flips face down); play the second potion on the sleeping Ichor to DISCARD it. Deactivating your own Cravus makes it a secret (opponent can't peek). The opponent's Pandorama can be put to sleep too.",
+            hand: ['Sleep Potion', 'Sleep Potion'],
+            p1creatures: [{ name: 'Cravus', damageTaken: 0 }],
+            p2creatures: [{ name: 'Ichor', damageTaken: 0 }],
+            p2landmarks: ['Pandorama'],
+        },
     };
 
     const devLogData = [
+        { date: '2026-07-09', msg: "Sleep Potion (Duality A1) — implemented (active), the deactivator the whole face-down subsystem was built for, per Simon's confirmed design: 'In your Construction or Creature Phase, deactivate a Creature or Landmark of your choice; targeting an already face-down card discards it instead; you may deactivate your own Creature to keep it anonymous.' Played from the hand like Dark Matter (a name branch in the hand-click dispatcher, legal in phase 1 OR 2). triggerSleepPotion() gathers every Creature and Landmark on BOTH boards that is either already asleep (→ discard) or canBeDeactivated() (so face-up Atlantica/Razo are never offered, but an already-deactivated card always is), pulses them with a new cyan .sleep-target glow plus a docked CHOOSE A CREATURE OR LANDMARK / CANCEL bar (same picker pattern as Threat/Mines, capture-click to preempt the card's normal handler). resolveSleepPotion() branches on the target's state: a face-up target flips card.deactivated = true through the existing subsystem (syncFaceDownVisual + refreshBoardAfterDeactivation, so Cabin badges, hand limit and Atlantica parked-card cleanup all re-sync), and if it's YOUR OWN Creature it also gets faceDownSecret so the opponent can't peek it (anonymity); an already face-down target is discarded to its OWNER'S History (a discarded Landmark cycles/rebuilds on draw like a Hyperscope kill). This realizes Simon's double-deactivation = discard rule; maybeMasiotaRescue already refuses on an already-deactivated card, so a sleeping Masiota Sleep-Potioned just discards with no rescue, consistent. Sleep Potion then spends itself to the caster's History (Artifacts return to History after use); CANCEL leaves it in hand. V1: the Computer doesn't cast it (it buys no Artifacts) but is a valid target — a deactivated AI creature already can't block or attack. Sim preset (two potions in hand, your Cravus + the opponent's Ichor and Pandorama on the board). Verified live all four paths: the picker glowed exactly Cravus/Ichor/Pandorama; deactivating the opponent's Ichor flipped it to a card back (deactivated, NOT secret) and spent the potion to your History; a second potion on that sleeping Ichor discarded it to P2's History; deactivating your own Cravus set faceDownSecret true; the opponent's Pandorama went to sleep as a non-secret card back; CANCEL left both potions in hand with no leftover glow. No console errors." },
         { date: '2026-07-09', msg: "Sea Lord (Duality C8) — implemented (active), completing all 8 Duality Creatures: 'After Sea Lord attacks and is discarded, you may shuffle your History Pile and Future Pile into a new Future Pile.' Hooked at the end of finishAttacker — right after the standard clearSlot + discard-to-History that every attacker goes through, so by the time the offer appears Sea Lord is already in History and cycles back into the deck too (matching the printed 'and is discarded ... shuffle your History Pile'). maybeSeaLordReshuffle() reuses the two rules the End-Phase reshuffle already established rather than inventing new ones: it combines History + Future, exiles any Meridia to the Abyss (she can't be folded into a new Future Pile), shuffles the rest via the shared shuffleArray into the Future Pile, empties History (both piles re-rendered through updateStackIndicator, which handles the slot-empty/label/card-back visuals), and calls resolveGravitasRefill() since forming a new Future Pile from History is exactly Gravitas's trigger. It's optional (confirm), and an empty History+Future is a no-op. V1: the Computer declines (the offer is gated on !aiTurnInProgress), matching Looper/Namandi. Sim preset: Sea Lord (Strength 6) ready, History = Smoke + Ichor, Future = 2 Steam. Verified live both ways — ACCEPT: his direct strike hit P2 Day 12→6, then all five cards (Smoke, Ichor, the 2 Steam, and Sea Lord himself) folded into a Future Pile in a shuffled order (≠ the concatenation, proving the shuffle) with History emptied; DECLINE: the same strike landed and Sea Lord went to History (Smoke, Ichor, Sea Lord) with both piles left untouched. No console errors." },
         { date: '2026-07-09', msg: "Namandi (Duality C7) — implemented (active), per Simon's rulings: he 'gains +1 Strength for each Non-Steam Card you discard while attacking,' where the discard comes from your Hand (or with Atlantica, the wider parked hand), the cards go to your History Pile, and the buff is THIS ATTACK ONLY. Wired as a discard step at the top of triggerAttack (ahead of Hyperscope/target selection, so it reads as 'before attacking'): promptNamandiDiscard() gathers every non-Steam '.hand-slot, .atlantica-slot' card (reusing the exact selector Mines/Atlantica established for 'hand as resource'), pulses them with the red threat-target glow plus a docked bar, and lets you TENTATIVELY toggle any number — each pick locks gold (.namandi-selected) and the bar's live 'Strength N' updates. ATTACK spends the selected cards to History (clearSlot + finishSingleCardPlacement, the standard discard chokepoint) and resumes via a boosted copy { ...attacker, baseStrength: base + bonus, namandiResolved }, so the +Strength threads through the identical Meridius-style pipeline — calculateCurrentStrength reads the copy's baseStrength, so the combat screen, resolveCombat and spillover all use it with ZERO new plumbing; Resistance is untouched (attack-only) and his zone card stays base 3 (he's discarded after attacking anyway). namandiResolved marks the second pass so the chooser can't reopen; CANCEL aborts the whole attack with nothing discarded; an empty eligible set skips the UI straight to a plain attack. V1: the Computer attacks with Namandi at base Strength (the discard branch is gated on !aiTurnInProgress), matching Looper/Hyperscope. Sim preset: Namandi (base 3) in the zone with Smoke + Ichor (eligible) and a FireSteam (Steam, excluded) in hand. Verified live: only Smoke and Ichor pulsed (FireSteam stayed dark, proving the Non-Steam filter); selecting both read 'Strength 5', ATTACK discarded both to History (hand 3→1) with a '+2 Strength' float and the defense screen showed attacker Strength 5; the direct strike hit for 5; a re-run with CANCEL left the hand untouched and returned Namandi to the zone. No console errors." },
         { date: '2026-07-09', msg: "General Wave (Duality C6) — marked implemented (vanilla). His printed ability is '—': he's a plain 6/6/6-class body (health 4/strength 4/resistance 4) with no special effect, so the normal combat engine already runs him correctly, exactly like Ichor. No code was written beyond the checklist flag; nothing to test past confirming he attacks/blocks as a 4/4." },
@@ -958,6 +968,14 @@ document.addEventListener('DOMContentLoaded', () => {
                     const isMyBoard = slot.closest('.player-zone')?.id === `player-${currentPlayer}`;
                     if (!devMode && isMyBoard && currentPhase === 1 && cardData.name === 'Dark Matter') {
                         triggerDarkMatter(cardData, slot);
+                        return;
+                    }
+
+                    // Sleep Potion (Duality A1): play from hand in your Construction OR Creature
+                    // Phase to deactivate a Creature or Landmark of your choice (an already
+                    // face-down target is discarded instead).
+                    if (!devMode && isMyBoard && (currentPhase === 1 || currentPhase === 2) && cardData.name === 'Sleep Potion') {
+                        triggerSleepPotion(cardData, slot);
                         return;
                     }
 
@@ -1920,6 +1938,101 @@ document.addEventListener('DOMContentLoaded', () => {
             syncAtlanticaZone(parseInt(board.id.split('-')[1]));
         }
         checkHandLimit();
+    }
+
+    // --- Sleep Potion (Duality A1): the deactivator ---
+    // "In your Construction Phase or Creature Phase: You may deactivate a Creature or a
+    // Landmark of your choice. (If you target a deactivated Card, it gets discarded.) (You
+    // may deactivate your Creature to keep it anonymous when bringing it into battle.)"
+    // A card that is already face down is a legal target too — targeting it discards it
+    // (Simon's confirmed double-deactivation = discard rule). Deactivating your OWN Creature
+    // makes it a secret placement (faceDownSecret) so the opponent can't peek it.
+    function sleepPotionTargets() {
+        const found = [];
+        for (let p = 1; p <= activePlayerCount; p++) {
+            const board = document.getElementById(`player-${p}`);
+            if (!board) continue;
+            board.querySelectorAll('.creature-zone-main .card:not(.slot-empty), .landmark-zone-main .card:not(.slot-empty)').forEach(slot => {
+                let c; try { c = JSON.parse(slot.dataset.cardData); } catch (e) { return; }
+                if (Array.isArray(c)) return;
+                // Eligible if it's already asleep (→ discard) or it can be put to sleep.
+                if (c.deactivated || canBeDeactivated(c)) found.push({ slot, owner: p });
+            });
+        }
+        return found;
+    }
+
+    function triggerSleepPotion(sleepCard, handSlot) {
+        const targets = sleepPotionTargets();
+        if (!targets.length) {
+            alert('Sleep Potion — no Creature or Landmark can be targeted right now.');
+            return;
+        }
+
+        const bar = document.createElement('div');
+        bar.id = 'sleep-potion-bar';
+        bar.style.cssText = 'position:fixed;bottom:40px;left:50%;transform:translateX(-50%);display:flex;gap:10px;z-index:6000;';
+        const hint = document.createElement('div');
+        hint.className = 'menu-btn tech-font';
+        hint.style.cssText = 'pointer-events:none;opacity:0.85;';
+        hint.textContent = 'SLEEP POTION — CHOOSE A CREATURE OR LANDMARK';
+        bar.appendChild(hint);
+        const cancelBtn = document.createElement('button');
+        cancelBtn.className = 'menu-btn secondary-btn';
+        cancelBtn.textContent = 'CANCEL';
+        bar.appendChild(cancelBtn);
+        document.body.appendChild(bar);
+
+        const cleanup = () => {
+            targets.forEach(t => {
+                t.slot.classList.remove('sleep-target');
+                if (t.slot._sleepHandler) t.slot.removeEventListener('click', t.slot._sleepHandler, true);
+                delete t.slot._sleepHandler;
+            });
+            bar.remove();
+        };
+        cancelBtn.onclick = cleanup; // Sleep Potion stays in hand, nothing happens
+
+        targets.forEach(t => {
+            t.slot.classList.add('sleep-target');
+            const handler = (e) => {
+                e.stopPropagation();
+                e.preventDefault();
+                cleanup();
+                resolveSleepPotion(t.slot, t.owner, sleepCard, handSlot);
+            };
+            t.slot._sleepHandler = handler;
+            t.slot.addEventListener('click', handler, true); // capture: preempt the normal card click
+        });
+    }
+
+    function resolveSleepPotion(targetSlot, ownerNum, sleepCard, handSlot) {
+        let target; try { target = JSON.parse(targetSlot.dataset.cardData); } catch (e) { return; }
+        const ownerBoard = document.getElementById(`player-${ownerNum}`);
+        const ownerHistory = ownerBoard.querySelector('.history-pile');
+
+        if (target.deactivated) {
+            // Already asleep → discard it to its owner's History (a discarded Landmark cycles
+            // and rebuilds itself on draw, exactly like a Hyperscope-destroyed one).
+            floatValue(targetSlot, `${target.name} Discarded`, 'damage');
+            clearSlot(targetSlot);
+            finishSingleCardPlacement(ownerHistory, target);
+        } else {
+            target.deactivated = true;
+            // Your own Creature goes down as a secret (anonymous) placement; opponents' cards
+            // and any Landmark were already seen, so they stay peekable while asleep.
+            if (target.type === 'Creature' && ownerNum === currentPlayer) target.faceDownSecret = true;
+            targetSlot.dataset.cardData = JSON.stringify(target);
+            syncFaceDownVisual(targetSlot);
+            refreshBoardAfterDeactivation(targetSlot);
+            floatValue(targetSlot, 'Deactivated', 'gain');
+        }
+
+        // Spend Sleep Potion to the caster's History (Artifacts return to History after use).
+        const casterHistory = document.getElementById(`player-${currentPlayer}`).querySelector('.history-pile');
+        clearSlot(handSlot);
+        finishSingleCardPlacement(casterHistory, sleepCard);
+        updateHandLayout(currentPlayer);
     }
 
     // --- Atlantica (Duality L6): an extended hand behind your Landmarks ---
