@@ -192,6 +192,7 @@ document.addEventListener('DOMContentLoaded', () => {
     let gameStarted = false;
     let gameWon = false;
     let activeStrDebuff = 0;
+    let cellShieldDefender = null;       // Cell Shield (A4): player who armed it for the current attack
     let totalTurns = 0;
     const phases = ['Steam', 'Construction', 'Creature', 'End'];
 
@@ -284,7 +285,7 @@ document.addEventListener('DOMContentLoaded', () => {
         };
     }
 
-    const implementedCards = ["Pandorama", "Fountain of Youth", "Laser Catalyst", "Dragura's Wasteland", "Planetarium", "Lethargo's Temple", "Clone Factory", "Aetherlab", "Entrophy", "Meridius", "Meridia", "Time Thief", "Ichor", "Vulcanem", "Cravus", "Rampadon", "Smoke", "Dark Matter", "Reflector", "Talisman", "Reversal", "Faith", "Threat", "Confiscation", "Gravitas", "Time Bender", "Meridia's Cabin", "Repo Station", "Hand of Rhone", "Atlantica", "Hyperscope", "Mines of Pyralos", "Chrona", "Razo", "Looper", "Masiota", "Aromeas", "General Wave", "Namandi", "Sea Lord", "Sleep Potion", "Lotus", "Rush"];
+    const implementedCards = ["Pandorama", "Fountain of Youth", "Laser Catalyst", "Dragura's Wasteland", "Planetarium", "Lethargo's Temple", "Clone Factory", "Aetherlab", "Entrophy", "Meridius", "Meridia", "Time Thief", "Ichor", "Vulcanem", "Cravus", "Rampadon", "Smoke", "Dark Matter", "Reflector", "Talisman", "Reversal", "Faith", "Threat", "Confiscation", "Gravitas", "Time Bender", "Meridia's Cabin", "Repo Station", "Hand of Rhone", "Atlantica", "Hyperscope", "Mines of Pyralos", "Chrona", "Razo", "Looper", "Masiota", "Aromeas", "General Wave", "Namandi", "Sea Lord", "Sleep Potion", "Lotus", "Rush", "Cell Shield"];
 
     // --- Intent Classification ---
     // auto: fires on its own when condition is met
@@ -334,6 +335,7 @@ document.addEventListener('DOMContentLoaded', () => {
         'Sleep Potion': 'active',
         'Lotus': 'active',
         'Rush': 'active',
+        'Cell Shield': 'active',
     };
 
     // --- Simulation Presets ---
@@ -581,6 +583,12 @@ document.addEventListener('DOMContentLoaded', () => {
             p2creatures: [{ name: 'Ichor', damageTaken: 0 }],
             p2landmarks: ['Pandorama'],
         },
+        'Cell Shield': {
+            phase: 2,
+            desc: "Ichor (Strength 2) attacking from Player 1; Cell Shield in Player 2's hand. On defense, open PLAY ARTIFACT and play Cell Shield — the 2 Time Points the strike would cost are fully prevented (Day stays 12) and Player 2 draws 2 Cards instead.",
+            p1creatures: [{ name: 'Ichor', damageTaken: 0 }],
+            p2hand: ['Cell Shield'],
+        },
         'Rush': {
             phase: 2,
             desc: "Creature Phase: Ichor was just summoned, so clicking it says 'Summoning sickness!'. Play Rush from hand → with one Creature it applies automatically, stamps Ichor attack-ready, and opens the ATTACK menu so the strike lands this turn. Rush goes to your History.",
@@ -596,6 +604,7 @@ document.addEventListener('DOMContentLoaded', () => {
     };
 
     const devLogData = [
+        { date: '2026-07-09', msg: "Cell Shield (Duality A4) — implemented (active), completing all FOUR Duality Artifacts (I had miscounted A1-A3 and missed this one). 'When you're being attacked: Prevent all Time Points that you would lose from an attack and draw Cards equal to that amount.' It's a defensive response, so it rides the existing PLAY ARTIFACT step of the defense screen next to Smoke/Reflector/Talisman (any Artifact in the defender's hand already surfaces there — no new UI). Selecting it in the artifact-CONFIRM loop arms one module flag, cellShieldDefender = defenderNum; the effect then resolves at damage time via maybeCellShield(amount, defenderNum), guarded into all three attack→player damage sites (unblocked direct strike in resolveDamageDirect, blocked spillover in resolveCombat, and the no-blocker fallback in resolveBlock): when armed for that defender it prevents the hit entirely (the caller skips resolveDamageDirectly) and instead draws that many Cards. JUDGMENT CALL: 'Time Points you would lose' is capped at the Time Points you actually hold — Math.min(damage, totalTimePoints) — so a lethal-looking overkill only draws up to your remaining TP; tell me if you'd rather draw the raw attack amount. The flag is one-attack-only (cleared on use, in finishAttacker's terminal path so a repelled attack can't leak it, and in the per-turn reset). Because Cell Shield fully prevents, blocking is optional — playing it and taking the hit draws the full Strength. V1: the Computer doesn't play defensive Artifacts, so it never uses Cell Shield (it remains a valid target of nothing — it's the human's tool); Time Thief still gains his TP since the damage was 'dealt' before being prevented (Meridia precedent). Sim preset (Ichor Str 2 from P1, Cell Shield in P2's hand). Verified live hot-seat: P2 opened PLAY ARTIFACT, played Cell Shield (→ P2 History), took the strike, and the feedback read 'Cell Shield! 2 Time Points prevented — draw 2' — P2's Day stayed 12 (nothing lost), P2's Future dropped 5→3 as it drew FireSteam + Ichor into hand, and Ichor spent to P1's History as normal. No console errors." },
         { date: '2026-07-09', msg: "Rush (Duality A3) — implemented (active): 'In your Creature Phase: Make a Creature attack instantly.' Played from hand (a name branch in the hand-click dispatcher, gated to phase 2). triggerRush() collects your face-up zone Creatures; with one it applies automatically, with several it pulses them (red threat-target) behind a docked CHOOSE A CREATURE / CANCEL bar (the Repo Station / Sleep Potion picker pattern, capture-click to preempt the normal attack click). Applying spends Rush to your History (Artifacts return to History after use) and calls rushCreature(): it stamps the chosen Creature's summonedOnTurn to 0 so the summoning-sickness gate is bypassed for the rest of the turn (a cancelled attack can still be retried by clicking the Creature), then opens the standard ATTACK menu via showAttackMenu — so the whole existing attack pipeline (Entrophy/Looper/Namandi/Hyperscope, targeting, defense) runs unchanged. CANCEL leaves Rush in hand; no Creature in play alerts and spends nothing. V1: the Computer doesn't buy Artifacts, so it never plays Rush. Sim preset (Creature Phase: a just-summoned, summoning-sick Ichor + Rush in hand). Verified live: clicking Ichor first alerted 'Summoning sickness!'; playing Rush auto-applied (one Creature), stamped Ichor summonedOnTurn 0, sent Rush to History and opened the ATTACK menu; ATTACK then struck P2 directly for 2 (Day 12→10) and Ichor moved to History (History = Rush, Ichor). No console errors." },
         { date: '2026-07-09', msg: "Lotus (Duality A2) — implemented (active), per Simon's placement rulings. This also formalized the Creature-Zone geometry: the MIDDLE slot (index 2) is the only default Creature field, and Creatures are now CLICK-SUMMONED (click one in your Creature Phase → it lands in the middle) rather than dragged — the drag highlight for Creatures is likewise narrowed to the middle slot. Lotus is played by clicking it in your Construction Phase: placeLotusPad() lays it as a face-up Artifact pad in the first open slot in Simon's order [1,3,0,4] (left-adjacent, right-adjacent, outer-left, outer-right). An unoccupied pad already counts as an Artifact-in-zone for Meridia's Cabin (cabinBonus was pre-wired for exactly this). Summoning onto a pad: when the middle is taken, summonCreatureToZone() seats the additional Creature ON the first open Lotus pad, stacking it as a full Creature (baseStrength/badges/attack/block all normal — Simon: 'a fully functional second attacker AND blocker') with the Lotus riding along on card.lotusPad and a 🪷 corner marker. Fate-binding rides two hooks: the History write inside finishSingleCardPlacement discharges the Lotus alongside the Creature whenever a lotus-borne Creature is removed to History (covers Repo Station / Dark Matter sacrifice and every combat defeat in one chokepoint — the Creature and its Lotus both land in the owner's History, marker stripped so a redraw is clean); and finishAttacker special-cases the spent-after-attack path — JUDGMENT CALL per the literal card text ('when the Creature is defeated or sacrificed'): a Creature that merely ATTACKS and is spent leaves its Lotus pad BEHIND (empty, reusable next turn), so finishAttacker re-seats the pad and strips the marker, while a mutually-destroyed attacker (new attackerDefeated flag from resolveCombat) keeps the rider so the Lotus discharges. A creature-stat init guard (type === 'Creature') keeps a Lotus laid in the zone from picking up combat stats. V1: the Computer doesn't buy Artifacts, so it neither plays Lotus nor summons onto one. Sim preset (Construction Phase: Lotus + two Cravus in hand, Repo Station in play). Verified live all four paths: clicking Lotus laid a pad in slot 1 (Artifact, no stat pollution); advancing to the Creature Phase, clicking the first Cravus summoned it to the middle and the second seated on the pad with the 🪷 marker (onLotus, baseStrength 2); Repo-Station-sacrificing the Lotus Cravus sent BOTH Cravus and Lotus to History with the pad cleared; and in a re-run, ATTACKING with the Lotus Cravus struck P2 for 2 (Day 12→10), sent only the Cravus to History (no rider), and LEFT the empty Lotus pad in slot 1. No console errors. NOTE FOR SIMON: I read 'defeated or sacrificed' literally, so Lotus survives a plain attack and is reusable — tell me if instead the Lotus should discard whenever its Creature leaves the zone for any reason (including after attacking)." },
         { date: '2026-07-09', msg: "Sleep Potion (Duality A1) — implemented (active), the deactivator the whole face-down subsystem was built for, per Simon's confirmed design: 'In your Construction or Creature Phase, deactivate a Creature or Landmark of your choice; targeting an already face-down card discards it instead; you may deactivate your own Creature to keep it anonymous.' Played from the hand like Dark Matter (a name branch in the hand-click dispatcher, legal in phase 1 OR 2). triggerSleepPotion() gathers every Creature and Landmark on BOTH boards that is either already asleep (→ discard) or canBeDeactivated() (so face-up Atlantica/Razo are never offered, but an already-deactivated card always is), pulses them with a new cyan .sleep-target glow plus a docked CHOOSE A CREATURE OR LANDMARK / CANCEL bar (same picker pattern as Threat/Mines, capture-click to preempt the card's normal handler). resolveSleepPotion() branches on the target's state: a face-up target flips card.deactivated = true through the existing subsystem (syncFaceDownVisual + refreshBoardAfterDeactivation, so Cabin badges, hand limit and Atlantica parked-card cleanup all re-sync), and if it's YOUR OWN Creature it also gets faceDownSecret so the opponent can't peek it (anonymity); an already face-down target is discarded to its OWNER'S History (a discarded Landmark cycles/rebuilds on draw like a Hyperscope kill). This realizes Simon's double-deactivation = discard rule; maybeMasiotaRescue already refuses on an already-deactivated card, so a sleeping Masiota Sleep-Potioned just discards with no rescue, consistent. Sleep Potion then spends itself to the caster's History (Artifacts return to History after use); CANCEL leaves it in hand. V1: the Computer doesn't cast it (it buys no Artifacts) but is a valid target — a deactivated AI creature already can't block or attack. Sim preset (two potions in hand, your Cravus + the opponent's Ichor and Pandorama on the board). Verified live all four paths: the picker glowed exactly Cravus/Ichor/Pandorama; deactivating the opponent's Ichor flipped it to a card back (deactivated, NOT secret) and spent the potion to your History; a second potion on that sleeping Ichor discarded it to P2's History; deactivating your own Cravus set faceDownSecret true; the opponent's Pandorama went to sleep as a non-secret card back; CANCEL left both potions in hand with no leftover glow. No console errors." },
@@ -3054,6 +3063,7 @@ document.addEventListener('DOMContentLoaded', () => {
             if (cloneFactoryArmed) disarmCloneFactory();
             return;
         }
+        cellShieldDefender = null; // attack fully resolved — clear any unused Cell Shield arming
         // Lotus (Duality A2): a Creature that merely ATTACKED and is now spent (not defeated in
         // combat) leaves its Lotus pad behind, reusable next turn — detach the Lotus, re-seat it
         // as an empty pad, and strip the marker so the History chokepoint doesn't take it too.
@@ -5769,7 +5779,8 @@ document.addEventListener('DOMContentLoaded', () => {
         const str = calculateCurrentStrength(attacker, attackerSlot);
         feedbackEl.textContent = `Direct Strike for ${str} Damage!`;
 
-        resolveDamageDirectly(str, defenderNum);
+        // Cell Shield (A4) prevents the whole hit and turns it into card draws.
+        if (!maybeCellShield(str, defenderNum)) resolveDamageDirectly(str, defenderNum);
         applyTimeThiefGain(attacker, attackerSlot, str);
 
         const attackerHistory = attackerSlot.closest('.player-zone').querySelector('.history-pile');
@@ -5845,7 +5856,8 @@ document.addEventListener('DOMContentLoaded', () => {
                 finishSingleCardPlacement(blockerHistory, blockerData);
             }
             applyRepoStationGain(attackerSlot);
-            resolveDamageDirectly(overflow, defenderNum);
+            // Cell Shield (A4) prevents the spillover Time Points and draws that many Cards.
+            if (!maybeCellShield(overflow, defenderNum)) resolveDamageDirectly(overflow, defenderNum);
         } else if (attackerStr < blockerStr) {
             feedbackEl.textContent = "Attacker Repelled! Defender Survives.";
             blockerData.damageTaken = (blockerData.damageTaken || 0) + attackerStr;
@@ -5864,6 +5876,22 @@ document.addEventListener('DOMContentLoaded', () => {
         // Cleanup Attacker - move to history (unless Clone Factory keeps it for a 2nd strike).
         // attackerDefeated flags mutual destruction so a Lotus-borne attacker discards its Lotus.
         finishAttacker(attackerSlot, attacker, attackerHistory, attackerDefeated);
+    }
+
+    // Cell Shield (Duality A4): if the defender armed it during this attack's PLAY ARTIFACT step,
+    // prevent the Time Points they would lose and draw that many Cards instead. Returns true when
+    // it absorbs the hit (the caller then skips applying the damage). The amount is capped at the
+    // Time Points the player actually has — you can't "lose" more than you hold.
+    function maybeCellShield(amount, defenderNum) {
+        if (cellShieldDefender !== defenderNum) return false;
+        cellShieldDefender = null; // one attack only
+        const prevented = Math.min(amount, totalTimePoints(defenderNum));
+        const feedbackEl = document.getElementById('combat-feedback');
+        if (feedbackEl) feedbackEl.textContent = `Cell Shield! ${prevented} Time Points prevented — draw ${prevented}.`;
+        const board = document.getElementById(`player-${defenderNum}`);
+        if (board) floatValue(board.querySelector(activeDieSel(defenderNum)), `Shielded +${prevented} Cards`, 'gain');
+        if (prevented > 0) drawCards(defenderNum, prevented);
+        return true;
     }
 
     function resolveDamageDirectly(damage, playerNum) {
@@ -5898,7 +5926,8 @@ document.addEventListener('DOMContentLoaded', () => {
             try { const c = JSON.parse(s.dataset.cardData); return c.type === 'Creature' && !c.deactivated; } catch (e) { return false; }
         });
         if (availableCreatures.length === 0) {
-            resolveDamageDirectly(parseInt(attacker.baseStrength ?? attacker.baseHealth) || 0, defenderNum);
+            const dmg = parseInt(attacker.baseStrength ?? attacker.baseHealth) || 0;
+            if (!maybeCellShield(dmg, defenderNum)) resolveDamageDirectly(dmg, defenderNum);
             return;
         }
         selectBlocker(attacker, attackerSlot, defenderNum, availableCreatures);
@@ -5983,6 +6012,13 @@ document.addEventListener('DOMContentLoaded', () => {
                     // CARD EFFECT: REFLECTOR - redirects the attack instead of blocking/debuffing it.
                     if (artifactData.name === "Reflector") {
                         reflectorPlayed = true;
+                    }
+
+                    // CARD EFFECT: CELL SHIELD (A4) - arm it; the Time Points this attack would
+                    // cost the defender are prevented and turned into card draws when the damage
+                    // resolves (see maybeCellShield in the direct-strike / spillover paths).
+                    if (artifactData.name === "Cell Shield") {
+                        cellShieldDefender = defenderNum;
                     }
                 });
 
@@ -6966,6 +7002,7 @@ document.addEventListener('DOMContentLoaded', () => {
         disarmCloneFactory();
         closeLandmarkContext();
         activeStrDebuff = 0;
+        cellShieldDefender = null;
         aetherlabUsedThisPhase = false;
         deactivateAetherlab();
         resetHyperscopeTurnDamage();
