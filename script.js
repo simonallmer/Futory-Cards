@@ -284,7 +284,7 @@ document.addEventListener('DOMContentLoaded', () => {
         };
     }
 
-    const implementedCards = ["Pandorama", "Fountain of Youth", "Laser Catalyst", "Dragura's Wasteland", "Planetarium", "Lethargo's Temple", "Clone Factory", "Aetherlab", "Entrophy", "Meridius", "Meridia", "Time Thief", "Ichor", "Vulcanem", "Cravus", "Rampadon", "Smoke", "Dark Matter", "Reflector", "Talisman", "Reversal", "Faith", "Threat", "Confiscation", "Gravitas", "Time Bender", "Meridia's Cabin", "Repo Station", "Hand of Rhone", "Atlantica"];
+    const implementedCards = ["Pandorama", "Fountain of Youth", "Laser Catalyst", "Dragura's Wasteland", "Planetarium", "Lethargo's Temple", "Clone Factory", "Aetherlab", "Entrophy", "Meridius", "Meridia", "Time Thief", "Ichor", "Vulcanem", "Cravus", "Rampadon", "Smoke", "Dark Matter", "Reflector", "Talisman", "Reversal", "Faith", "Threat", "Confiscation", "Gravitas", "Time Bender", "Meridia's Cabin", "Repo Station", "Hand of Rhone", "Atlantica", "Hyperscope", "Mines of Pyralos", "Chrona", "Razo", "Looper", "Masiota", "Aromeas"];
 
     // --- Intent Classification ---
     // auto: fires on its own when condition is met
@@ -321,6 +321,13 @@ document.addEventListener('DOMContentLoaded', () => {
         'Repo Station': 'contextual',
         'Hand of Rhone': 'active',
         'Atlantica': 'contextual',
+        'Hyperscope': 'contextual',
+        'Mines of Pyralos': 'active',
+        'Chrona': 'active',
+        'Razo': 'auto',
+        'Looper': 'auto',
+        'Masiota': 'contextual',
+        'Aromeas': 'auto',
     };
 
     // --- Simulation Presets ---
@@ -502,9 +509,61 @@ document.addEventListener('DOMContentLoaded', () => {
             hand: ['FireSteam', 'GoldSteam', 'LaserSteam'],
             landmarks: ['Atlantica', 'Pandorama'],
         },
+        'Hyperscope': {
+            phase: 2,
+            desc: "Hyperscope in play, Cravus + Vulcanem ready. Attack: the opponent's Ichor and Landmarks glow as direct targets (plus a Strike-Player button). Pandorama (Price 2) falls to one Cravus hit; Gravitas (Price 3) needs 3+ attack damage in one turn. No block choice for the defender.",
+            landmarks: ['Hyperscope'],
+            p1creatures: [{ name: 'Cravus', damageTaken: 0 }, { name: 'Vulcanem', damageTaken: 0 }],
+            p2landmarks: ['Pandorama', 'Gravitas'],
+            p2creatures: [{ name: 'Ichor', damageTaken: 0 }],
+        },
+        'Mines of Pyralos': {
+            phase: 1,
+            desc: "Mines in play, 2 cards in hand, 7 in your Future, 2 in the opponent's. Click the Mines: send a card into the Abyss, pick either Future Pile, rearrange its top 6 (leftmost = drawn next), then draw 1 — set up your own next draw.",
+            hand: ['FireSteam', 'GoldSteam'],
+            landmarks: ['Mines of Pyralos'],
+            p1future: ['Ichor', 'Cravus', 'Smoke', 'FireSteam', 'GoldSteam', 'LaserSteam', 'Vulcanem'],
+            p2future: ['Rampadon', 'FireSteam'],
+        },
+        'Chrona': {
+            phase: 2,
+            desc: "Chrona just summoned — the split window is open. Click it to redistribute its 4 Health Points: 1⚔/3⛨ → 2/2 → 3⚔/1⛨ (wrapping, never 0). Next turn the split locks in and it attacks/blocks with the chosen values.",
+            p1creatures: [{ name: 'Chrona', damageTaken: 0, forceThisTurn: true }],
+        },
+        'Razo': {
+            phase: 2,
+            desc: "Razo + Ichor in your zone. Turn on Dev Mode and double-click each: Ichor flips face down, Razo refuses — he can never be deactivated (Sleep Potion will bounce off him the same way).",
+            p1creatures: [{ name: 'Razo', damageTaken: 0 }, { name: 'Ichor', damageTaken: 0 }],
+        },
+        'Looper': {
+            phase: 2,
+            desc: "Looper in your zone, opponent has an Ichor blocker and Smoke in hand. Attack: the Futory Die rolls the number of strikes — re-pick the target each strike, defender may block each one separately. Only the FIRST strike allows Artifact responses and carries buffs/debuffs; later strikes are plain Strength-1 hits.",
+            p1creatures: [{ name: 'Looper', damageTaken: 0 }],
+            p2creatures: [{ name: 'Ichor', damageTaken: 0 }],
+            p2hand: ['Smoke'],
+        },
+        'Masiota': {
+            phase: 2,
+            desc: "Masiota (3 HP) in your zone, opponent blocks with Razo (3 HP). Attack into the mutual destruction: the rescue offer flips Masiota face down instead of discarding. Next turn, click him to reactivate at 2 HP (-1 per rescue; same-turn reactivation is refused). Two rescues max — a third would bring him back at 0.",
+            p1creatures: [{ name: 'Masiota', damageTaken: 0 }],
+            p2creatures: [{ name: 'Razo', damageTaken: 0 }],
+        },
+        'Aromeas': {
+            phase: 2,
+            day: 9,
+            desc: "Your active Day die is at 9 TP. Aromeas is already in the Creature Zone — his HP was fixed on entry to half of 9, ROUNDED UP = 5 (badge shows 5). The value is locked at entry: it does not track the die if the 9 changes later.",
+            p1creatures: [{ name: 'Aromeas', damageTaken: 0, forceThisTurn: true }],
+        },
     };
 
     const devLogData = [
+        { date: '2026-07-09', msg: "Aromeas (Duality C5) — implemented (auto on entry), per Simon's rulings: 'Health Points become half of the Time Points of your active Time Die upon entering the Creature Zone,' rounding UP and FIXED at the moment of entry (it does not follow the die as it changes afterward). The whole effect is one guarded block in finishSingleCardPlacement — the single chokepoint every Creature-Zone placement flows through (normal summon, drag, and the sim loader all route here): when an 'Aromeas' card lands in a creature-zone slot and hasn't been stamped yet, it reads the owner's active die via activeDieType(ownerNum) (reusing Time Bender's groundwork, so a Night-active player halves the Night die), sets HP = Math.ceil(dieTP / 2) into BOTH baseStrength and baseResistance (the single-HP model — Aromeas prints X/X/X), stamps card.aromeasSet so re-renders never recompute, and floats 'N HP (½ of M)'. Because the value is a stored stat like Chrona's split or Meridia's placement HP, 'fixed at entry' is inherent — nothing recomputes it, and it flows through calculateCurrentStrength, resolveCombat and the AI heuristic unchanged (combat needed zero edits). The one display edit: Aromeas prints X/X/X, so unlike other Creatures his computed HP has no printed number to fall back on — updateCreatureVisuals now force-shows his creature-stat-badge (aromeasFixed flag, same always-show path as a rescued Masiota) so the player can always read his stat, even when it happens to equal the base. Sim preset: active Day die pinned to 9 with Aromeas freshly in the zone. Verified live: badge read 5 (⌈9/2⌉, proving round-up over 4) with aromeasSet stamped, matching baseStrength/baseResistance both 5. No console errors. V1 note: the Computer summons Aromeas through the same placement path, so its HP is set identically." },
+        { date: '2026-07-09', msg: "Masiota (Duality C4) — implemented (contextual), per Simon's ruling: whenever he would be DISCARDED from the Creature Zone — defeated as a blocker (outright or mutual destruction), spent after his own attack, or sacrificed — his owner may deactivate him in place instead (face down via the deactivation subsystem, damage cleared). Reactivating him, next turn at the earliest, costs 1 Health Point per rescue so far: printed 3 → back at 2 → back at 1; a rescue that would return him at 0 HP is not offered, so two rescues is his lifetime maximum. One shared gate, maybeMasiotaRescue(), is called at all four discard sites (resolveCombat's blocker-defeated + mutual-destruction branches, finishAttacker's after-attack cleanup — where it also disarms a waiting Clone Factory priming — and both sacrifice paths, Repo Station and Dark Matter). Judgment calls wired in: an attack that 'defeats' him still pays the attacker's Repo Station (the defeat happened; only the discard was dodged), but rescuing him from your OWN Repo Station sacrifice pays no Time Point (no sacrifice, no payout), and a Dark Matter sacrifice he dodges still counts as the opponent's one chosen cost. The 'next turn' lock rides a rescue stamp (totalTurns + seat), so a defender's mid-opponent-turn rescue correctly unlocks on their own next turn; same-turn unveiling alerts and refuses. Reactivation heals him fully at the reduced ceiling (baseStrength = baseResistance = printed − uses) with a permanent red badge showing the reduced value (his printed card still says 3), and reduced stats flow through all combat consumers automatically. V1: the Computer never rescues (it takes the discard). Sim preset (Masiota vs a blocking Razo — the 3/3 mirror forces mutual destruction). Verified live: mutual destruction offered 'reactivates next turn at 2 HP', accepting flipped him face down (uses 1) while Razo went to History; same-turn click refused; next turn he reactivated at 2/2 with the red '2' badge; attacking directly then struck for 2 (reduced Strength honored) and offered the second rescue at 1 HP (uses 2). The no-third-rescue gate is the arithmetic floor in maybeMasiotaRescue (3−3=0 → false), verified by code review. No console errors." },
+        { date: '2026-07-09', msg: "Looper (Duality C3) — implemented (auto on attack), per Simon's rulings: declaring his attack first rolls a Futory Die (a single scaled-up die face reusing Entrophy's pip builder and ease-out spin — 1-6), and the result is his number of strikes, resolved CLONE FACTORY STYLE: Looper stays in his zone between strikes, the target is re-picked every time (each follow-up re-enters triggerAttack, so a fresh defense screen opens per strike), and he goes to History only after the last one. The defender may block EVERY strike separately — each strike is its own block-or-take decision against the blocker's live state, so a blocker that survived strike 1 with damage blocks strike 2 at its reduced value. 'Any additional effects only apply to the first attack' is enforced by a looperPlainStrike flag stamped on strikes 2+: calculateCurrentStrength returns plain printed Strength (no Cabin buff, no Smoke debuff — a Smoke played against strike 1 does NOT weaken later strikes, by code path), the PLAY ARTIFACT button is disabled (no Smoke/Reflector responses after strike 1), and the Hyperscope targeting step is skipped (later strikes are ordinary player attacks). Plumbing mirrors Clone Factory exactly: a finishAttacker branch keeps him in the zone while strikes remain, and maybeLooperNextStrike() rides the same close-of-overlay hook as maybeCloneSecondStrike. Counters reset in finishTurn and on sim-preset load. V1 notes: the Computer's Looper attacks once (its path calls beginAttack directly, skipping the roll), and a Reflector on strike 1 that kills the chain simply drops the remaining strikes at turn's end. Sim preset (Looper vs Ichor blocker + Smoke in the opponent's hand). Verified live with the die pinned to 3: roll overlay read '3 Attacks! — only the first carries additional effects'; strike 1 offered block + artifact and was repelled by Ichor with Looper staying in the zone; strike 2 auto-opened with PLAY ARTIFACT disabled but blocking still offered; strikes 2-3 landed as plain 'Direct Strike for 1 Damage!' (P2 Day 12→10); after strike 3 Looper moved to History and the overlay chain ended cleanly. No console errors." },
+        { date: '2026-07-09', msg: "Razo (Duality C2) — marked implemented (auto): \"Razo can't be deactivated.\" No new code needed — his immunity was built into the deactivation subsystem on day one via canBeDeactivated() (the single gate every deactivation attempt must pass: the Dev-Mode flip today, Sleep Potion and any future deactivator tomorrow), which exempts exactly Atlantica and Razo per their printed rules. This entry makes the checklist honest about it and adds a sim preset (Razo + Ichor in zone) so the immunity is one click to demonstrate. Verified live with Dev Mode on: double-clicking Razo alerted 'Razo cannot be deactivated.' and he stayed face up, while the same gesture flipped Ichor face down. No console errors." },
+        { date: '2026-07-09', msg: "Chrona (Duality C1) — implemented (active), first Duality Creature, per Simon's control design: its 4 Health Points (printed 2⚔/2⛨) redistribute between Strength and Resistance when it enters the Creature Zone. Untouched it simply acts like Ichor (2/2, no badge); clicking it during the turn it was summoned walks the legal splits from 1 Strength upward — 1⚔/3⛨ → 2/2 → 3⚔/1⛨ → wrap — with 0 on either side never offered (cycleChronaSplit generates splits from the pool, so a future buffed pool would still work). The split window is enforced by the same summonedOnTurn stamp the summoning-sickness check uses: a capture branch in the zone-click dispatcher (ahead of the attack-menu branch, so no false 'Summoning sickness!' alert during the choice) cycles while summonedOnTurn === totalTurns on the owner's turn, and from the next turn on clicks fall through to the normal attack flow with the split locked. This is the card the engine's strength/resistance groundwork was laid for: baseStrength/baseResistance already feed calculateCurrentStrength, resolveCombat's blocker math, the AI's block heuristic and Hyperscope's creature lock, so combat needed ZERO changes — only display did. An uneven split renders as a pill badge '⚔N ⛨M' (new .chrona-split CSS riding .creature-stat-badge; even split shows nothing, matching the printed card), a '⚔N / ⛨M' float confirms each click, and updateCreatureStatBadge now prefers live baseStrength over the printed stat (fixes the Smoke-debuff badge for a split Chrona attacker too). V1 note: the Computer keeps the default 2/2 when it summons Chrona. Sim preset (Chrona just summoned, window open). Verified live: click sequence read exactly 2/2 → ⚔1 ⛨3 → 2/2 (badge gone) → ⚔3 ⛨1 → ⚔1 ⛨3 with no alerts; set 3⚔/1⛨, passed a full round (P1 End → P2's whole turn → back to P1), and in the new Creature Phase clicking Chrona opened the ATTACK menu instead of cycling, the attack screen showed Strength 3, and the direct strike hit for 3 (P2 Day 12→9). No console errors." },
+        { date: '2026-07-09', msg: "Mines of Pyralos (Duality L8) — implemented (active), completing all 8 Duality Landmarks: 'Once per Construction Phase: send 1 of your Cards into the Abyss to look at the top 6 Cards in any Future Pile and rearrange them. Then, draw a Card.' Three-step flow, all built from existing patterns: (1) click the Mines in your Construction Phase → your hand pulses with the red target glow (Atlantica-parked cards included — they work just like the hand) plus a docked SEND A CARD INTO THE ABYSS / CANCEL bar; CANCEL exists only before paying, since the Abyss cost is irreversible once picked (clearSlot + finishSingleCardPlacement to the shared Abyss slot, '{name} Lost' float, landmark pulse). (2) Pick ANY Future Pile — yours or an opponent's — via the same pulse-and-capture-click picker; auto-resolves when only one pile has cards, and if every pile is empty the effect degrades gracefully to just the draw. (3) A rearrange overlay (landmark-choice styling) lays the pile's top N≤6 out as art tiles, leftmost = drawn next, each with ◀ ▶ arrows; CONFIRM ORDER & DRAW splices the new order back onto the untouched rest of the pile and draws 1 via the shared drawCards() — so setting up your OWN next draw works, and a rearranged Landmark on top would rebuild itself on draw (new Duality cycle rule). Once-per-phase guard (minesUsedThisPhase) resets in finishTurn and on sim-preset load (found live: the sim skips finishTurn, so the flag survived a preset reload and the lockout alert froze the harness). Sim preset added (Mines + 2 hand cards, 7-card own Future, 2-card opponent Future) plus p2future support in the sim loader. Verified live: hand pulsed and FireSteam paid to the Abyss; both piles glowed; own pile showed its top 6 of 7 in correct top-first order (bottom card hidden); moving Smoke from 5th to leftmost and confirming drew exactly Smoke, with the remaining pile persisting the confirmed order (Vulcanem next); opponent's 2-card pile opened correctly, its rearrange left it untouched at 2 while the draw came from MY pile; second click same phase correctly refused. No console errors." },
+        { date: '2026-07-08', msg: "Hyperscope (Duality L7) — implemented (contextual), per Simon's rulings: a Landmark's Price is its total Steam pip count regardless of color (GGGL = 4), and every Hyperscope-targeted attack resolves WITHOUT the block-or-not choice — the target is locked in (Artifact responses like Smoke/Reflector stay legal on the defense screen, since responding isn't blocking). With Hyperscope in play, ATTACK opens a targeting step instead of striking the player: promptHyperscopeTarget() pulses every face-up enemy Creature and Landmark with the Threat red glow plus a docked STRIKE PLAYER DIRECTLY / CANCEL bar (deactivated face-down cards can't be aimed at — their stats/Price are hidden). The chosen target rides one hyperTarget parameter threaded through the whole attack pipeline (beginAttack → Entrophy's wheel → Meridius scaling → initiateDefense → the artifact-response resume and Reflector redirect), so every attacker keeps its own effect on the way in. Player target = direct unblockable strike (existing path); Creature target = the exact normal combat math via resolveCombat (attacker Str vs its Resistance, spillover to the player, Repo Station/Time Thief hooks intact — mutual destruction and Meridia absorption behave identically); Landmark target = new resolveLandmarkStrike(): the attack's damage accumulates on the Landmark for THIS TURN ONLY (red '⌖ N/Price' badge, cleared with the data in finishTurn via resetHyperscopeTurnDamage), and reaching the Price destroys it into its OWNER'S History (per Simon: a new Duality rule — destroyed Landmarks cycle; when later drawn from the Future Pile they rebuild themselves straight into the Landmark Zone automatically, wired as landmarkRebuildSlot() in drawCards, falling back to the hand only when the zone is full or a duplicate is in play; Threat's printed 'to the Abyss' stays Abyss), attacker to History as usual — Clone Factory's double strike naturally counts twice. Destroyed-landmark cleanup (Atlantica parked cards, Rhone charge) rides the existing clearSlot chokepoint. V1 scope: the Computer doesn't aim Hyperscope itself (plain attack flow); as a defender it simply has no decision and the AI defense handler skips its blocker heuristic. Sim preset (Hyperscope + Cravus/Vulcanem vs Ichor + Pandorama/Gravitas). Verified live: targeting bar + 3 glowing targets; Cravus one-shot Pandorama (2/2) into P2's History and P2's next End-Phase draws rebuilt it into the Landmark Zone with a 'Rebuilt' float; Cravus 2/3 on Gravitas then Vulcanem finished it (8/3); locked Ichor died in mutual destruction with no block prompt; direct player strike hit for 6 (Day 12→6); turn end wiped the 2/3 badge and stored damage; CANCEL fully restored the board. No console errors." },
         { date: '2026-07-08', msg: "Atlantica (Duality L6) — implemented (contextual), per Simon's ruling that parked cards are 'an extension of the hand and work just like the hand': a contextual third row (.atlantica-zone, sea-blue dashed slots) appears below the Landmark Zone the moment Atlantica lands and hides when it leaves. One slot sits behind each Landmark position; while holding a card in your Construction Phase, the empty slots behind ACTIVE Landmarks light up as drop targets (usableAtlanticaSlots() — face-down Landmarks don't qualify), enforcing the printed 1-card-per-Landmark limit by geometry. Parked cards are deliberately NOT .hand-slot (so the Hand Limit, End-Phase draws, discard counter and hand fan never see them — that's the point of the card) but every hand-as-resource path now scans '.hand-slot, .atlantica-slot': autoPayCost, the Bazaar affordability lighting (updateBazaarLighting — found live when a parked FireSteam didn't light an FGL Artifact), Lethargo's steam counting + spending, Aetherlab's upgrade targets, and Clone Factory's GoldSteam. Grabbing a parked card back works through the ordinary click-to-grab flow, so 'just like the hand' holds for replays too. The connected-card rule rides one reconciler, syncAtlanticaZone(): called from clearSlot (Landmark destroyed, e.g. Threat), finishSingleCardPlacement (Landmark arrives) and refreshBoardAfterDeactivation (Landmark flips face down) — any parked card whose Landmark is gone or asleep is discarded to History with a float; if Atlantica itself leaves, the whole row discards and hides. Atlantica can't be deactivated (canBeDeactivated already exempts it). Verified live via sim (Atlantica + Pandorama, 3 Steam in hand): row appeared with exactly 2 slots lit; parking FireSteam dropped hand 3→2 without touching the Hand Limit; buying Dark Matter (FGL) spent the PARKED FireSteam plus hand G+L — the Bazaar tile only unlocked after the affordability fix; parking GoldSteam behind Pandorama and Dev-Mode flipping Pandorama face down discarded the parked card to History while the row (and Atlantica) stayed put. No console errors." },
         { date: '2026-07-08', msg: "Deactivation subsystem (face-down cards) + Hand of Rhone direction choice for 3-4p. Deactivation, per Simon's design: a deactivated card lies FACE DOWN as an actual card back in both cases — deactivated-in-place AND secret placement — for full mystery (cool-dimmed via .card-deactivated so it doesn't read as a Future pile). Two flags in the card data: `deactivated` renders the back and suppresses everything; `faceDownSecret` marks a hidden placement (a Sleep-Potioned Creature entering the zone) that only its owner may peek. Hover rules: your own face-down cards and an opponent's that were deactivated AFTER being shown reveal their front on hover in a dimmed, desaturated 'asleep' modal state (.asleep-preview); a secret placement shows an opponent nothing at all — the hover handler re-reads live slot data, so cards flip visibility correctly after binding. Effect suppression rides the existing chokepoints: findLandmark() treats deactivated Landmarks as absent (silencing Gravitas, Wasteland, Catalyst, Planetarium, Aetherlab, Clone Factory and Rhone's auto-charge — the printed 'unless deactivated' clause now real), all four Pandorama hand-limit checks and cabinBonus() check the flag, face-down Creatures can't block (human picker + AI heuristic), the AI won't attack with one, and stat badges vanish while asleep (refreshBoardAfterDeactivation re-syncs badges/hand limit whenever a card flips). Clicking your own face-down card offers Unveil (flip up + reactivate); an opponent's is not interactable. Atlantica and Razo are exempt via canBeDeactivated(). Until Sleep Potion lands, Dev Mode double-click is the toggle/test path. Rhone: the release now walks seats via rhoneSeat(owner, dir, step) instead of a 2-player alternation; at 3+ players the context window grows a Direction toggle ('→ Towards P2' / '← Towards P4') that live-updates the outcome preview — at 2 players it stays hidden since both directions hit the single opponent first. Verified live: full-charge release regression intact (Opponent −3/You +3, no Direction row at 2p); Dev-Mode flipping Meridia's Cabin face down dropped Ichor's badge 3→base and flipping back restored it with the scan art; owner hover-peek showed the dimmed front; a secret face-down card on the opponent's board showed nothing on hover while the same card without the secret flag showed the asleep preview; clicking your own face-down Ichor unveiled it. No console errors." },
         { date: '2026-07-08', msg: "Hand of Rhone (Duality L5) — implemented (active), per Simon's design: charging is AUTOMATIC — entering your Construction Phase adds +1 Force to the landmark's counting die (capped at 6, shown as a violet '⚡ N Force' badge that turns gold at full charge), hooked into updatePhaseUI's phase-1 branch with a once-per-phase guard, so the Computer's Rhone charges too. Releasing is the player's call: clicking the landmark in your Construction Phase opens the same docked 'Landmark in Use' context window Lethargo's Temple uses, showing the charge and a live outcome preview ('Opponent −2 TP · You −1 TP'), with a Release Force button. The Force travels around the table alternating opponent → you → opponent… for the charged distance, resolving one pass per beat (~550ms) with -1 TP floats on each active die — in 2-player either direction reaches the opponent first, so the direction choice waits for 3-4p. Under 6 it's the shot-in-the-knee trade (3 Force: opponent −2, you −1); at the FULL charge of 6 your own passes heal instead of damage (opponent −3, you +3), routed through gainTimePoints/resolveDamageDirectly so Time Bender's active die and the lost-die cap are respected. Releasing removes the die (charge to 0, badge gone); a destroyed landmark takes its charge with it, and Play Again resets all four counters. The 'unless deactivated' clause on charging is noted and will be wired when the face-down deactivation subsystem lands (needed for Atlantica/Sleep Potion/Razo/Masiota). Sim preset seeds 5 Force so the load-time auto-charge demonstrates itself by completing the full 6. Verified live both ways: at 3 Force the release hit Opponent 12→10 and You 9→8; at 6 the badge went gold, the preview read 'Opponent −3 TP · You +3 TP', and the release finished Opponent 12→9, You 9→12. No alerts, no console errors." },
@@ -735,13 +794,18 @@ document.addEventListener('DOMContentLoaded', () => {
                 future: sim.p1future,
             });
 
-            if (sim.p2landmarks || sim.p2hand || sim.p2creatures) {
+            if (sim.p2landmarks || sim.p2hand || sim.p2creatures || sim.p2future) {
                 setupBoard(2, {
                     landmarks: sim.p2landmarks,
                     hand: sim.p2hand,
                     creatures: sim.p2creatures,
+                    future: sim.p2future,
                 });
             }
+
+            // Per-phase/turn flags don't survive a preset reload (the sim skips finishTurn).
+            minesUsedThisPhase = false;
+            resetLooper();
 
             // Pre-charge Hand of Rhone (its auto +1 then fires via updatePhaseUI below).
             if (sim.rhoneCharge !== undefined) {
@@ -1048,9 +1112,25 @@ document.addEventListener('DOMContentLoaded', () => {
                 // an opponent's face-down card is not interactable at all.
                 if (!devMode && cardData.deactivated &&
                     (isCreatureZone || (slot.parentNode && slot.parentNode.classList.contains('landmark-zone-main')))) {
+                    // Masiota's self-rescue can't be undone in the same turn it happened.
+                    if (isMyBoard && cardData.name === 'Masiota' &&
+                        cardData.masiotaRescueStamp === `${totalTurns}-${currentPlayer}`) {
+                        alert('Masiota can be reactivated next turn.');
+                        return;
+                    }
                     if (isMyBoard && confirm(`Unveil ${cardData.name}? It flips face up and reactivates.`)) {
                         reactivateCard(slot);
                     }
+                    return;
+                }
+
+                // Chrona (Duality C1): while it's still the turn it entered the Creature Zone,
+                // clicking it redistributes its Health Points between Strength and Resistance
+                // (1⚔/3⛨ → 2/2 → 3⚔/1⛨, wrapping — never 0 on either side). From the next
+                // turn on the split is locked and clicks behave normally.
+                if (!devMode && isCreatureZone && isMyBoard && cardData.name === 'Chrona' &&
+                    cardData.summonedOnTurn === totalTurns) {
+                    cycleChronaSplit(slot, cardData);
                     return;
                 }
 
@@ -1092,6 +1172,13 @@ document.addEventListener('DOMContentLoaded', () => {
                 // Repo Station: sacrifice one of your Creatures for 1 TP (Construction or Creature Phase).
                 if (!devMode && isLandmarkZone && isMyBoard && (currentPhase === 1 || currentPhase === 2) && cardData.name === 'Repo Station') {
                     activateRepoStation();
+                    return;
+                }
+
+                // Mines of Pyralos: send a card into the Abyss to rearrange a Future Pile's
+                // top 6, then draw (Construction Phase, once per phase).
+                if (!devMode && isLandmarkZone && isMyBoard && currentPhase === 1 && cardData.name === 'Mines of Pyralos') {
+                    activateMines();
                     return;
                 }
 
@@ -1260,8 +1347,10 @@ document.addEventListener('DOMContentLoaded', () => {
         
         if (!card || card.type !== 'Creature') return;
 
-        // Strength Badge (Displays effectively current health/strength)
-        const baseStr = getBaseStrength(card);
+        // Strength Badge (Displays effectively current health/strength).
+        // Prefer the live baseStrength (a placed creature always carries it, and
+        // Chrona's split can move it off the printed value) over the printed stat.
+        const baseStr = card.baseStrength !== undefined ? card.baseStrength : getBaseStrength(card);
         const permMod = card.permanentStrMod || 0;
         const isAttacker = slot.closest('.player-zone') && slot.closest('.player-zone').id === `player-${currentPlayer}`;
         const tempMod = isAttacker ? -activeStrDebuff : 0;
@@ -1279,6 +1368,23 @@ document.addEventListener('DOMContentLoaded', () => {
         else if (finalVal > (baseStr + permMod)) sb.classList.add('positive');
         
         slot.appendChild(sb);
+    }
+
+    // --- Chrona (Duality C1): redistribute its Health Points on entry ---
+    // The pool is Strength + Resistance (printed 2/2 = 4). Untouched it acts like Ichor;
+    // each click walks the legal splits from 1 Strength upward: 1/3 → 2/2 → 3/1 → 1/3…
+    // (0 on either side is not allowed). Only callable during the turn it was summoned.
+    function cycleChronaSplit(slot, card) {
+        const pool = getBaseStrength(card) + getBaseResistance(card);
+        const splits = [];
+        for (let s = 1; s <= pool - 1; s++) splits.push([s, pool - s]);
+        const idx = card.chronaSplitIdx === undefined ? 0 : (card.chronaSplitIdx + 1) % splits.length;
+        card.chronaSplitIdx = idx;
+        card.baseStrength = splits[idx][0];
+        card.baseResistance = splits[idx][1];
+        slot.dataset.cardData = JSON.stringify(card);
+        updateCreatureVisuals(slot);
+        floatValue(slot, `⚔${card.baseStrength} / ⛨${card.baseResistance}`, 'gain');
     }
 
     function getBaseStrength(card) {
@@ -1741,10 +1847,49 @@ document.addEventListener('DOMContentLoaded', () => {
         try { card = JSON.parse(slot.dataset.cardData); } catch (e) { return; }
         delete card.deactivated;
         delete card.faceDownSecret;
+        // Masiota: reactivating after a rescue costs 1 Health Point per rescue so far
+        // (printed 3 → 2 → 1), fully healed at the reduced ceiling.
+        if (card.name === 'Masiota' && card.masiotaUses) {
+            const hp = (parseInt(card.health) || 3) - card.masiotaUses;
+            card.baseStrength = hp;
+            card.baseResistance = hp;
+            card.damageTaken = 0;
+            slot.dataset.cardData = JSON.stringify(card);
+            syncFaceDownVisual(slot);
+            floatValue(slot, `Reactivated — ${hp} HP`, 'gain');
+            refreshBoardAfterDeactivation(slot);
+            return;
+        }
         slot.dataset.cardData = JSON.stringify(card);
         syncFaceDownVisual(slot);
         floatValue(slot, 'Unveiled', 'gain');
         refreshBoardAfterDeactivation(slot);
+    }
+
+    // --- Masiota (Duality C4): "Instead of discarding, you may choose to deactivate Masiota." ---
+    // Whenever he would leave the Creature Zone for History (defeated in combat, after his own
+    // attack, or sacrificed), his owner may flip him face down in place instead. Reactivating
+    // him — next turn at the earliest — reduces his Health Points by 1 per rescue so far, so
+    // 3 HP allows two rescues; a rescue that would reactivate him at 0 HP isn't offered.
+    // Returns true if rescued (the caller skips the discard).
+    function maybeMasiotaRescue(slot, card) {
+        if (!card || card.name !== 'Masiota' || card.deactivated) return false;
+        const printed = parseInt(card.health) || 3;
+        const uses = card.masiotaUses || 0;
+        if (printed - (uses + 1) < 1) return false; // would come back at 0 HP — no rescue
+        const board = slot.closest('.player-zone');
+        const owner = board ? parseInt(board.id.split('-')[1]) : currentPlayer;
+        if (vsComputer && owner === AI_PLAYER) return false; // V1: the Computer doesn't rescue
+        if (!confirm(`Deactivate Masiota instead of discarding? He reactivates next turn at ${printed - (uses + 1)} HP.`)) return false;
+        card.masiotaUses = uses + 1;
+        card.masiotaRescueStamp = `${totalTurns}-${currentPlayer}`; // blocks same-turn reactivation
+        card.deactivated = true;
+        card.damageTaken = 0;
+        slot.dataset.cardData = JSON.stringify(card);
+        syncFaceDownVisual(slot);
+        refreshBoardAfterDeactivation(slot);
+        floatValue(slot, 'Deactivated', 'gain');
+        return true;
     }
 
     // (De)activating a card can move board-wide state — a buffing Landmark's creature
@@ -1839,6 +1984,20 @@ document.addEventListener('DOMContentLoaded', () => {
                 if (card.baseResistance === undefined) {
                     const p = parseInt(card.resistance ?? card.health);
                     card.baseResistance = Number.isNaN(p) ? 1 : p;
+                }
+                // Aromeas (Duality C5): "Health Points become half of the Time Points of
+                // your active Time Die upon entering the Creature Zone." Rounds UP, and the
+                // value is FIXED at entry — it does not track the die as it changes later
+                // (Simon's ruling). Both Strength and Resistance take the single HP value.
+                if (card.name === 'Aromeas' && !card.aromeasSet) {
+                    const ownerZone = targetSlot.closest('.player-zone');
+                    const ownerNum = ownerZone ? parseInt(ownerZone.id.split('-')[1]) : currentPlayer;
+                    const dieTP = playersState[ownerNum][activeDieType(ownerNum)];
+                    const hp = Math.ceil(dieTP / 2);
+                    card.baseStrength = hp;
+                    card.baseResistance = hp;
+                    card.aromeasSet = true;
+                    floatValue(targetSlot, `${hp} HP (½ of ${dieTP})`, 'gain');
                 }
             }
             targetSlot.dataset.cardData = JSON.stringify(card);
@@ -2570,10 +2729,23 @@ document.addEventListener('DOMContentLoaded', () => {
     // Move a spent attacker to History after its strike — unless Clone Factory is primed for a
     // first strike, in which case the creature stays in its zone to strike a second time.
     function finishAttacker(attackerSlot, attacker, attackerHistory) {
+        // Looper: stays in his zone until the rolled strikes are used up; History after the last.
+        if (attacker.name === 'Looper' && looperStrikesRemaining > 1) {
+            looperStrikesRemaining--;
+            looperFirstStrikeResolved = true;
+            looperPendingSlot = attackerSlot;
+            return;
+        }
+        if (attacker.name === 'Looper') resetLooper();
         if (cloneFactoryArmed && !cloneSecondStrikePending) {
             cloneSecondStrikePending = true;
             cloneAttackerSlot = attackerSlot;
             return; // keep the creature in place for its second attack
+        }
+        // Masiota may dodge the normal after-attack discard by deactivating instead.
+        if (maybeMasiotaRescue(attackerSlot, attacker)) {
+            if (cloneFactoryArmed) disarmCloneFactory();
+            return;
         }
         clearSlot(attackerSlot);
         finishSingleCardPlacement(attackerHistory, attacker);
@@ -2583,6 +2755,7 @@ document.addEventListener('DOMContentLoaded', () => {
     // After an attack's result overlay closes, if Clone Factory kept the attacker for a second
     // strike, re-open the attack flow for that same creature (target re-selectable).
     function maybeCloneSecondStrike() {
+        maybeLooperNextStrike(); // Looper's follow-up strikes ride the same close-of-overlay hook
         if (!cloneSecondStrikePending) return;
         const slot = cloneAttackerSlot;
         if (!slot || slot.classList.contains('slot-empty')) { disarmCloneFactory(); return; }
@@ -2673,6 +2846,9 @@ document.addEventListener('DOMContentLoaded', () => {
         const board = document.getElementById(`player-${currentPlayer}`);
         let card;
         try { card = JSON.parse(slot.dataset.cardData); } catch (e) { return; }
+        // Masiota can dodge the sacrifice by deactivating — but then it wasn't a
+        // sacrifice, so Repo Station pays no Time Point either.
+        if (maybeMasiotaRescue(slot, card)) return;
         floatValue(slot, 'Sacrificed', 'damage');
         clearSlot(slot);
         finishSingleCardPlacement(board.querySelector('.history-pile'), card);
@@ -3915,17 +4091,36 @@ document.addEventListener('DOMContentLoaded', () => {
             // zone badge (that would misread as block strength / be ambiguous with 3+ players).
             // His buff is surfaced only in the Creature Attack screen — see decorateCombatScreen.
 
+            // Chrona: an uneven split shows both values (⚔ Strength / ⛨ Resistance).
+            if (card.name === 'Chrona' && card.baseStrength !== undefined &&
+                card.baseStrength !== card.baseResistance) {
+                const cStr = Math.max(0, card.baseStrength + bonus - (card.damageTaken || 0));
+                const cRes = Math.max(0, card.baseResistance + bonus - (card.damageTaken || 0));
+                const badge = document.createElement('div');
+                badge.className = 'creature-stat-badge tech-font chrona-split';
+                badge.textContent = `⚔${cStr} ⛨${cRes}`;
+                if ((card.damageTaken || 0) > 0) badge.classList.add('damage');
+                if (bonus > 0) badge.classList.add('buffed');
+                slot.appendChild(badge);
+                return;
+            }
+
             const base = parseInt(card.baseStrength ?? card.baseHealth) || 0;
             const curStr = base + bonus - (card.damageTaken || 0);
 
-            // Only show the badge if the strength/health has changed from the printed/base value
-            if (curStr === base && bonus === 0 && (card.damageTaken || 0) === 0) return;
+            // Only show the badge if the strength/health has changed from the printed/base value.
+            // A rescued Masiota's reduced ceiling always shows (his printed card still says 3).
+            const masiotaReduced = card.name === 'Masiota' && (card.masiotaUses || 0) > 0;
+            // Aromeas prints X/X/X — there's no printed number, so his entry-fixed HP must
+            // ALWAYS show or the player can't read his stat.
+            const aromeasFixed = card.name === 'Aromeas' && card.aromeasSet;
+            if (curStr === base && bonus === 0 && (card.damageTaken || 0) === 0 && !masiotaReduced && !aromeasFixed) return;
 
             const badge = document.createElement('div');
             badge.className = 'creature-stat-badge tech-font';
             badge.textContent = curStr;
 
-            if ((card.damageTaken || 0) > 0) badge.classList.add('damage');
+            if ((card.damageTaken || 0) > 0 || masiotaReduced) badge.classList.add('damage');
             if (bonus > 0) badge.classList.add('buffed');
 
             slot.appendChild(badge);
@@ -4093,9 +4288,26 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function triggerAttack(attackerCard, attackerSlot) {
+        // Looper (C3): his attack opens with a Futory-die roll — that many strikes in a row.
+        if (attackerCard.name === 'Looper' && looperStrikesRemaining === 0 && !aiTurnInProgress) {
+            rollLooperDie(attackerCard, attackerSlot);
+            return;
+        }
+        // Looper strikes 2+ are plain: printed Strength only, no Artifact responses,
+        // no Hyperscope targeting — "any additional effects only apply to the first attack".
+        const looperPlain = attackerCard.name === 'Looper' && looperFirstStrikeResolved;
+        const attacker = looperPlain ? { ...attackerCard, looperPlainStrike: true } : attackerCard;
+
+        // Hyperscope (L7): the attack gains a targeting step — any Player, Creature, or
+        // Landmark, all resolved without a block choice (Simon's ruling). The Computer
+        // keeps the plain attack flow for now (V1: it doesn't aim at cards).
+        if (!aiTurnInProgress && !looperPlain && findLandmark(currentPlayer, 'Hyperscope')) {
+            promptHyperscopeTarget(attacker, attackerSlot);
+            return;
+        }
         if (activePlayerCount === 2) {
             const defender = currentPlayer === 1 ? 2 : 1;
-            beginAttack(attackerCard, attackerSlot, defender);
+            beginAttack(attacker, attackerSlot, defender);
         } else {
             const overlay = document.getElementById('target-player-overlay');
             const list = document.getElementById('target-player-list');
@@ -4108,12 +4320,411 @@ document.addEventListener('DOMContentLoaded', () => {
                 circle.textContent = `P${i}`;
                 circle.onclick = () => {
                     overlay.classList.add('hidden');
-                    beginAttack(attackerCard, attackerSlot, i);
+                    beginAttack(attacker, attackerSlot, i);
                 };
                 list.appendChild(circle);
             }
             overlay.classList.remove('hidden');
         }
+    }
+
+    // --- Looper (Duality C3): attack multiple times by rolling a Futory Die ---
+    // The roll sets the number of strikes. Clone Factory style: Looper stays in his zone
+    // between strikes, the target is re-picked each time, and he goes to History only after
+    // the final strike. The defender may block every strike separately, but additional
+    // effects (Artifacts, buffs, Hyperscope) only apply to the FIRST one — later strikes
+    // hit with plain printed Strength.
+    let looperStrikesRemaining = 0;
+    let looperFirstStrikeResolved = false;
+    let looperPendingSlot = null;
+
+    function resetLooper() {
+        looperStrikesRemaining = 0;
+        looperFirstStrikeResolved = false;
+        looperPendingSlot = null;
+    }
+
+    function rollLooperDie(attackerCard, attackerSlot) {
+        const result = 1 + Math.floor(Math.random() * 6);
+
+        const overlay = document.createElement('div');
+        overlay.className = 'overlay entrophy-overlay';
+        const panel = document.createElement('div');
+        panel.className = 'glass-panel entrophy-panel';
+        panel.innerHTML = `<h2 class="fantasy-font glowing-text entrophy-title">LOOPER</h2>
+            <p class="tech-font entrophy-subtitle">Rolling the Futory Die&hellip;</p>`;
+        const dieWrap = document.createElement('div');
+        dieWrap.style.cssText = 'display:flex;justify-content:center;margin:14px 0;transform:scale(2);';
+        panel.appendChild(dieWrap);
+        const footer = document.createElement('div');
+        footer.className = 'entrophy-footer';
+        panel.appendChild(footer);
+        overlay.appendChild(panel);
+        document.body.appendChild(overlay);
+
+        const showFace = (n) => { dieWrap.innerHTML = ''; dieWrap.appendChild(buildPips(n)); };
+
+        // Cycle the faces fast → slowing, then land on the result (Entrophy's ease-out).
+        const minSteps = 18;
+        let step = 0;
+        let face = 1;
+        function tick() {
+            showFace(face);
+            if (step >= minSteps && face === result) { land(); return; }
+            face = (face % 6) + 1;
+            step++;
+            const progress = Math.min(1, step / (minSteps + 6));
+            setTimeout(tick, 45 + Math.pow(progress, 3) * 300);
+        }
+
+        function land() {
+            panel.querySelector('.entrophy-subtitle').innerHTML =
+                `<span class="entrophy-result">${result} Attack${result === 1 ? '' : 's'}!</span>` +
+                (result > 1 ? ' &mdash; only the first carries additional effects' : '');
+            const btn = document.createElement('button');
+            btn.className = 'menu-btn combat-btn';
+            btn.textContent = 'ATTACK';
+            btn.onclick = () => {
+                overlay.remove();
+                looperStrikesRemaining = result;
+                looperFirstStrikeResolved = false;
+                triggerAttack(attackerCard, attackerSlot);
+            };
+            footer.appendChild(btn);
+        }
+
+        tick();
+    }
+
+    // After a strike's result overlay closes, re-open the attack flow if Looper has
+    // strikes left (the Clone Factory maybeCloneSecondStrike pattern).
+    function maybeLooperNextStrike() {
+        if (!looperPendingSlot || looperStrikesRemaining < 1) return;
+        const slot = looperPendingSlot;
+        looperPendingSlot = null;
+        if (slot.classList.contains('slot-empty') || !slot.dataset.cardData) { resetLooper(); return; }
+        let data;
+        try { data = JSON.parse(slot.dataset.cardData); } catch (e) { resetLooper(); return; }
+        setTimeout(() => triggerAttack(data, slot), 150);
+    }
+
+    // --- Hyperscope (Duality L7): target any Player, Creature, or Landmark directly ---
+    // While Hyperscope is in play, attacking opens a targeting step: every face-up enemy
+    // Creature and Landmark pulses as a clickable target (the Threat picker pattern), and a
+    // docked bar offers the direct player strike or a cancel. Whatever is picked, the attack
+    // resolves with NO block choice for the defender — Artifact responses (Smoke, Reflector)
+    // stay legal on the defense screen. Landmark damage accumulates per turn toward the
+    // Landmark's Price (its total Steam pip count, color-blind: GGGL = 4).
+    function promptHyperscopeTarget(attackerCard, attackerSlot) {
+        const targets = [];
+        for (let p = 1; p <= activePlayerCount; p++) {
+            if (p === currentPlayer) continue;
+            const board = document.getElementById(`player-${p}`);
+            if (!board) continue;
+            board.querySelectorAll('.creature-zone-main .card:not(.slot-empty)').forEach(slot => {
+                try {
+                    const d = JSON.parse(slot.dataset.cardData);
+                    if (d.type === 'Creature' && !d.deactivated) targets.push({ slot, owner: p, kind: 'creature' });
+                } catch (e) { /* skip */ }
+            });
+            board.querySelectorAll('.landmark-zone-main .card:not(.slot-empty)').forEach(slot => {
+                try {
+                    const d = JSON.parse(slot.dataset.cardData);
+                    if (d.type === 'Landmark' && !d.deactivated) targets.push({ slot, owner: p, kind: 'landmark' });
+                } catch (e) { /* skip */ }
+            });
+        }
+
+        const bar = document.createElement('div');
+        bar.id = 'hyperscope-target-bar';
+        bar.style.cssText = 'position:fixed;bottom:40px;left:50%;transform:translateX(-50%);display:flex;gap:10px;z-index:6000;';
+
+        const cleanup = () => {
+            targets.forEach(t => {
+                t.slot.classList.remove('threat-target');
+                if (t.slot._hyperHandler) t.slot.removeEventListener('click', t.slot._hyperHandler, true);
+                delete t.slot._hyperHandler;
+            });
+            bar.remove();
+        };
+
+        targets.forEach(t => {
+            t.slot.classList.add('threat-target');
+            const handler = (e) => {
+                e.stopPropagation();
+                e.preventDefault();
+                cleanup();
+                beginAttack(attackerCard, attackerSlot, t.owner, { kind: t.kind, slot: t.slot });
+            };
+            t.slot._hyperHandler = handler;
+            t.slot.addEventListener('click', handler, true); // capture: preempt the normal card click
+        });
+
+        for (let p = 1; p <= activePlayerCount; p++) {
+            if (p === currentPlayer) continue;
+            const btn = document.createElement('button');
+            btn.className = 'menu-btn combat-btn';
+            btn.textContent = activePlayerCount === 2 ? 'STRIKE PLAYER DIRECTLY' : `STRIKE P${p} DIRECTLY`;
+            btn.onclick = () => {
+                cleanup();
+                beginAttack(attackerCard, attackerSlot, p, { kind: 'player' });
+            };
+            bar.appendChild(btn);
+        }
+        const cancelBtn = document.createElement('button');
+        cancelBtn.className = 'menu-btn secondary-btn';
+        cancelBtn.textContent = 'CANCEL';
+        cancelBtn.onclick = cleanup;
+        bar.appendChild(cancelBtn);
+        document.body.appendChild(bar);
+
+        pulseLandmark(currentPlayer, 'Hyperscope');
+    }
+
+    // A Landmark's Price is its total Steam pip count, regardless of color (GGGL = 4).
+    function landmarkPrice(card) {
+        return (card.cost && card.cost !== '-') ? card.cost.length : 0;
+    }
+
+    // A Hyperscope strike on a Landmark: the attack's damage accumulates on the Landmark
+    // for the rest of this turn (badge shows progress); reaching its Price destroys it —
+    // to its OWNER'S HISTORY (Duality rule: destroyed Landmarks cycle, and rebuild
+    // themselves when drawn — see drawCards). The attacker still goes to History too.
+    function resolveLandmarkStrike(attacker, attackerSlot, targetSlot, defenderNum) {
+        const feedbackEl = document.getElementById('combat-feedback');
+        feedbackEl.classList.add('combat-feedback-vital');
+
+        let target;
+        try { target = JSON.parse(targetSlot.dataset.cardData); } catch (e) { return; }
+        const str = calculateCurrentStrength(attacker, attackerSlot);
+        const price = landmarkPrice(target);
+        target.hyperDamage = (target.hyperDamage || 0) + str;
+        const attackerHistory = attackerSlot.closest('.player-zone').querySelector('.history-pile');
+
+        if (price > 0 && target.hyperDamage >= price) {
+            feedbackEl.textContent = `${target.name} Destroyed! (${target.hyperDamage}/${price})`;
+            delete target.hyperDamage; // don't carry turn damage into the History cycle
+            const ownerHistory = targetSlot.closest('.player-zone').querySelector('.history-pile');
+            clearSlot(targetSlot);
+            finishSingleCardPlacement(ownerHistory, target);
+            floatValue(ownerHistory, `${target.name} Destroyed`, 'damage');
+        } else {
+            targetSlot.dataset.cardData = JSON.stringify(target);
+            feedbackEl.textContent = `${target.name} Struck — ${target.hyperDamage}/${price} this turn.`;
+            updateHyperDamageBadge(targetSlot, target);
+            floatValue(targetSlot, `-${str}`, 'damage');
+        }
+        finishAttacker(attackerSlot, attacker, attackerHistory);
+    }
+
+    function updateHyperDamageBadge(slot, card) {
+        let badge = slot.querySelector('.hyper-damage-badge');
+        if (!badge) {
+            badge = document.createElement('div');
+            badge.className = 'hyper-damage-badge tech-font';
+            slot.appendChild(badge);
+        }
+        badge.textContent = `⌖ ${card.hyperDamage}/${landmarkPrice(card)}`;
+    }
+
+    // "The attacks in one turn" — accumulated Landmark damage expires when the turn passes.
+    function resetHyperscopeTurnDamage() {
+        document.querySelectorAll('.landmark-zone-main .card:not(.slot-empty)').forEach(slot => {
+            const badge = slot.querySelector('.hyper-damage-badge');
+            if (badge) badge.remove();
+            try {
+                const d = JSON.parse(slot.dataset.cardData);
+                if (d.hyperDamage) { delete d.hyperDamage; slot.dataset.cardData = JSON.stringify(d); }
+            } catch (e) { /* skip */ }
+        });
+    }
+
+    // --- Mines of Pyralos (Duality L8) ---
+    // "Once per Construction Phase: You may send 1 of your Cards into the Abyss to look at
+    // the top 6 Cards in any Future Pile and rearrange them. Then, draw a Card."
+    // Flow: click the Mines → pick the card to pay (hand + Atlantica-parked cards pulse;
+    // CANCEL is only offered before paying) → pick a Future Pile (auto if only one is
+    // non-empty) → rearrange its top 6 in an overlay (leftmost = drawn next) → draw 1.
+    let minesUsedThisPhase = false;
+
+    function activateMines() {
+        if (minesUsedThisPhase) {
+            alert('Mines of Pyralos — already used this Construction Phase.');
+            return;
+        }
+        const board = document.getElementById(`player-${currentPlayer}`);
+        const costSlots = Array.from(board.querySelectorAll('.hand-slot:not(.slot-empty), .atlantica-slot:not(.slot-empty)'));
+        if (!costSlots.length) {
+            alert('Mines of Pyralos — no card in hand to send into the Abyss.');
+            return;
+        }
+        promptMinesCost(costSlots);
+    }
+
+    // Step 1 — choose which of your cards is sent into the Abyss (gone for good).
+    function promptMinesCost(costSlots) {
+        const bar = document.createElement('div');
+        bar.id = 'mines-cost-bar';
+        bar.style.cssText = 'position:fixed;bottom:40px;left:50%;transform:translateX(-50%);display:flex;gap:10px;z-index:6000;';
+        const hint = document.createElement('div');
+        hint.className = 'menu-btn tech-font';
+        hint.style.cssText = 'pointer-events:none;opacity:0.85;';
+        hint.textContent = 'SEND A CARD INTO THE ABYSS';
+        bar.appendChild(hint);
+        const cancelBtn = document.createElement('button');
+        cancelBtn.className = 'menu-btn secondary-btn';
+        cancelBtn.textContent = 'CANCEL';
+        bar.appendChild(cancelBtn);
+        document.body.appendChild(bar);
+
+        const cleanup = () => {
+            costSlots.forEach(s => {
+                s.classList.remove('threat-target');
+                if (s._minesHandler) s.removeEventListener('click', s._minesHandler, true);
+                delete s._minesHandler;
+            });
+            bar.remove();
+        };
+        cancelBtn.onclick = cleanup;
+
+        costSlots.forEach(s => {
+            s.classList.add('threat-target');
+            const handler = (e) => {
+                e.stopPropagation();
+                e.preventDefault();
+                let data;
+                try { data = JSON.parse(s.dataset.cardData); } catch (err) { return; }
+                cleanup();
+                const abyssEl = document.querySelector('.card--abyss');
+                clearSlot(s);
+                finishSingleCardPlacement(abyssEl, data);
+                floatValue(abyssEl, `${data.name} Lost`, 'damage');
+                updateHandLayout(currentPlayer);
+                minesUsedThisPhase = true;
+                pulseLandmark(currentPlayer, 'Mines of Pyralos');
+                promptMinesPile();
+            };
+            s._minesHandler = handler;
+            s.addEventListener('click', handler, true); // capture: preempt the normal grab
+        });
+    }
+
+    // Step 2 — choose ANY Future Pile (yours or an opponent's). Auto-resolves when only
+    // one pile has cards; if every pile is empty there is nothing to look at — just draw.
+    function promptMinesPile() {
+        const piles = [];
+        for (let p = 1; p <= activePlayerCount; p++) {
+            const board = document.getElementById(`player-${p}`);
+            if (!board) continue;
+            const pile = board.querySelector('.future-pile');
+            if (!pile) continue;
+            let count = 0;
+            try { const d = JSON.parse(pile.dataset.cardData || '[]'); count = Array.isArray(d) ? d.length : 1; } catch (e) {}
+            if (count > 0) piles.push({ slot: pile, owner: p });
+        }
+        if (piles.length === 0) { drawCards(currentPlayer, 1); return; }
+        if (piles.length === 1) { openMinesRearrange(piles[0]); return; }
+
+        const cleanup = () => piles.forEach(t => {
+            t.slot.classList.remove('threat-target');
+            if (t.slot._minesHandler) t.slot.removeEventListener('click', t.slot._minesHandler, true);
+            delete t.slot._minesHandler;
+        });
+        piles.forEach(t => {
+            t.slot.classList.add('threat-target');
+            const handler = (e) => {
+                e.stopPropagation();
+                e.preventDefault();
+                cleanup();
+                openMinesRearrange(t);
+            };
+            t.slot._minesHandler = handler;
+            t.slot.addEventListener('click', handler, true);
+        });
+    }
+
+    // Step 3 — look at the pile's top 6 and rearrange them. Leftmost = drawn next; each
+    // card moves with its ◀ ▶ arrows. Confirming writes the order back, then draws 1.
+    function openMinesRearrange(target) {
+        const { slot: pileSlot, owner } = target;
+        let deck = [];
+        try { deck = JSON.parse(pileSlot.dataset.cardData || '[]'); if (!Array.isArray(deck)) deck = [deck]; } catch (e) {}
+        const lookCount = Math.min(6, deck.length);
+        // Top of the pile is the END of the array (draws pop from the end); display top-first.
+        const order = deck.slice(-lookCount).reverse();
+
+        const overlay = document.createElement('div');
+        overlay.className = 'overlay landmark-choice-overlay';
+        const panel = document.createElement('div');
+        panel.className = 'glass-panel landmark-choice-panel';
+        panel.style.maxWidth = 'none';
+        const title = document.createElement('div');
+        title.className = 'fantasy-font glowing-text landmark-choice-title';
+        title.textContent = `Mines of Pyralos — P${owner}'s Future Pile`;
+        panel.appendChild(title);
+        const desc = document.createElement('div');
+        desc.className = 'tech-font';
+        desc.style.cssText = 'font-size:11px;opacity:0.75;margin:-6px 0 8px;';
+        desc.textContent = `Top ${lookCount} card${lookCount === 1 ? '' : 's'} — leftmost is drawn next. Rearrange with the arrows.`;
+        panel.appendChild(desc);
+
+        const row = document.createElement('div');
+        row.style.cssText = 'display:flex;gap:10px;justify-content:center;flex-wrap:wrap;margin-bottom:10px;';
+        panel.appendChild(row);
+
+        function renderRow() {
+            row.innerHTML = '';
+            order.forEach((card, i) => {
+                const tile = document.createElement('div');
+                tile.style.cssText = 'display:flex;flex-direction:column;align-items:center;gap:4px;';
+                const face = document.createElement('div');
+                face.style.cssText = 'width:80px;height:112px;border-radius:6px;background-size:cover;background-position:center;border:1px solid rgba(255,255,255,0.25);display:flex;align-items:center;justify-content:center;text-align:center;font-size:10px;';
+                const art = cardArtUrl(card);
+                if (art) face.style.backgroundImage = `url('${art}')`;
+                else { face.style.backgroundColor = 'rgba(255,255,255,0.1)'; face.textContent = card.name; }
+                tile.appendChild(face);
+                const name = document.createElement('div');
+                name.className = 'tech-font';
+                name.style.cssText = 'font-size:9px;opacity:0.8;max-width:84px;text-align:center;';
+                name.textContent = card.name;
+                tile.appendChild(name);
+                const arrows = document.createElement('div');
+                arrows.style.cssText = 'display:flex;gap:4px;';
+                const mk = (txt, delta) => {
+                    const b = document.createElement('button');
+                    b.className = 'menu-btn secondary-btn';
+                    b.style.cssText = 'padding:2px 8px;font-size:10px;min-width:0;';
+                    b.textContent = txt;
+                    b.disabled = (i + delta < 0 || i + delta >= order.length);
+                    b.style.opacity = b.disabled ? '0.4' : '1';
+                    b.onclick = () => {
+                        [order[i], order[i + delta]] = [order[i + delta], order[i]];
+                        renderRow();
+                    };
+                    return b;
+                };
+                arrows.appendChild(mk('◀', -1));
+                arrows.appendChild(mk('▶', 1));
+                tile.appendChild(arrows);
+                row.appendChild(tile);
+            });
+        }
+        renderRow();
+
+        const confirmBtn = document.createElement('button');
+        confirmBtn.className = 'menu-btn combat-btn tech-font';
+        confirmBtn.textContent = 'CONFIRM ORDER & DRAW';
+        confirmBtn.onclick = () => {
+            const newDeck = deck.slice(0, deck.length - lookCount).concat(order.slice().reverse());
+            pileSlot.dataset.cardData = JSON.stringify(newDeck);
+            updateStackIndicator(pileSlot);
+            overlay.remove();
+            drawCards(currentPlayer, 1);
+        };
+        panel.appendChild(confirmBtn);
+
+        overlay.appendChild(panel);
+        document.body.appendChild(overlay);
     }
 
     // Dark Matter (A2): Construction Phase — discard it to your History, draw a card, then a
@@ -4213,6 +4824,7 @@ document.addEventListener('DOMContentLoaded', () => {
         function sacrificeCreature(cSlot) {
             const cData = JSON.parse(cSlot.dataset.cardData);
             const hist = defenderBoard.querySelector('.history-pile');
+            if (maybeMasiotaRescue(cSlot, cData)) { finish('Masiota Deactivated.'); return; }
             floatValue(cSlot, 'Sacrificed', 'damage');
             clearSlot(cSlot);
             finishSingleCardPlacement(hist, cData);
@@ -4268,13 +4880,13 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // The defender is now chosen. Most creatures go straight to the defense step; Entrophy first
     // rolls its die (the casino wheel), and Meridius scales off the defender's Landmarks.
-    function beginAttack(attacker, attackerSlot, defenderNum) {
+    function beginAttack(attacker, attackerSlot, defenderNum, hyperTarget = null) {
         if (attacker.name.includes('Entrophy')) {
-            rollEntrophy(attacker, attackerSlot, defenderNum);
+            rollEntrophy(attacker, attackerSlot, defenderNum, hyperTarget);
         } else if (attacker.name.includes('Meridius')) {
-            initiateDefense(meridiusAttacker(attacker, defenderNum), attackerSlot, defenderNum);
+            initiateDefense(meridiusAttacker(attacker, defenderNum), attackerSlot, defenderNum, hyperTarget);
         } else {
-            initiateDefense(attacker, attackerSlot, defenderNum);
+            initiateDefense(attacker, attackerSlot, defenderNum, hyperTarget);
         }
     }
 
@@ -4322,7 +4934,7 @@ document.addEventListener('DOMContentLoaded', () => {
         return face;
     }
 
-    function rollEntrophy(attacker, attackerSlot, defenderNum) {
+    function rollEntrophy(attacker, attackerSlot, defenderNum, hyperTarget = null) {
         const finalIdx = Math.floor(Math.random() * ENTROPHY_OUTCOMES.length);
 
         const overlay = document.createElement('div');
@@ -4379,7 +4991,7 @@ document.addEventListener('DOMContentLoaded', () => {
             btn.textContent = outcome.id === 'hand' || outcome.id === 'self' ? 'RESOLVE' : 'ATTACK';
             btn.onclick = () => {
                 overlay.remove();
-                applyEntrophyOutcome(outcome.id, attacker, attackerSlot, defenderNum);
+                applyEntrophyOutcome(outcome.id, attacker, attackerSlot, defenderNum, hyperTarget);
             };
             footer.appendChild(btn);
 
@@ -4414,19 +5026,19 @@ document.addEventListener('DOMContentLoaded', () => {
         if (rem > 0 && st[second] > 0) adjustPlayerDie(pNum, second, rem);
     }
 
-    function applyEntrophyOutcome(outcomeId, base, slot, defenderNum) {
+    function applyEntrophyOutcome(outcomeId, base, slot, defenderNum, hyperTarget = null) {
         switch (outcomeId) {
             case 'none':
             case 'str3':
             case 'unblock':
-                initiateDefense(entrophyAttacker(base, outcomeId), slot, defenderNum);
+                initiateDefense(entrophyAttacker(base, outcomeId), slot, defenderNum, hyperTarget);
                 break;
             case 'tp4': {
                 gainTimePoints(currentPlayer, 4);
                 const board = document.getElementById(`player-${currentPlayer}`);
                 const dieSel = activeDieSel(currentPlayer);
                 if (board) floatValue(board.querySelector(dieSel), '+4 TP', 'gain');
-                initiateDefense(entrophyAttacker(base, 'none'), slot, defenderNum); // attack still lands with 2
+                initiateDefense(entrophyAttacker(base, 'none'), slot, defenderNum, hyperTarget); // attack still lands with 2
                 break;
             }
             case 'hand': {
@@ -4481,7 +5093,7 @@ document.addEventListener('DOMContentLoaded', () => {
             `<span class="ctp ctp-defender">P${defenderNum} (Defender) &middot; ${totalTimePoints(defenderNum)} TP</span>`;
     }
 
-    function initiateDefense(attacker, attackerSlot, defenderNum) {
+    function initiateDefense(attacker, attackerSlot, defenderNum, hyperTarget = null) {
         const defenderBoard = document.getElementById(`player-${defenderNum}`);
         const defenseOverlay = document.getElementById('defense-overlay');
         const attackerPreview = document.getElementById('attacker-preview');
@@ -4512,8 +5124,26 @@ document.addEventListener('DOMContentLoaded', () => {
         let isCombatResolved = false;
         let selectedBlockerSlot = availableCreatures.length > 0 ? availableCreatures[0] : null;
 
-        const isUnblockable = attacker.name.includes("Rampadon") || attacker.unblockable;
-        if (isUnblockable) {
+        // A Hyperscope-targeted attack is never blockable — the target is locked in.
+        const isUnblockable = attacker.name.includes("Rampadon") || attacker.unblockable || !!hyperTarget;
+        if (hyperTarget) {
+            btnBlock.disabled = true;
+            btnBlock.style.opacity = "0.5";
+            if (hyperTarget.kind === 'player') {
+                defenderTarget.style.backgroundImage = "";
+                defenderTarget.classList.remove('faded', 'active-blocker');
+                defenderTarget.textContent = `P${defenderNum}`;
+                feedbackEl.textContent = "Hyperscope: Direct Player Strike!";
+            } else {
+                defenderTarget.style.backgroundImage = hyperTarget.slot.style.backgroundImage;
+                defenderTarget.classList.remove('faded');
+                defenderTarget.classList.add('active-blocker');
+                defenderTarget.textContent = "";
+                let lockName = '';
+                try { lockName = JSON.parse(hyperTarget.slot.dataset.cardData).name; } catch (e) { /* skip */ }
+                feedbackEl.textContent = `Hyperscope Lock: ${lockName}`;
+            }
+        } else if (isUnblockable) {
              btnBlock.disabled = true;
              btnBlock.style.opacity = "0.5";
              feedbackEl.textContent = "Unblockable Attacker Detected!";
@@ -4530,7 +5160,8 @@ document.addEventListener('DOMContentLoaded', () => {
             btnBlock.disabled = true;
         }
 
-        btnArtifact.disabled = artifactsInHand.length === 0;
+        // Looper strikes 2+ carry no additional effects — Artifact responses included.
+        btnArtifact.disabled = artifactsInHand.length === 0 || !!attacker.looperPlainStrike;
         btnBlock.classList.remove('in-use');
         btnArtifact.classList.remove('in-use');
         btnContinue.textContent = "CONTINUE";
@@ -4600,7 +5231,7 @@ document.addEventListener('DOMContentLoaded', () => {
             if (isCombatResolved) return;
             if (artifactsInHand.length > 0) {
                 defenseOverlay.classList.add('hidden');
-                selectArtifactToPlay(attacker, attackerSlot, defenderNum, artifactsInHand);
+                selectArtifactToPlay(attacker, attackerSlot, defenderNum, artifactsInHand, hyperTarget);
             }
         };
 
@@ -4621,10 +5252,27 @@ document.addEventListener('DOMContentLoaded', () => {
             const pickerEl = document.getElementById('blocker-picker');
             if (pickerEl) pickerEl.remove();
 
-            if (isBlocking) {
+            if (hyperTarget && hyperTarget.kind === 'creature') {
+                // Hyperscope: normal combat math against the locked Creature — no block choice.
+                feedbackEl.textContent = "Resolving Battle...";
+                attackerPreview.classList.add('battle-tap-attacker');
+                defenderTarget.classList.add('battle-tap-defender');
+                setTimeout(() => {
+                    let targetData = null;
+                    try { targetData = JSON.parse(hyperTarget.slot.dataset.cardData); } catch (e) { /* skip */ }
+                    if (targetData) resolveCombat(attacker, attackerSlot, targetData, hyperTarget.slot, defenderNum);
+                }, 400);
+            } else if (hyperTarget && hyperTarget.kind === 'landmark') {
+                feedbackEl.textContent = "Resolving Strike...";
+                attackerPreview.classList.add('battle-tap-attacker');
+                defenderTarget.classList.add('battle-tap-defender');
+                setTimeout(() => {
+                    resolveLandmarkStrike(attacker, attackerSlot, hyperTarget.slot, defenderNum);
+                }, 400);
+            } else if (isBlocking) {
                 const blockerSlot = selectedBlockerSlot || availableCreatures[0];
                 const blockerData = JSON.parse(blockerSlot.dataset.cardData);
-                
+
                 feedbackEl.textContent = "Resolving Battle...";
                 attackerPreview.classList.add('battle-tap-attacker');
                 defenderTarget.classList.add('battle-tap-defender');
@@ -4646,7 +5294,7 @@ document.addEventListener('DOMContentLoaded', () => {
         // The defender is the Computer: it decides block-or-take on this same
         // screen (visible to you, buttons locked) after a short "thinking" beat.
         if (vsComputer && defenderNum === AI_PLAYER) {
-            aiHandleDefense({ attacker, attackerSlot, availableCreatures, isUnblockable, btnBlock, btnContinue, feedbackEl, defenseOverlay });
+            aiHandleDefense({ attacker, attackerSlot, availableCreatures, isUnblockable, btnBlock, btnContinue, feedbackEl, defenseOverlay, hyperTarget });
         }
     }
 
@@ -4683,6 +5331,11 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function calculateCurrentStrength(attacker, attackerSlot) {
+        // Looper strikes 2+: additional effects don't apply — plain printed Strength,
+        // no buffs (Cabin) and no debuffs (Smoke).
+        if (attacker.looperPlainStrike) {
+            return Math.max(0, (parseInt(attacker.baseStrength ?? attacker.baseHealth) || 0) - (attacker.damageTaken || 0));
+        }
         let bonus = 0;
         if (attacker.name === 'Meridia') {
             bonus = meridiaArtifactBonus(attackerSlot.closest('.player-zone').querySelector('.history-pile'));
@@ -4724,9 +5377,11 @@ document.addEventListener('DOMContentLoaded', () => {
         if (attackerStr > blockerStr) {
             const overflow = attackerStr - blockerStr;
             feedbackEl.textContent = `Blocker Defeated! ${overflow} Spillover Damage.`;
-            
-            clearSlot(blockerSlot);
-            finishSingleCardPlacement(blockerHistory, blockerData);
+
+            if (!maybeMasiotaRescue(blockerSlot, blockerData)) {
+                clearSlot(blockerSlot);
+                finishSingleCardPlacement(blockerHistory, blockerData);
+            }
             applyRepoStationGain(attackerSlot);
             resolveDamageDirectly(overflow, defenderNum);
         } else if (attackerStr < blockerStr) {
@@ -4736,8 +5391,10 @@ document.addEventListener('DOMContentLoaded', () => {
             updateCreatureStatBadge(blockerSlot, blockerData);
         } else {
             feedbackEl.textContent = "Mutual Destruction! Both cards to History.";
-            clearSlot(blockerSlot);
-            finishSingleCardPlacement(blockerHistory, blockerData);
+            if (!maybeMasiotaRescue(blockerSlot, blockerData)) {
+                clearSlot(blockerSlot);
+                finishSingleCardPlacement(blockerHistory, blockerData);
+            }
             applyRepoStationGain(attackerSlot);
         }
 
@@ -4801,7 +5458,7 @@ document.addEventListener('DOMContentLoaded', () => {
         };
     }
 
-    function selectArtifactToPlay(attacker, attackerSlot, defenderNum, handSlots) {
+    function selectArtifactToPlay(attacker, attackerSlot, defenderNum, handSlots, hyperTarget = null) {
         passDevice(defenderNum, () => {
             // Switch View to Defender
             document.querySelectorAll('.player-zone').forEach(z => z.classList.remove('active-player'));
@@ -4895,12 +5552,12 @@ document.addEventListener('DOMContentLoaded', () => {
 
                 if (reflectorPlayed) {
                     // Reflector redirects the attack instead of resuming the normal defense screen.
-                    handleReflectorRedirect(attacker, attackerSlot, defenderNum);
+                    handleReflectorRedirect(attacker, attackerSlot, defenderNum, hyperTarget);
                 } else {
                     // Return to defense overlay
                     const defenseOverlay = document.getElementById('defense-overlay');
                     defenseOverlay.classList.remove('hidden');
-                    initiateDefense(attacker, attackerSlot, defenderNum);
+                    initiateDefense(attacker, attackerSlot, defenderNum, hyperTarget);
                 }
             };
         }, "SELECT ARTIFACT");
@@ -4994,7 +5651,7 @@ document.addEventListener('DOMContentLoaded', () => {
     // Reflector (A3): "Change the attack target to a Player of your choice." V1 is 2-player
     // only, so the only choice is the attacker themself — the attack bounces straight back.
     // Before it lands, offer the newly-targeted player (the attacker) a Talisman response.
-    function handleReflectorRedirect(attacker, attackerSlot, defenderNum) {
+    function handleReflectorRedirect(attacker, attackerSlot, defenderNum, hyperTarget = null) {
         const newTarget = currentPlayer;
         offerTalismanResponse(newTarget, 'Reflector', {
             onPrevented: () => {
@@ -5003,7 +5660,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     document.getElementById(`player-${defenderNum}`).classList.add('active-player');
                     document.getElementById('game-field').className = `players-${activePlayerCount} turn-p${defenderNum}`;
                     document.getElementById('defense-overlay').classList.remove('hidden');
-                    initiateDefense(attacker, attackerSlot, defenderNum);
+                    initiateDefense(attacker, attackerSlot, defenderNum, hyperTarget);
                     const feedbackEl = document.getElementById('combat-feedback');
                     feedbackEl.textContent = "Talisman prevents Reflector! Attack proceeds normally.";
                     feedbackEl.classList.add('combat-feedback-vital');
@@ -5635,10 +6292,23 @@ document.addEventListener('DOMContentLoaded', () => {
                 futurePile.dataset.cardData = JSON.stringify(currentFuture);
                 updateStackIndicator(futurePile);
 
-                updateHandLayout(pNum);
-                animateCardDeal(futurePile, targetSlot, card);
-
-                setTimeout(checkHandLimit, 650);
+                // Duality rule: a destroyed Landmark cycles through History/Future and
+                // rebuilds itself — a drawn Landmark goes straight back into the owner's
+                // Landmark Zone, not the hand (falls to hand only if the zone is full or
+                // a duplicate is already in play).
+                const rebuildSlot = card.type === 'Landmark' ? landmarkRebuildSlot(pNum, card) : null;
+                if (rebuildSlot) {
+                    if (targetSlot.classList.contains('temporary-slot')) targetSlot.remove();
+                    animateCardDeal(futurePile, rebuildSlot, card);
+                    setTimeout(() => {
+                        finishSingleCardPlacement(rebuildSlot, card);
+                        floatValue(rebuildSlot, 'Rebuilt', 'gain');
+                    }, 650);
+                } else {
+                    updateHandLayout(pNum);
+                    animateCardDeal(futurePile, targetSlot, card);
+                    setTimeout(checkHandLimit, 650);
+                }
             }
 
             // Wait for card animation to finish before next draw
@@ -5649,6 +6319,20 @@ document.addEventListener('DOMContentLoaded', () => {
         // Future Pile, draw Cards until you reach your Hand Limit. Resolved after the
         // pending draws land so the deficit is measured against the final hand.
         if (reshuffled) await resolveGravitasRefill(pNum);
+    }
+
+    // Where a drawn Landmark rebuilds itself: the first empty slot in its owner's
+    // Landmark Zone — or nowhere (null) if the zone is full or a copy is already in play.
+    function landmarkRebuildSlot(pNum, card) {
+        const board = document.getElementById(`player-${pNum}`);
+        if (!board) return null;
+        const slots = Array.from(board.querySelectorAll('.landmark-zone-main .card'));
+        const duplicate = slots.some(s => {
+            if (s.classList.contains('slot-empty')) return false;
+            try { return JSON.parse(s.dataset.cardData).name === card.name; } catch (e) { return false; }
+        });
+        if (duplicate) return null;
+        return slots.find(s => s.classList.contains('slot-empty')) || null;
     }
 
     // Gravitas — counts the hand after the in-flight deal animations settle (a dealt
@@ -5820,6 +6504,9 @@ document.addEventListener('DOMContentLoaded', () => {
         activeStrDebuff = 0;
         aetherlabUsedThisPhase = false;
         deactivateAetherlab();
+        resetHyperscopeTurnDamage();
+        minesUsedThisPhase = false;
+        resetLooper();
 
         const hint = document.getElementById('next-player-hint');
         if (hint) hint.textContent = `To Player ${currentPlayer}`;
@@ -6292,13 +6979,14 @@ document.addEventListener('DOMContentLoaded', () => {
         return null;
     }
 
-    function aiHandleDefense({ attacker, attackerSlot, availableCreatures, isUnblockable, btnBlock, btnContinue, feedbackEl, defenseOverlay }) {
+    function aiHandleDefense({ attacker, attackerSlot, availableCreatures, isUnblockable, btnBlock, btnContinue, feedbackEl, defenseOverlay, hyperTarget = null }) {
         defenseOverlay.classList.add('ai-controlled');
         feedbackEl.textContent = 'Computer is deciding…';
         const attackerStr = calculateCurrentStrength(attacker, attackerSlot);
 
         setTimeout(() => {
-            const choice = aiChooseBlocker(attackerStr, availableCreatures, isUnblockable);
+            // A Hyperscope-locked target leaves the Computer no block decision to make.
+            const choice = hyperTarget ? null : aiChooseBlocker(attackerStr, availableCreatures, isUnblockable);
             if (choice) {
                 btnBlock.onclick();
                 if (availableCreatures.length > 1) {
@@ -6307,6 +6995,8 @@ document.addEventListener('DOMContentLoaded', () => {
                     if (pickBtn) pickBtn.click();
                 }
                 aiLog(`Blocks with ${choice.name}`, 'combat');
+            } else if (hyperTarget && hyperTarget.kind !== 'player') {
+                aiLog(`Can't block — Hyperscope strike resolves`, 'combat');
             } else {
                 aiLog(isUnblockable ? `Can't block — takes ${attackerStr} damage` : `Takes ${attackerStr} damage`, 'combat');
             }
