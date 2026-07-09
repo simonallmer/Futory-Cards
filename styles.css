@@ -2852,6 +2852,18 @@ body.dev-mode-on::after {
   50%      { box-shadow: 0 0 20px 5px rgba(224, 90, 90, 0.95); }
 }
 
+/* Lotus: a small pad marker on a Creature seated on a Lotus (they share fate). */
+.lotus-marker {
+  position: absolute;
+  bottom: 3px;
+  left: 3px;
+  font-size: 14px;
+  line-height: 1;
+  filter: drop-shadow(0 0 3px rgba(120, 220, 160, 0.9));
+  pointer-events: none;
+  z-index: 5;
+}
+
 /* Sleep Potion: eligible Creature/Landmark targets pulse cyan, matching the face-down theme. */
 .sleep-target {
   cursor: pointer;

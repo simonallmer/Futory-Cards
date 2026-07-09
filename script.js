@@ -284,7 +284,7 @@ document.addEventListener('DOMContentLoaded', () => {
         };
     }
 
-    const implementedCards = ["Pandorama", "Fountain of Youth", "Laser Catalyst", "Dragura's Wasteland", "Planetarium", "Lethargo's Temple", "Clone Factory", "Aetherlab", "Entrophy", "Meridius", "Meridia", "Time Thief", "Ichor", "Vulcanem", "Cravus", "Rampadon", "Smoke", "Dark Matter", "Reflector", "Talisman", "Reversal", "Faith", "Threat", "Confiscation", "Gravitas", "Time Bender", "Meridia's Cabin", "Repo Station", "Hand of Rhone", "Atlantica", "Hyperscope", "Mines of Pyralos", "Chrona", "Razo", "Looper", "Masiota", "Aromeas", "General Wave", "Namandi", "Sea Lord", "Sleep Potion"];
+    const implementedCards = ["Pandorama", "Fountain of Youth", "Laser Catalyst", "Dragura's Wasteland", "Planetarium", "Lethargo's Temple", "Clone Factory", "Aetherlab", "Entrophy", "Meridius", "Meridia", "Time Thief", "Ichor", "Vulcanem", "Cravus", "Rampadon", "Smoke", "Dark Matter", "Reflector", "Talisman", "Reversal", "Faith", "Threat", "Confiscation", "Gravitas", "Time Bender", "Meridia's Cabin", "Repo Station", "Hand of Rhone", "Atlantica", "Hyperscope", "Mines of Pyralos", "Chrona", "Razo", "Looper", "Masiota", "Aromeas", "General Wave", "Namandi", "Sea Lord", "Sleep Potion", "Lotus"];
 
     // --- Intent Classification ---
     // auto: fires on its own when condition is met
@@ -332,6 +332,7 @@ document.addEventListener('DOMContentLoaded', () => {
         'Namandi': 'active',
         'Sea Lord': 'active',
         'Sleep Potion': 'active',
+        'Lotus': 'active',
     };
 
     // --- Simulation Presets ---
@@ -579,9 +580,16 @@ document.addEventListener('DOMContentLoaded', () => {
             p2creatures: [{ name: 'Ichor', damageTaken: 0 }],
             p2landmarks: ['Pandorama'],
         },
+        'Lotus': {
+            phase: 1,
+            desc: "Construction Phase, hand holds a Lotus + two Cravus, Repo Station in play. Click Lotus → it lays a pad beside the middle (order 1,3,0,4). Advance to the Creature Phase, then click a Cravus → it summons to the MIDDLE slot; click the second Cravus → it seats on the Lotus pad (🪷 marker). The Lotus rides with that Creature — sacrifice it via Repo Station (or defeat it) and Lotus goes to History too; a plain attack leaves the empty pad behind.",
+            hand: ['Lotus', 'Cravus', 'Cravus'],
+            landmarks: ['Repo Station'],
+        },
     };
 
     const devLogData = [
+        { date: '2026-07-09', msg: "Lotus (Duality A2) — implemented (active), per Simon's placement rulings. This also formalized the Creature-Zone geometry: the MIDDLE slot (index 2) is the only default Creature field, and Creatures are now CLICK-SUMMONED (click one in your Creature Phase → it lands in the middle) rather than dragged — the drag highlight for Creatures is likewise narrowed to the middle slot. Lotus is played by clicking it in your Construction Phase: placeLotusPad() lays it as a face-up Artifact pad in the first open slot in Simon's order [1,3,0,4] (left-adjacent, right-adjacent, outer-left, outer-right). An unoccupied pad already counts as an Artifact-in-zone for Meridia's Cabin (cabinBonus was pre-wired for exactly this). Summoning onto a pad: when the middle is taken, summonCreatureToZone() seats the additional Creature ON the first open Lotus pad, stacking it as a full Creature (baseStrength/badges/attack/block all normal — Simon: 'a fully functional second attacker AND blocker') with the Lotus riding along on card.lotusPad and a 🪷 corner marker. Fate-binding rides two hooks: the History write inside finishSingleCardPlacement discharges the Lotus alongside the Creature whenever a lotus-borne Creature is removed to History (covers Repo Station / Dark Matter sacrifice and every combat defeat in one chokepoint — the Creature and its Lotus both land in the owner's History, marker stripped so a redraw is clean); and finishAttacker special-cases the spent-after-attack path — JUDGMENT CALL per the literal card text ('when the Creature is defeated or sacrificed'): a Creature that merely ATTACKS and is spent leaves its Lotus pad BEHIND (empty, reusable next turn), so finishAttacker re-seats the pad and strips the marker, while a mutually-destroyed attacker (new attackerDefeated flag from resolveCombat) keeps the rider so the Lotus discharges. A creature-stat init guard (type === 'Creature') keeps a Lotus laid in the zone from picking up combat stats. V1: the Computer doesn't buy Artifacts, so it neither plays Lotus nor summons onto one. Sim preset (Construction Phase: Lotus + two Cravus in hand, Repo Station in play). Verified live all four paths: clicking Lotus laid a pad in slot 1 (Artifact, no stat pollution); advancing to the Creature Phase, clicking the first Cravus summoned it to the middle and the second seated on the pad with the 🪷 marker (onLotus, baseStrength 2); Repo-Station-sacrificing the Lotus Cravus sent BOTH Cravus and Lotus to History with the pad cleared; and in a re-run, ATTACKING with the Lotus Cravus struck P2 for 2 (Day 12→10), sent only the Cravus to History (no rider), and LEFT the empty Lotus pad in slot 1. No console errors. NOTE FOR SIMON: I read 'defeated or sacrificed' literally, so Lotus survives a plain attack and is reusable — tell me if instead the Lotus should discard whenever its Creature leaves the zone for any reason (including after attacking)." },
         { date: '2026-07-09', msg: "Sleep Potion (Duality A1) — implemented (active), the deactivator the whole face-down subsystem was built for, per Simon's confirmed design: 'In your Construction or Creature Phase, deactivate a Creature or Landmark of your choice; targeting an already face-down card discards it instead; you may deactivate your own Creature to keep it anonymous.' Played from the hand like Dark Matter (a name branch in the hand-click dispatcher, legal in phase 1 OR 2). triggerSleepPotion() gathers every Creature and Landmark on BOTH boards that is either already asleep (→ discard) or canBeDeactivated() (so face-up Atlantica/Razo are never offered, but an already-deactivated card always is), pulses them with a new cyan .sleep-target glow plus a docked CHOOSE A CREATURE OR LANDMARK / CANCEL bar (same picker pattern as Threat/Mines, capture-click to preempt the card's normal handler). resolveSleepPotion() branches on the target's state: a face-up target flips card.deactivated = true through the existing subsystem (syncFaceDownVisual + refreshBoardAfterDeactivation, so Cabin badges, hand limit and Atlantica parked-card cleanup all re-sync), and if it's YOUR OWN Creature it also gets faceDownSecret so the opponent can't peek it (anonymity); an already face-down target is discarded to its OWNER'S History (a discarded Landmark cycles/rebuilds on draw like a Hyperscope kill). This realizes Simon's double-deactivation = discard rule; maybeMasiotaRescue already refuses on an already-deactivated card, so a sleeping Masiota Sleep-Potioned just discards with no rescue, consistent. Sleep Potion then spends itself to the caster's History (Artifacts return to History after use); CANCEL leaves it in hand. V1: the Computer doesn't cast it (it buys no Artifacts) but is a valid target — a deactivated AI creature already can't block or attack. Sim preset (two potions in hand, your Cravus + the opponent's Ichor and Pandorama on the board). Verified live all four paths: the picker glowed exactly Cravus/Ichor/Pandorama; deactivating the opponent's Ichor flipped it to a card back (deactivated, NOT secret) and spent the potion to your History; a second potion on that sleeping Ichor discarded it to P2's History; deactivating your own Cravus set faceDownSecret true; the opponent's Pandorama went to sleep as a non-secret card back; CANCEL left both potions in hand with no leftover glow. No console errors." },
         { date: '2026-07-09', msg: "Sea Lord (Duality C8) — implemented (active), completing all 8 Duality Creatures: 'After Sea Lord attacks and is discarded, you may shuffle your History Pile and Future Pile into a new Future Pile.' Hooked at the end of finishAttacker — right after the standard clearSlot + discard-to-History that every attacker goes through, so by the time the offer appears Sea Lord is already in History and cycles back into the deck too (matching the printed 'and is discarded ... shuffle your History Pile'). maybeSeaLordReshuffle() reuses the two rules the End-Phase reshuffle already established rather than inventing new ones: it combines History + Future, exiles any Meridia to the Abyss (she can't be folded into a new Future Pile), shuffles the rest via the shared shuffleArray into the Future Pile, empties History (both piles re-rendered through updateStackIndicator, which handles the slot-empty/label/card-back visuals), and calls resolveGravitasRefill() since forming a new Future Pile from History is exactly Gravitas's trigger. It's optional (confirm), and an empty History+Future is a no-op. V1: the Computer declines (the offer is gated on !aiTurnInProgress), matching Looper/Namandi. Sim preset: Sea Lord (Strength 6) ready, History = Smoke + Ichor, Future = 2 Steam. Verified live both ways — ACCEPT: his direct strike hit P2 Day 12→6, then all five cards (Smoke, Ichor, the 2 Steam, and Sea Lord himself) folded into a Future Pile in a shuffled order (≠ the concatenation, proving the shuffle) with History emptied; DECLINE: the same strike landed and Sea Lord went to History (Smoke, Ichor, Sea Lord) with both piles left untouched. No console errors." },
         { date: '2026-07-09', msg: "Namandi (Duality C7) — implemented (active), per Simon's rulings: he 'gains +1 Strength for each Non-Steam Card you discard while attacking,' where the discard comes from your Hand (or with Atlantica, the wider parked hand), the cards go to your History Pile, and the buff is THIS ATTACK ONLY. Wired as a discard step at the top of triggerAttack (ahead of Hyperscope/target selection, so it reads as 'before attacking'): promptNamandiDiscard() gathers every non-Steam '.hand-slot, .atlantica-slot' card (reusing the exact selector Mines/Atlantica established for 'hand as resource'), pulses them with the red threat-target glow plus a docked bar, and lets you TENTATIVELY toggle any number — each pick locks gold (.namandi-selected) and the bar's live 'Strength N' updates. ATTACK spends the selected cards to History (clearSlot + finishSingleCardPlacement, the standard discard chokepoint) and resumes via a boosted copy { ...attacker, baseStrength: base + bonus, namandiResolved }, so the +Strength threads through the identical Meridius-style pipeline — calculateCurrentStrength reads the copy's baseStrength, so the combat screen, resolveCombat and spillover all use it with ZERO new plumbing; Resistance is untouched (attack-only) and his zone card stays base 3 (he's discarded after attacking anyway). namandiResolved marks the second pass so the chooser can't reopen; CANCEL aborts the whole attack with nothing discarded; an empty eligible set skips the UI straight to a plain attack. V1: the Computer attacks with Namandi at base Strength (the discard branch is gated on !aiTurnInProgress), matching Looper/Hyperscope. Sim preset: Namandi (base 3) in the zone with Smoke + Ichor (eligible) and a FireSteam (Steam, excluded) in hand. Verified live: only Smoke and Ichor pulsed (FireSteam stayed dark, proving the Non-Steam filter); selecting both read 'Strength 5', ATTACK discarded both to History (hand 3→1) with a '+2 Strength' float and the defense screen showed attacker Strength 5; the direct strike hit for 5; a re-run with CANCEL left the hand untouched and returned Namandi to the zone. No console errors." },
@@ -976,6 +984,20 @@ document.addEventListener('DOMContentLoaded', () => {
                     // face-down target is discarded instead).
                     if (!devMode && isMyBoard && (currentPhase === 1 || currentPhase === 2) && cardData.name === 'Sleep Potion') {
                         triggerSleepPotion(cardData, slot);
+                        return;
+                    }
+
+                    // Lotus (Duality A2): play from hand in your Construction Phase to lay an
+                    // extra Creature pad beside the middle slot (fills 1,3,0,4 in order).
+                    if (!devMode && isMyBoard && currentPhase === 1 && cardData.name === 'Lotus') {
+                        placeLotusPad(cardData, slot);
+                        return;
+                    }
+
+                    // Creatures are click-summoned in the Creature Phase: the middle slot is the
+                    // default field; extra Lotus pads host the additional Creatures.
+                    if (!devMode && isMyBoard && currentPhase === 2 && cardData.type === 'Creature') {
+                        summonCreatureToZone(cardData, slot);
                         return;
                     }
 
@@ -1572,7 +1594,9 @@ document.addEventListener('DOMContentLoaded', () => {
         } else if (card.type === 'Creature') {
             targets = Array.from(activeBoard.querySelectorAll('.hand-slot.slot-empty, .hand-auto-drop'));
             if (currentPhase === 1 || currentPhase === 2) {
-                const zones = Array.from(activeBoard.querySelectorAll('.creature-zone-main .card.slot-empty'));
+                // The middle slot is the only valid default Creature field; extra slots come
+                // from Lotus pads, which are filled by click-summoning rather than dragging.
+                const zones = Array.from(activeBoard.querySelectorAll('.creature-zone-main .middle-slot.slot-empty'));
                 targets = targets.concat(zones);
             }
             color = 'blue';
@@ -2035,6 +2059,62 @@ document.addEventListener('DOMContentLoaded', () => {
         updateHandLayout(currentPlayer);
     }
 
+    // --- Lotus (Duality A2): an Artifact pad that hosts an additional Creature ---
+    // "Lay Lotus next to the center of your Creature Zone; place an additional Creature on it;
+    // when that Creature is defeated or sacrificed, Lotus is discarded too." Per Simon: the
+    // middle slot is the only default Creature field, and Lotus pads fill the slots beside it
+    // in the order left-adjacent, right-adjacent, outer-left, outer-right (indices 1,3,0,4).
+    const LOTUS_SLOT_ORDER = [1, 3, 0, 4];
+
+    function placeLotusPad(lotusCard, handSlot) {
+        const board = document.getElementById(`player-${currentPlayer}`);
+        const slots = Array.from(board.querySelectorAll('.creature-zone-main .card'));
+        const target = LOTUS_SLOT_ORDER.map(i => slots[i]).find(s => s && s.classList.contains('slot-empty'));
+        if (!target) {
+            alert('Lotus — no open Creature-Zone slot beside the middle.');
+            return;
+        }
+        clearSlot(handSlot);
+        finishSingleCardPlacement(target, lotusCard);
+        floatValue(target, 'Lotus', 'gain');
+        // An unoccupied Lotus counts as an Artifact in the zone for Meridia's Cabin — refresh.
+        refreshBoardAfterDeactivation(target);
+        updateHandLayout(currentPlayer);
+    }
+
+    // Click-summon a Creature: the middle slot by default; if it's taken, seat the additional
+    // Creature ON the first open Lotus pad (the Lotus rides along on card.lotusPad so it can be
+    // discarded with the Creature when it's defeated or sacrificed).
+    function summonCreatureToZone(card, handSlot) {
+        const board = document.getElementById(`player-${currentPlayer}`);
+        const slots = Array.from(board.querySelectorAll('.creature-zone-main .card'));
+        const middle = slots[2];
+
+        if (middle.classList.contains('slot-empty')) {
+            clearSlot(handSlot);
+            finishSingleCardPlacement(middle, card);
+            checkMeridiaZeroHp(middle, card);
+            updateHandLayout(currentPlayer);
+            return;
+        }
+
+        for (const idx of LOTUS_SLOT_ORDER) {
+            const s = slots[idx];
+            if (!s || s.classList.contains('slot-empty')) continue;
+            let pad; try { pad = JSON.parse(s.dataset.cardData); } catch (e) { continue; }
+            if (pad && pad.type === 'Artifact' && pad.name === 'Lotus' && !pad.deactivated) {
+                const creature = { ...card, lotusPad: pad };
+                clearSlot(s);
+                finishSingleCardPlacement(s, creature);
+                checkMeridiaZeroHp(s, creature);
+                clearSlot(handSlot);
+                updateHandLayout(currentPlayer);
+                return;
+            }
+        }
+        alert('No open Creature field — the middle slot is taken. Play Lotus for an extra slot.');
+    }
+
     // --- Atlantica (Duality L6): an extended hand behind your Landmarks ---
     // While Atlantica is active you may park 1 Hand card face up behind each active
     // Landmark (the contextual .atlantica-zone row below the Landmark Zone). Parked cards
@@ -2101,11 +2181,23 @@ document.addEventListener('DOMContentLoaded', () => {
                     if (!Array.isArray(deck)) deck = [deck];
                 } catch(e) { deck = []; }
             }
-            deck.push(card);
+            // Lotus (Duality A2): a Creature discarded to History from its Lotus pad (defeat or
+            // sacrifice) takes the Lotus with it — the after-attack path strips the marker first,
+            // so only real removals carry the rider here. Both cards land in this History.
+            if (isHistory && card && card.lotusPad) {
+                const lotus = card.lotusPad;
+                card = { ...card };
+                delete card.lotusPad;
+                deck.push(card);
+                deck.push(lotus);
+            } else {
+                deck.push(card);
+            }
             targetSlot.dataset.cardData = JSON.stringify(deck);
         } else {
-            // Initialize creature-specific stats if placed in creature zone
-            if (targetSlot.parentNode && targetSlot.parentNode.classList.contains('creature-zone-main')) {
+            // Initialize creature-specific stats if placed in creature zone (only for actual
+            // Creatures — a Lotus Artifact laid in the zone must not pick up combat stats).
+            if (card.type === 'Creature' && targetSlot.parentNode && targetSlot.parentNode.classList.contains('creature-zone-main')) {
                 if (card.summonedOnTurn === undefined) card.summonedOnTurn = totalTurns;
                 if (card.damageTaken === undefined) card.damageTaken = 0;
                 // parseInt || 1 would clobber a legitimate 0 base stat (e.g. Meridia); use isNaN instead.
@@ -2860,7 +2952,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // Move a spent attacker to History after its strike — unless Clone Factory is primed for a
     // first strike, in which case the creature stays in its zone to strike a second time.
-    function finishAttacker(attackerSlot, attacker, attackerHistory) {
+    function finishAttacker(attackerSlot, attacker, attackerHistory, defeated = false) {
         // Looper: stays in his zone until the rolled strikes are used up; History after the last.
         if (attacker.name === 'Looper' && looperStrikesRemaining > 1) {
             looperStrikesRemaining--;
@@ -2876,6 +2968,21 @@ document.addEventListener('DOMContentLoaded', () => {
         }
         // Masiota may dodge the normal after-attack discard by deactivating instead.
         if (maybeMasiotaRescue(attackerSlot, attacker)) {
+            if (cloneFactoryArmed) disarmCloneFactory();
+            return;
+        }
+        // Lotus (Duality A2): a Creature that merely ATTACKED and is now spent (not defeated in
+        // combat) leaves its Lotus pad behind, reusable next turn — detach the Lotus, re-seat it
+        // as an empty pad, and strip the marker so the History chokepoint doesn't take it too.
+        // A mutually-destroyed attacker (defeated) keeps the marker so the Lotus rides to History.
+        if (attacker.lotusPad && !defeated) {
+            const lotus = attacker.lotusPad;
+            attacker = { ...attacker };
+            delete attacker.lotusPad;
+            clearSlot(attackerSlot);
+            finishSingleCardPlacement(attackerSlot, lotus);
+            refreshBoardAfterDeactivation(attackerSlot);
+            finishSingleCardPlacement(attackerHistory, attacker);
             if (cloneFactoryArmed) disarmCloneFactory();
             return;
         }
@@ -4251,10 +4358,18 @@ document.addEventListener('DOMContentLoaded', () => {
             const card = JSON.parse(slot.dataset.cardData);
             if (card.type !== 'Creature') return;
 
-            slot.querySelectorAll('.creature-stat-badge, .health-badge, .str-marker').forEach(b => b.remove());
+            slot.querySelectorAll('.creature-stat-badge, .health-badge, .str-marker, .lotus-marker').forEach(b => b.remove());
 
             // Face-down cards show no stats — that's the mystery.
             if (card.deactivated) return;
+
+            // Lotus (Duality A2): mark a Creature that sits on a Lotus pad (they share fate).
+            if (card.lotusPad) {
+                const lm = document.createElement('div');
+                lm.className = 'lotus-marker';
+                lm.textContent = '🪷';
+                slot.appendChild(lm);
+            }
 
             // Calculate special buffs (e.g., Meridia, Meridia's Cabin)
             let bonus = 0;
@@ -5611,7 +5726,8 @@ document.addEventListener('DOMContentLoaded', () => {
     function resolveCombat(attacker, attackerSlot, blockerData, blockerSlot, defenderNum) {
         const feedbackEl = document.getElementById('combat-feedback');
         feedbackEl.classList.add('combat-feedback-vital');
-        
+        let attackerDefeated = false; // set on mutual destruction — governs the Lotus rider
+
         const attackerStr = calculateCurrentStrength(attacker, attackerSlot);
         const attackerHistory = attackerSlot.closest('.player-zone').querySelector('.history-pile');
         const blockerHistory = blockerSlot.closest('.player-zone').querySelector('.history-pile');
@@ -5659,10 +5775,12 @@ document.addEventListener('DOMContentLoaded', () => {
                 finishSingleCardPlacement(blockerHistory, blockerData);
             }
             applyRepoStationGain(attackerSlot);
+            attackerDefeated = true; // the attacker died too — a Lotus rider goes to History with it
         }
 
-        // Cleanup Attacker - move to history (unless Clone Factory keeps it for a 2nd strike)
-        finishAttacker(attackerSlot, attacker, attackerHistory);
+        // Cleanup Attacker - move to history (unless Clone Factory keeps it for a 2nd strike).
+        // attackerDefeated flags mutual destruction so a Lotus-borne attacker discards its Lotus.
+        finishAttacker(attackerSlot, attacker, attackerHistory, attackerDefeated);
     }
 
     function resolveDamageDirectly(damage, playerNum) {
