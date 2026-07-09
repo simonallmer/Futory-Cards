@@ -284,7 +284,7 @@ document.addEventListener('DOMContentLoaded', () => {
         };
     }
 
-    const implementedCards = ["Pandorama", "Fountain of Youth", "Laser Catalyst", "Dragura's Wasteland", "Planetarium", "Lethargo's Temple", "Clone Factory", "Aetherlab", "Entrophy", "Meridius", "Meridia", "Time Thief", "Ichor", "Vulcanem", "Cravus", "Rampadon", "Smoke", "Dark Matter", "Reflector", "Talisman", "Reversal", "Faith", "Threat", "Confiscation", "Gravitas", "Time Bender", "Meridia's Cabin", "Repo Station", "Hand of Rhone", "Atlantica", "Hyperscope", "Mines of Pyralos", "Chrona", "Razo", "Looper", "Masiota", "Aromeas", "General Wave", "Namandi", "Sea Lord", "Sleep Potion", "Lotus"];
+    const implementedCards = ["Pandorama", "Fountain of Youth", "Laser Catalyst", "Dragura's Wasteland", "Planetarium", "Lethargo's Temple", "Clone Factory", "Aetherlab", "Entrophy", "Meridius", "Meridia", "Time Thief", "Ichor", "Vulcanem", "Cravus", "Rampadon", "Smoke", "Dark Matter", "Reflector", "Talisman", "Reversal", "Faith", "Threat", "Confiscation", "Gravitas", "Time Bender", "Meridia's Cabin", "Repo Station", "Hand of Rhone", "Atlantica", "Hyperscope", "Mines of Pyralos", "Chrona", "Razo", "Looper", "Masiota", "Aromeas", "General Wave", "Namandi", "Sea Lord", "Sleep Potion", "Lotus", "Rush"];
 
     // --- Intent Classification ---
     // auto: fires on its own when condition is met
@@ -333,6 +333,7 @@ document.addEventListener('DOMContentLoaded', () => {
         'Sea Lord': 'active',
         'Sleep Potion': 'active',
         'Lotus': 'active',
+        'Rush': 'active',
     };
 
     // --- Simulation Presets ---
@@ -580,6 +581,12 @@ document.addEventListener('DOMContentLoaded', () => {
             p2creatures: [{ name: 'Ichor', damageTaken: 0 }],
             p2landmarks: ['Pandorama'],
         },
+        'Rush': {
+            phase: 2,
+            desc: "Creature Phase: Ichor was just summoned, so clicking it says 'Summoning sickness!'. Play Rush from hand → with one Creature it applies automatically, stamps Ichor attack-ready, and opens the ATTACK menu so the strike lands this turn. Rush goes to your History.",
+            hand: ['Rush'],
+            p1creatures: [{ name: 'Ichor', damageTaken: 0, forceThisTurn: true }],
+        },
         'Lotus': {
             phase: 1,
             desc: "Construction Phase, hand holds a Lotus + two Cravus, Repo Station in play. Click Lotus → it lays a pad beside the middle (order 1,3,0,4). Advance to the Creature Phase, then click a Cravus → it summons to the MIDDLE slot; click the second Cravus → it seats on the Lotus pad (🪷 marker). The Lotus rides with that Creature — sacrifice it via Repo Station (or defeat it) and Lotus goes to History too; a plain attack leaves the empty pad behind.",
@@ -589,6 +596,7 @@ document.addEventListener('DOMContentLoaded', () => {
     };
 
     const devLogData = [
+        { date: '2026-07-09', msg: "Rush (Duality A3) — implemented (active): 'In your Creature Phase: Make a Creature attack instantly.' Played from hand (a name branch in the hand-click dispatcher, gated to phase 2). triggerRush() collects your face-up zone Creatures; with one it applies automatically, with several it pulses them (red threat-target) behind a docked CHOOSE A CREATURE / CANCEL bar (the Repo Station / Sleep Potion picker pattern, capture-click to preempt the normal attack click). Applying spends Rush to your History (Artifacts return to History after use) and calls rushCreature(): it stamps the chosen Creature's summonedOnTurn to 0 so the summoning-sickness gate is bypassed for the rest of the turn (a cancelled attack can still be retried by clicking the Creature), then opens the standard ATTACK menu via showAttackMenu — so the whole existing attack pipeline (Entrophy/Looper/Namandi/Hyperscope, targeting, defense) runs unchanged. CANCEL leaves Rush in hand; no Creature in play alerts and spends nothing. V1: the Computer doesn't buy Artifacts, so it never plays Rush. Sim preset (Creature Phase: a just-summoned, summoning-sick Ichor + Rush in hand). Verified live: clicking Ichor first alerted 'Summoning sickness!'; playing Rush auto-applied (one Creature), stamped Ichor summonedOnTurn 0, sent Rush to History and opened the ATTACK menu; ATTACK then struck P2 directly for 2 (Day 12→10) and Ichor moved to History (History = Rush, Ichor). No console errors." },
         { date: '2026-07-09', msg: "Lotus (Duality A2) — implemented (active), per Simon's placement rulings. This also formalized the Creature-Zone geometry: the MIDDLE slot (index 2) is the only default Creature field, and Creatures are now CLICK-SUMMONED (click one in your Creature Phase → it lands in the middle) rather than dragged — the drag highlight for Creatures is likewise narrowed to the middle slot. Lotus is played by clicking it in your Construction Phase: placeLotusPad() lays it as a face-up Artifact pad in the first open slot in Simon's order [1,3,0,4] (left-adjacent, right-adjacent, outer-left, outer-right). An unoccupied pad already counts as an Artifact-in-zone for Meridia's Cabin (cabinBonus was pre-wired for exactly this). Summoning onto a pad: when the middle is taken, summonCreatureToZone() seats the additional Creature ON the first open Lotus pad, stacking it as a full Creature (baseStrength/badges/attack/block all normal — Simon: 'a fully functional second attacker AND blocker') with the Lotus riding along on card.lotusPad and a 🪷 corner marker. Fate-binding rides two hooks: the History write inside finishSingleCardPlacement discharges the Lotus alongside the Creature whenever a lotus-borne Creature is removed to History (covers Repo Station / Dark Matter sacrifice and every combat defeat in one chokepoint — the Creature and its Lotus both land in the owner's History, marker stripped so a redraw is clean); and finishAttacker special-cases the spent-after-attack path — JUDGMENT CALL per the literal card text ('when the Creature is defeated or sacrificed'): a Creature that merely ATTACKS and is spent leaves its Lotus pad BEHIND (empty, reusable next turn), so finishAttacker re-seats the pad and strips the marker, while a mutually-destroyed attacker (new attackerDefeated flag from resolveCombat) keeps the rider so the Lotus discharges. A creature-stat init guard (type === 'Creature') keeps a Lotus laid in the zone from picking up combat stats. V1: the Computer doesn't buy Artifacts, so it neither plays Lotus nor summons onto one. Sim preset (Construction Phase: Lotus + two Cravus in hand, Repo Station in play). Verified live all four paths: clicking Lotus laid a pad in slot 1 (Artifact, no stat pollution); advancing to the Creature Phase, clicking the first Cravus summoned it to the middle and the second seated on the pad with the 🪷 marker (onLotus, baseStrength 2); Repo-Station-sacrificing the Lotus Cravus sent BOTH Cravus and Lotus to History with the pad cleared; and in a re-run, ATTACKING with the Lotus Cravus struck P2 for 2 (Day 12→10), sent only the Cravus to History (no rider), and LEFT the empty Lotus pad in slot 1. No console errors. NOTE FOR SIMON: I read 'defeated or sacrificed' literally, so Lotus survives a plain attack and is reusable — tell me if instead the Lotus should discard whenever its Creature leaves the zone for any reason (including after attacking)." },
         { date: '2026-07-09', msg: "Sleep Potion (Duality A1) — implemented (active), the deactivator the whole face-down subsystem was built for, per Simon's confirmed design: 'In your Construction or Creature Phase, deactivate a Creature or Landmark of your choice; targeting an already face-down card discards it instead; you may deactivate your own Creature to keep it anonymous.' Played from the hand like Dark Matter (a name branch in the hand-click dispatcher, legal in phase 1 OR 2). triggerSleepPotion() gathers every Creature and Landmark on BOTH boards that is either already asleep (→ discard) or canBeDeactivated() (so face-up Atlantica/Razo are never offered, but an already-deactivated card always is), pulses them with a new cyan .sleep-target glow plus a docked CHOOSE A CREATURE OR LANDMARK / CANCEL bar (same picker pattern as Threat/Mines, capture-click to preempt the card's normal handler). resolveSleepPotion() branches on the target's state: a face-up target flips card.deactivated = true through the existing subsystem (syncFaceDownVisual + refreshBoardAfterDeactivation, so Cabin badges, hand limit and Atlantica parked-card cleanup all re-sync), and if it's YOUR OWN Creature it also gets faceDownSecret so the opponent can't peek it (anonymity); an already face-down target is discarded to its OWNER'S History (a discarded Landmark cycles/rebuilds on draw like a Hyperscope kill). This realizes Simon's double-deactivation = discard rule; maybeMasiotaRescue already refuses on an already-deactivated card, so a sleeping Masiota Sleep-Potioned just discards with no rescue, consistent. Sleep Potion then spends itself to the caster's History (Artifacts return to History after use); CANCEL leaves it in hand. V1: the Computer doesn't cast it (it buys no Artifacts) but is a valid target — a deactivated AI creature already can't block or attack. Sim preset (two potions in hand, your Cravus + the opponent's Ichor and Pandorama on the board). Verified live all four paths: the picker glowed exactly Cravus/Ichor/Pandorama; deactivating the opponent's Ichor flipped it to a card back (deactivated, NOT secret) and spent the potion to your History; a second potion on that sleeping Ichor discarded it to P2's History; deactivating your own Cravus set faceDownSecret true; the opponent's Pandorama went to sleep as a non-secret card back; CANCEL left both potions in hand with no leftover glow. No console errors." },
         { date: '2026-07-09', msg: "Sea Lord (Duality C8) — implemented (active), completing all 8 Duality Creatures: 'After Sea Lord attacks and is discarded, you may shuffle your History Pile and Future Pile into a new Future Pile.' Hooked at the end of finishAttacker — right after the standard clearSlot + discard-to-History that every attacker goes through, so by the time the offer appears Sea Lord is already in History and cycles back into the deck too (matching the printed 'and is discarded ... shuffle your History Pile'). maybeSeaLordReshuffle() reuses the two rules the End-Phase reshuffle already established rather than inventing new ones: it combines History + Future, exiles any Meridia to the Abyss (she can't be folded into a new Future Pile), shuffles the rest via the shared shuffleArray into the Future Pile, empties History (both piles re-rendered through updateStackIndicator, which handles the slot-empty/label/card-back visuals), and calls resolveGravitasRefill() since forming a new Future Pile from History is exactly Gravitas's trigger. It's optional (confirm), and an empty History+Future is a no-op. V1: the Computer declines (the offer is gated on !aiTurnInProgress), matching Looper/Namandi. Sim preset: Sea Lord (Strength 6) ready, History = Smoke + Ichor, Future = 2 Steam. Verified live both ways — ACCEPT: his direct strike hit P2 Day 12→6, then all five cards (Smoke, Ichor, the 2 Steam, and Sea Lord himself) folded into a Future Pile in a shuffled order (≠ the concatenation, proving the shuffle) with History emptied; DECLINE: the same strike landed and Sea Lord went to History (Smoke, Ichor, Sea Lord) with both piles left untouched. No console errors." },
@@ -998,6 +1006,13 @@ document.addEventListener('DOMContentLoaded', () => {
                     // default field; extra Lotus pads host the additional Creatures.
                     if (!devMode && isMyBoard && currentPhase === 2 && cardData.type === 'Creature') {
                         summonCreatureToZone(cardData, slot);
+                        return;
+                    }
+
+                    // Rush (Duality A3): play from hand in your Creature Phase to make one of your
+                    // Creatures attack instantly (bypassing summoning sickness).
+                    if (!devMode && isMyBoard && currentPhase === 2 && cardData.name === 'Rush') {
+                        triggerRush(cardData, slot);
                         return;
                     }
 
@@ -2113,6 +2128,74 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         }
         alert('No open Creature field — the middle slot is taken. Play Lotus for an extra slot.');
+    }
+
+    // --- Rush (Duality A3): make a Creature attack instantly ---
+    // "In your Creature Phase: Make a Creature attack instantly." Played from hand: pick one of
+    // your face-up Creatures (auto if there's only one), spend Rush to History, then open that
+    // Creature's attack — stamping summonedOnTurn so the summoning-sickness gate is bypassed for
+    // the rest of the turn (so a cancelled attack can still be retried by clicking it).
+    function triggerRush(rushCard, handSlot) {
+        const board = document.getElementById(`player-${currentPlayer}`);
+        const creatures = Array.from(board.querySelectorAll('.creature-zone-main .card:not(.slot-empty)')).filter(s => {
+            try { const c = JSON.parse(s.dataset.cardData); return c.type === 'Creature' && !c.deactivated; } catch (e) { return false; }
+        });
+        if (!creatures.length) { alert('Rush — you have no Creature in play to attack.'); return; }
+
+        const apply = (slot) => {
+            const casterHistory = board.querySelector('.history-pile');
+            clearSlot(handSlot);
+            finishSingleCardPlacement(casterHistory, rushCard);
+            updateHandLayout(currentPlayer);
+            rushCreature(slot);
+        };
+
+        if (creatures.length === 1) { apply(creatures[0]); return; }
+
+        // Several Creatures — pulse them and let the player pick which one rushes.
+        const bar = document.createElement('div');
+        bar.id = 'rush-bar';
+        bar.style.cssText = 'position:fixed;bottom:40px;left:50%;transform:translateX(-50%);display:flex;gap:10px;z-index:6000;';
+        const hint = document.createElement('div');
+        hint.className = 'menu-btn tech-font';
+        hint.style.cssText = 'pointer-events:none;opacity:0.85;';
+        hint.textContent = 'RUSH — CHOOSE A CREATURE TO ATTACK';
+        bar.appendChild(hint);
+        const cancelBtn = document.createElement('button');
+        cancelBtn.className = 'menu-btn secondary-btn';
+        cancelBtn.textContent = 'CANCEL';
+        bar.appendChild(cancelBtn);
+        document.body.appendChild(bar);
+
+        const cleanup = () => {
+            creatures.forEach(s => {
+                s.classList.remove('threat-target');
+                if (s._rushHandler) s.removeEventListener('click', s._rushHandler, true);
+                delete s._rushHandler;
+            });
+            bar.remove();
+        };
+        cancelBtn.onclick = cleanup; // Rush stays in hand
+
+        creatures.forEach(s => {
+            s.classList.add('threat-target');
+            const handler = (e) => {
+                e.stopPropagation();
+                e.preventDefault();
+                cleanup();
+                apply(s);
+            };
+            s._rushHandler = handler;
+            s.addEventListener('click', handler, true); // capture: preempt the normal attack click
+        });
+    }
+
+    function rushCreature(slot) {
+        let card; try { card = JSON.parse(slot.dataset.cardData); } catch (e) { return; }
+        card.summonedOnTurn = 0; // bypass summoning sickness for the rest of this turn
+        slot.dataset.cardData = JSON.stringify(card);
+        floatValue(slot, 'Rush!', 'gain');
+        showAttackMenu(card, slot);
     }
 
     // --- Atlantica (Duality L6): an extended hand behind your Landmarks ---
