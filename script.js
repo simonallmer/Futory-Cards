@@ -284,7 +284,7 @@ document.addEventListener('DOMContentLoaded', () => {
         };
     }
 
-    const implementedCards = ["Pandorama", "Fountain of Youth", "Laser Catalyst", "Dragura's Wasteland", "Planetarium", "Lethargo's Temple", "Clone Factory", "Aetherlab", "Entrophy", "Meridius", "Meridia", "Time Thief", "Ichor", "Vulcanem", "Cravus", "Rampadon", "Smoke", "Dark Matter", "Reflector", "Talisman", "Reversal", "Faith", "Threat", "Confiscation", "Gravitas", "Time Bender", "Meridia's Cabin", "Repo Station", "Hand of Rhone", "Atlantica", "Hyperscope", "Mines of Pyralos", "Chrona", "Razo", "Looper", "Masiota", "Aromeas", "General Wave", "Namandi"];
+    const implementedCards = ["Pandorama", "Fountain of Youth", "Laser Catalyst", "Dragura's Wasteland", "Planetarium", "Lethargo's Temple", "Clone Factory", "Aetherlab", "Entrophy", "Meridius", "Meridia", "Time Thief", "Ichor", "Vulcanem", "Cravus", "Rampadon", "Smoke", "Dark Matter", "Reflector", "Talisman", "Reversal", "Faith", "Threat", "Confiscation", "Gravitas", "Time Bender", "Meridia's Cabin", "Repo Station", "Hand of Rhone", "Atlantica", "Hyperscope", "Mines of Pyralos", "Chrona", "Razo", "Looper", "Masiota", "Aromeas", "General Wave", "Namandi", "Sea Lord"];
 
     // --- Intent Classification ---
     // auto: fires on its own when condition is met
@@ -330,6 +330,7 @@ document.addEventListener('DOMContentLoaded', () => {
         'Aromeas': 'auto',
         'General Wave': 'auto',
         'Namandi': 'active',
+        'Sea Lord': 'active',
     };
 
     // --- Simulation Presets ---
@@ -562,9 +563,17 @@ document.addEventListener('DOMContentLoaded', () => {
             p1creatures: [{ name: 'Namandi', damageTaken: 0 }],
             hand: ['Smoke', 'Ichor', 'FireSteam'],
         },
+        'Sea Lord': {
+            phase: 2,
+            desc: "Sea Lord (Strength 6) ready in your zone; History holds Smoke + Ichor, Future holds 2 Steam. Attack: after he strikes and is discarded to History, a prompt offers to fold your History + Future into one fresh shuffled Future Pile (Sea Lord cycles back in too) — History empties and Future holds all of them.",
+            p1creatures: [{ name: 'Sea Lord', damageTaken: 0 }],
+            p1history: ['Smoke', 'Ichor'],
+            p1future: ['FireSteam', 'GoldSteam'],
+        },
     };
 
     const devLogData = [
+        { date: '2026-07-09', msg: "Sea Lord (Duality C8) — implemented (active), completing all 8 Duality Creatures: 'After Sea Lord attacks and is discarded, you may shuffle your History Pile and Future Pile into a new Future Pile.' Hooked at the end of finishAttacker — right after the standard clearSlot + discard-to-History that every attacker goes through, so by the time the offer appears Sea Lord is already in History and cycles back into the deck too (matching the printed 'and is discarded ... shuffle your History Pile'). maybeSeaLordReshuffle() reuses the two rules the End-Phase reshuffle already established rather than inventing new ones: it combines History + Future, exiles any Meridia to the Abyss (she can't be folded into a new Future Pile), shuffles the rest via the shared shuffleArray into the Future Pile, empties History (both piles re-rendered through updateStackIndicator, which handles the slot-empty/label/card-back visuals), and calls resolveGravitasRefill() since forming a new Future Pile from History is exactly Gravitas's trigger. It's optional (confirm), and an empty History+Future is a no-op. V1: the Computer declines (the offer is gated on !aiTurnInProgress), matching Looper/Namandi. Sim preset: Sea Lord (Strength 6) ready, History = Smoke + Ichor, Future = 2 Steam. Verified live both ways — ACCEPT: his direct strike hit P2 Day 12→6, then all five cards (Smoke, Ichor, the 2 Steam, and Sea Lord himself) folded into a Future Pile in a shuffled order (≠ the concatenation, proving the shuffle) with History emptied; DECLINE: the same strike landed and Sea Lord went to History (Smoke, Ichor, Sea Lord) with both piles left untouched. No console errors." },
         { date: '2026-07-09', msg: "Namandi (Duality C7) — implemented (active), per Simon's rulings: he 'gains +1 Strength for each Non-Steam Card you discard while attacking,' where the discard comes from your Hand (or with Atlantica, the wider parked hand), the cards go to your History Pile, and the buff is THIS ATTACK ONLY. Wired as a discard step at the top of triggerAttack (ahead of Hyperscope/target selection, so it reads as 'before attacking'): promptNamandiDiscard() gathers every non-Steam '.hand-slot, .atlantica-slot' card (reusing the exact selector Mines/Atlantica established for 'hand as resource'), pulses them with the red threat-target glow plus a docked bar, and lets you TENTATIVELY toggle any number — each pick locks gold (.namandi-selected) and the bar's live 'Strength N' updates. ATTACK spends the selected cards to History (clearSlot + finishSingleCardPlacement, the standard discard chokepoint) and resumes via a boosted copy { ...attacker, baseStrength: base + bonus, namandiResolved }, so the +Strength threads through the identical Meridius-style pipeline — calculateCurrentStrength reads the copy's baseStrength, so the combat screen, resolveCombat and spillover all use it with ZERO new plumbing; Resistance is untouched (attack-only) and his zone card stays base 3 (he's discarded after attacking anyway). namandiResolved marks the second pass so the chooser can't reopen; CANCEL aborts the whole attack with nothing discarded; an empty eligible set skips the UI straight to a plain attack. V1: the Computer attacks with Namandi at base Strength (the discard branch is gated on !aiTurnInProgress), matching Looper/Hyperscope. Sim preset: Namandi (base 3) in the zone with Smoke + Ichor (eligible) and a FireSteam (Steam, excluded) in hand. Verified live: only Smoke and Ichor pulsed (FireSteam stayed dark, proving the Non-Steam filter); selecting both read 'Strength 5', ATTACK discarded both to History (hand 3→1) with a '+2 Strength' float and the defense screen showed attacker Strength 5; the direct strike hit for 5; a re-run with CANCEL left the hand untouched and returned Namandi to the zone. No console errors." },
         { date: '2026-07-09', msg: "General Wave (Duality C6) — marked implemented (vanilla). His printed ability is '—': he's a plain 6/6/6-class body (health 4/strength 4/resistance 4) with no special effect, so the normal combat engine already runs him correctly, exactly like Ichor. No code was written beyond the checklist flag; nothing to test past confirming he attacks/blocks as a 4/4." },
         { date: '2026-07-09', msg: "Aromeas (Duality C5) — implemented (auto on entry), per Simon's rulings: 'Health Points become half of the Time Points of your active Time Die upon entering the Creature Zone,' rounding UP and FIXED at the moment of entry (it does not follow the die as it changes afterward). The whole effect is one guarded block in finishSingleCardPlacement — the single chokepoint every Creature-Zone placement flows through (normal summon, drag, and the sim loader all route here): when an 'Aromeas' card lands in a creature-zone slot and hasn't been stamped yet, it reads the owner's active die via activeDieType(ownerNum) (reusing Time Bender's groundwork, so a Night-active player halves the Night die), sets HP = Math.ceil(dieTP / 2) into BOTH baseStrength and baseResistance (the single-HP model — Aromeas prints X/X/X), stamps card.aromeasSet so re-renders never recompute, and floats 'N HP (½ of M)'. Because the value is a stored stat like Chrona's split or Meridia's placement HP, 'fixed at entry' is inherent — nothing recomputes it, and it flows through calculateCurrentStrength, resolveCombat and the AI heuristic unchanged (combat needed zero edits). The one display edit: Aromeas prints X/X/X, so unlike other Creatures his computed HP has no printed number to fall back on — updateCreatureVisuals now force-shows his creature-stat-badge (aromeasFixed flag, same always-show path as a rescued Masiota) so the player can always read his stat, even when it happens to equal the base. Sim preset: active Day die pinned to 9 with Aromeas freshly in the zone. Verified live: badge read 5 (⌈9/2⌉, proving round-up over 4) with aromeasSet stamped, matching baseStrength/baseResistance both 5. No console errors. V1 note: the Computer summons Aromeas through the same placement path, so its HP is set identically." },
@@ -2760,6 +2769,49 @@ document.addEventListener('DOMContentLoaded', () => {
         clearSlot(attackerSlot);
         finishSingleCardPlacement(attackerHistory, attacker);
         if (cloneFactoryArmed) disarmCloneFactory();
+
+        // Sea Lord (Duality C8): after he attacks and is discarded, you may fold your
+        // History + Future into a fresh, shuffled Future Pile. He's already in History by
+        // now, so he cycles back into the deck too. The Computer declines the option (V1).
+        if (attacker.name === 'Sea Lord' && !aiTurnInProgress) {
+            const board = attackerHistory.closest('.player-zone');
+            if (board) maybeSeaLordReshuffle(parseInt(board.id.split('-')[1]));
+        }
+    }
+
+    // Sea Lord's optional deck refresh: combine this player's History + Future into one
+    // shuffled Future Pile (History emptied). Reuses the two reshuffle rules the End-Phase
+    // fold already established — Meridia is exiled to the Abyss rather than shuffled back,
+    // and forming a new Future Pile from History triggers Gravitas's refill.
+    function maybeSeaLordReshuffle(pNum) {
+        const board = document.getElementById(`player-${pNum}`);
+        if (!board) return;
+        const futurePile = board.querySelector('.future-pile');
+        const historyPile = board.querySelector('.history-pile');
+        if (!futurePile || !historyPile) return;
+
+        const readData = (el) => { try { return JSON.parse(el.dataset.cardData || '[]'); } catch (e) { return []; } };
+        const history = readData(historyPile);
+        const future = readData(futurePile);
+        if (!history.length && !future.length) return; // nothing to shuffle
+
+        if (!confirm('Sea Lord: shuffle your History Pile and Future Pile into a new Future Pile?')) return;
+
+        const combined = history.concat(future);
+        const meridiaCards = combined.filter(c => c.name === 'Meridia');
+        const shuffleable = combined.filter(c => c.name !== 'Meridia');
+        if (meridiaCards.length) {
+            activeBazaar['AB'] = (activeBazaar['AB'] || []).concat(meridiaCards);
+            renderBazaar();
+        }
+
+        futurePile.dataset.cardData = JSON.stringify(shuffleArray([...shuffleable]));
+        historyPile.dataset.cardData = JSON.stringify([]);
+        updateStackIndicator(historyPile);
+        updateStackIndicator(futurePile);
+        floatValue(futurePile, 'Reshuffled', 'gain');
+
+        resolveGravitasRefill(pNum);
     }
 
     // After an attack's result overlay closes, if Clone Factory kept the attacker for a second
