@@ -284,7 +284,7 @@ document.addEventListener('DOMContentLoaded', () => {
         };
     }
 
-    const implementedCards = ["Pandorama", "Fountain of Youth", "Laser Catalyst", "Dragura's Wasteland", "Planetarium", "Lethargo's Temple", "Clone Factory", "Aetherlab", "Entrophy", "Meridius", "Meridia", "Time Thief", "Ichor", "Vulcanem", "Cravus", "Rampadon", "Smoke", "Dark Matter", "Reflector", "Talisman", "Reversal", "Faith", "Threat", "Confiscation", "Gravitas", "Time Bender", "Meridia's Cabin", "Repo Station", "Hand of Rhone", "Atlantica", "Hyperscope", "Mines of Pyralos", "Chrona", "Razo", "Looper", "Masiota", "Aromeas"];
+    const implementedCards = ["Pandorama", "Fountain of Youth", "Laser Catalyst", "Dragura's Wasteland", "Planetarium", "Lethargo's Temple", "Clone Factory", "Aetherlab", "Entrophy", "Meridius", "Meridia", "Time Thief", "Ichor", "Vulcanem", "Cravus", "Rampadon", "Smoke", "Dark Matter", "Reflector", "Talisman", "Reversal", "Faith", "Threat", "Confiscation", "Gravitas", "Time Bender", "Meridia's Cabin", "Repo Station", "Hand of Rhone", "Atlantica", "Hyperscope", "Mines of Pyralos", "Chrona", "Razo", "Looper", "Masiota", "Aromeas", "General Wave", "Namandi"];
 
     // --- Intent Classification ---
     // auto: fires on its own when condition is met
@@ -328,6 +328,8 @@ document.addEventListener('DOMContentLoaded', () => {
         'Looper': 'auto',
         'Masiota': 'contextual',
         'Aromeas': 'auto',
+        'General Wave': 'auto',
+        'Namandi': 'active',
     };
 
     // --- Simulation Presets ---
@@ -554,9 +556,17 @@ document.addEventListener('DOMContentLoaded', () => {
             desc: "Your active Day die is at 9 TP. Aromeas is already in the Creature Zone — his HP was fixed on entry to half of 9, ROUNDED UP = 5 (badge shows 5). The value is locked at entry: it does not track the die if the 9 changes later.",
             p1creatures: [{ name: 'Aromeas', damageTaken: 0, forceThisTurn: true }],
         },
+        'Namandi': {
+            phase: 2,
+            desc: "Namandi (base Strength 3) in your zone; hand holds Smoke + Ichor (Non-Steam, eligible) and a FireSteam (Steam, NOT eligible). Attack: the eligible cards pulse red — click to select (gold), each discard = +1 Strength. Selecting both makes him strike for 5, this attack only; the discarded cards go to your History.",
+            p1creatures: [{ name: 'Namandi', damageTaken: 0 }],
+            hand: ['Smoke', 'Ichor', 'FireSteam'],
+        },
     };
 
     const devLogData = [
+        { date: '2026-07-09', msg: "Namandi (Duality C7) — implemented (active), per Simon's rulings: he 'gains +1 Strength for each Non-Steam Card you discard while attacking,' where the discard comes from your Hand (or with Atlantica, the wider parked hand), the cards go to your History Pile, and the buff is THIS ATTACK ONLY. Wired as a discard step at the top of triggerAttack (ahead of Hyperscope/target selection, so it reads as 'before attacking'): promptNamandiDiscard() gathers every non-Steam '.hand-slot, .atlantica-slot' card (reusing the exact selector Mines/Atlantica established for 'hand as resource'), pulses them with the red threat-target glow plus a docked bar, and lets you TENTATIVELY toggle any number — each pick locks gold (.namandi-selected) and the bar's live 'Strength N' updates. ATTACK spends the selected cards to History (clearSlot + finishSingleCardPlacement, the standard discard chokepoint) and resumes via a boosted copy { ...attacker, baseStrength: base + bonus, namandiResolved }, so the +Strength threads through the identical Meridius-style pipeline — calculateCurrentStrength reads the copy's baseStrength, so the combat screen, resolveCombat and spillover all use it with ZERO new plumbing; Resistance is untouched (attack-only) and his zone card stays base 3 (he's discarded after attacking anyway). namandiResolved marks the second pass so the chooser can't reopen; CANCEL aborts the whole attack with nothing discarded; an empty eligible set skips the UI straight to a plain attack. V1: the Computer attacks with Namandi at base Strength (the discard branch is gated on !aiTurnInProgress), matching Looper/Hyperscope. Sim preset: Namandi (base 3) in the zone with Smoke + Ichor (eligible) and a FireSteam (Steam, excluded) in hand. Verified live: only Smoke and Ichor pulsed (FireSteam stayed dark, proving the Non-Steam filter); selecting both read 'Strength 5', ATTACK discarded both to History (hand 3→1) with a '+2 Strength' float and the defense screen showed attacker Strength 5; the direct strike hit for 5; a re-run with CANCEL left the hand untouched and returned Namandi to the zone. No console errors." },
+        { date: '2026-07-09', msg: "General Wave (Duality C6) — marked implemented (vanilla). His printed ability is '—': he's a plain 6/6/6-class body (health 4/strength 4/resistance 4) with no special effect, so the normal combat engine already runs him correctly, exactly like Ichor. No code was written beyond the checklist flag; nothing to test past confirming he attacks/blocks as a 4/4." },
         { date: '2026-07-09', msg: "Aromeas (Duality C5) — implemented (auto on entry), per Simon's rulings: 'Health Points become half of the Time Points of your active Time Die upon entering the Creature Zone,' rounding UP and FIXED at the moment of entry (it does not follow the die as it changes afterward). The whole effect is one guarded block in finishSingleCardPlacement — the single chokepoint every Creature-Zone placement flows through (normal summon, drag, and the sim loader all route here): when an 'Aromeas' card lands in a creature-zone slot and hasn't been stamped yet, it reads the owner's active die via activeDieType(ownerNum) (reusing Time Bender's groundwork, so a Night-active player halves the Night die), sets HP = Math.ceil(dieTP / 2) into BOTH baseStrength and baseResistance (the single-HP model — Aromeas prints X/X/X), stamps card.aromeasSet so re-renders never recompute, and floats 'N HP (½ of M)'. Because the value is a stored stat like Chrona's split or Meridia's placement HP, 'fixed at entry' is inherent — nothing recomputes it, and it flows through calculateCurrentStrength, resolveCombat and the AI heuristic unchanged (combat needed zero edits). The one display edit: Aromeas prints X/X/X, so unlike other Creatures his computed HP has no printed number to fall back on — updateCreatureVisuals now force-shows his creature-stat-badge (aromeasFixed flag, same always-show path as a rescued Masiota) so the player can always read his stat, even when it happens to equal the base. Sim preset: active Day die pinned to 9 with Aromeas freshly in the zone. Verified live: badge read 5 (⌈9/2⌉, proving round-up over 4) with aromeasSet stamped, matching baseStrength/baseResistance both 5. No console errors. V1 note: the Computer summons Aromeas through the same placement path, so its HP is set identically." },
         { date: '2026-07-09', msg: "Masiota (Duality C4) — implemented (contextual), per Simon's ruling: whenever he would be DISCARDED from the Creature Zone — defeated as a blocker (outright or mutual destruction), spent after his own attack, or sacrificed — his owner may deactivate him in place instead (face down via the deactivation subsystem, damage cleared). Reactivating him, next turn at the earliest, costs 1 Health Point per rescue so far: printed 3 → back at 2 → back at 1; a rescue that would return him at 0 HP is not offered, so two rescues is his lifetime maximum. One shared gate, maybeMasiotaRescue(), is called at all four discard sites (resolveCombat's blocker-defeated + mutual-destruction branches, finishAttacker's after-attack cleanup — where it also disarms a waiting Clone Factory priming — and both sacrifice paths, Repo Station and Dark Matter). Judgment calls wired in: an attack that 'defeats' him still pays the attacker's Repo Station (the defeat happened; only the discard was dodged), but rescuing him from your OWN Repo Station sacrifice pays no Time Point (no sacrifice, no payout), and a Dark Matter sacrifice he dodges still counts as the opponent's one chosen cost. The 'next turn' lock rides a rescue stamp (totalTurns + seat), so a defender's mid-opponent-turn rescue correctly unlocks on their own next turn; same-turn unveiling alerts and refuses. Reactivation heals him fully at the reduced ceiling (baseStrength = baseResistance = printed − uses) with a permanent red badge showing the reduced value (his printed card still says 3), and reduced stats flow through all combat consumers automatically. V1: the Computer never rescues (it takes the discard). Sim preset (Masiota vs a blocking Razo — the 3/3 mirror forces mutual destruction). Verified live: mutual destruction offered 'reactivates next turn at 2 HP', accepting flipped him face down (uses 1) while Razo went to History; same-turn click refused; next turn he reactivated at 2/2 with the red '2' badge; attacking directly then struck for 2 (reduced Strength honored) and offered the second rescue at 1 HP (uses 2). The no-third-rescue gate is the arithmetic floor in maybeMasiotaRescue (3−3=0 → false), verified by code review. No console errors." },
         { date: '2026-07-09', msg: "Looper (Duality C3) — implemented (auto on attack), per Simon's rulings: declaring his attack first rolls a Futory Die (a single scaled-up die face reusing Entrophy's pip builder and ease-out spin — 1-6), and the result is his number of strikes, resolved CLONE FACTORY STYLE: Looper stays in his zone between strikes, the target is re-picked every time (each follow-up re-enters triggerAttack, so a fresh defense screen opens per strike), and he goes to History only after the last one. The defender may block EVERY strike separately — each strike is its own block-or-take decision against the blocker's live state, so a blocker that survived strike 1 with damage blocks strike 2 at its reduced value. 'Any additional effects only apply to the first attack' is enforced by a looperPlainStrike flag stamped on strikes 2+: calculateCurrentStrength returns plain printed Strength (no Cabin buff, no Smoke debuff — a Smoke played against strike 1 does NOT weaken later strikes, by code path), the PLAY ARTIFACT button is disabled (no Smoke/Reflector responses after strike 1), and the Hyperscope targeting step is skipped (later strikes are ordinary player attacks). Plumbing mirrors Clone Factory exactly: a finishAttacker branch keeps him in the zone while strikes remain, and maybeLooperNextStrike() rides the same close-of-overlay hook as maybeCloneSecondStrike. Counters reset in finishTurn and on sim-preset load. V1 notes: the Computer's Looper attacks once (its path calls beginAttack directly, skipping the roll), and a Reflector on strike 1 that kills the chain simply drops the remaining strikes at turn's end. Sim preset (Looper vs Ichor blocker + Smoke in the opponent's hand). Verified live with the die pinned to 3: roll overlay read '3 Attacks! — only the first carries additional effects'; strike 1 offered block + artifact and was repelled by Ichor with Looper staying in the zone; strike 2 auto-opened with PLAY ARTIFACT disabled but blocking still offered; strikes 2-3 landed as plain 'Direct Strike for 1 Damage!' (P2 Day 12→10); after strike 3 Looper moved to History and the overlay chain ended cleanly. No console errors." },
@@ -4298,6 +4308,15 @@ document.addEventListener('DOMContentLoaded', () => {
         const looperPlain = attackerCard.name === 'Looper' && looperFirstStrikeResolved;
         const attacker = looperPlain ? { ...attackerCard, looperPlainStrike: true } : attackerCard;
 
+        // Namandi (C7): before he attacks you may discard any number of Non-Steam cards from
+        // your Hand (Atlantica-parked cards count) to History; each gives +1 Strength for THIS
+        // attack only. The chooser reopens the attack via a boosted copy (namandiResolved), so
+        // the +Strength threads through the same pipeline as Meridius. The Computer skips it (V1).
+        if (attacker.name === 'Namandi' && !aiTurnInProgress && !attacker.namandiResolved) {
+            promptNamandiDiscard(attacker, attackerSlot);
+            return;
+        }
+
         // Hyperscope (L7): the attack gains a targeting step — any Player, Creature, or
         // Landmark, all resolved without a block choice (Simon's ruling). The Computer
         // keeps the plain attack flow for now (V1: it doesn't aim at cards).
@@ -4326,6 +4345,85 @@ document.addEventListener('DOMContentLoaded', () => {
             }
             overlay.classList.remove('hidden');
         }
+    }
+
+    // --- Namandi (Duality C7): discard Non-Steam cards for +Strength on this attack ---
+    // Tentative multi-select: eligible hand/parked cards pulse red; clicking toggles a gold
+    // selection; the running Strength updates live. ATTACK spends the selected cards to History
+    // (each +1 Strength) and resumes the attack with the boosted copy; CANCEL aborts the whole
+    // attack with nothing discarded. If nothing is eligible, we skip straight to the attack.
+    function promptNamandiDiscard(attacker, attackerSlot) {
+        const board = document.getElementById(`player-${currentPlayer}`);
+        const baseStr = parseInt(attacker.baseStrength ?? attacker.baseHealth) || 0;
+        const eligible = Array.from(board.querySelectorAll('.hand-slot:not(.slot-empty), .atlantica-slot:not(.slot-empty)'))
+            .filter(s => {
+                try { return JSON.parse(s.dataset.cardData).type !== 'Steam'; } catch (e) { return false; }
+            });
+
+        const resume = (bonus) => {
+            if (bonus > 0) floatValue(attackerSlot, `+${bonus} Strength`, 'gain');
+            triggerAttack({ ...attacker, baseStrength: baseStr + bonus, namandiResolved: true }, attackerSlot);
+        };
+
+        if (!eligible.length) { resume(0); return; }
+
+        const selected = new Set();
+
+        const bar = document.createElement('div');
+        bar.id = 'namandi-bar';
+        bar.style.cssText = 'position:fixed;bottom:40px;left:50%;transform:translateX(-50%);display:flex;gap:10px;z-index:6000;align-items:center;';
+        const hint = document.createElement('div');
+        hint.className = 'menu-btn tech-font';
+        hint.style.cssText = 'pointer-events:none;opacity:0.9;';
+        const updateHint = () => { hint.textContent = `DISCARD NON-STEAM FOR +1 STRENGTH · Strength ${baseStr + selected.size}`; };
+        updateHint();
+        bar.appendChild(hint);
+        const attackBtn = document.createElement('button');
+        attackBtn.className = 'menu-btn';
+        attackBtn.textContent = 'ATTACK';
+        bar.appendChild(attackBtn);
+        const cancelBtn = document.createElement('button');
+        cancelBtn.className = 'menu-btn secondary-btn';
+        cancelBtn.textContent = 'CANCEL';
+        bar.appendChild(cancelBtn);
+        document.body.appendChild(bar);
+
+        const cleanup = () => {
+            eligible.forEach(s => {
+                s.classList.remove('threat-target', 'namandi-selected');
+                if (s._namandiHandler) s.removeEventListener('click', s._namandiHandler, true);
+                delete s._namandiHandler;
+            });
+            bar.remove();
+        };
+
+        cancelBtn.onclick = cleanup; // abort the attack; nothing discarded
+
+        attackBtn.onclick = () => {
+            const historyEl = board.querySelector('.history-pile');
+            selected.forEach(s => {
+                let data; try { data = JSON.parse(s.dataset.cardData); } catch (e) { return; }
+                clearSlot(s);
+                finishSingleCardPlacement(historyEl, data);
+            });
+            const bonus = selected.size;
+            cleanup();
+            if (bonus > 0) updateHandLayout(currentPlayer);
+            resume(bonus);
+        };
+
+        eligible.forEach(s => {
+            s.classList.add('threat-target');
+            const handler = (e) => {
+                e.stopPropagation();
+                e.preventDefault();
+                if (selected.has(s)) { selected.delete(s); s.classList.remove('namandi-selected'); }
+                else { selected.add(s); s.classList.add('namandi-selected'); }
+                updateHint();
+            };
+            s._namandiHandler = handler;
+            s.addEventListener('click', handler, true); // capture: preempt the normal grab
+        });
     }
 
     // --- Looper (Duality C3): attack multiple times by rolling a Futory Die ---
