@@ -285,7 +285,7 @@ document.addEventListener('DOMContentLoaded', () => {
         };
     }
 
-    const implementedCards = ["Pandorama", "Fountain of Youth", "Laser Catalyst", "Dragura's Wasteland", "Planetarium", "Lethargo's Temple", "Clone Factory", "Aetherlab", "Entrophy", "Meridius", "Meridia", "Time Thief", "Ichor", "Vulcanem", "Cravus", "Rampadon", "Smoke", "Dark Matter", "Reflector", "Talisman", "Reversal", "Faith", "Threat", "Confiscation", "Gravitas", "Time Bender", "Meridia's Cabin", "Repo Station", "Hand of Rhone", "Atlantica", "Hyperscope", "Mines of Pyralos", "Chrona", "Razo", "Looper", "Masiota", "Aromeas", "General Wave", "Namandi", "Sea Lord", "Sleep Potion", "Lotus", "Rush", "Cell Shield", "Alchemy", "Tame Beast"];
+    const implementedCards = ["Pandorama", "Fountain of Youth", "Laser Catalyst", "Dragura's Wasteland", "Planetarium", "Lethargo's Temple", "Clone Factory", "Aetherlab", "Entrophy", "Meridius", "Meridia", "Time Thief", "Ichor", "Vulcanem", "Cravus", "Rampadon", "Smoke", "Dark Matter", "Reflector", "Talisman", "Reversal", "Faith", "Threat", "Confiscation", "Gravitas", "Time Bender", "Meridia's Cabin", "Repo Station", "Hand of Rhone", "Atlantica", "Hyperscope", "Mines of Pyralos", "Chrona", "Razo", "Looper", "Masiota", "Aromeas", "General Wave", "Namandi", "Sea Lord", "Sleep Potion", "Lotus", "Rush", "Cell Shield", "Alchemy", "Tame Beast", "Tele Control"];
 
     // --- Intent Classification ---
     // auto: fires on its own when condition is met
@@ -338,6 +338,7 @@ document.addEventListener('DOMContentLoaded', () => {
         'Cell Shield': 'active',
         'Alchemy': 'active',
         'Tame Beast': 'active',
+        'Tele Control': 'active',
     };
 
     // --- Simulation Presets ---
@@ -483,6 +484,13 @@ document.addEventListener('DOMContentLoaded', () => {
             p1creatures: [{ name: 'Ichor', damageTaken: 0 }],
             p2creatures: [{ name: 'Sea Lord', damageTaken: 0 }],
         },
+        'Tele Control': {
+            phase: 1,
+            desc: "Tele Control (F+G+L) in Bazaar S3 (Duality set active — buy it there). Player 1 has an Ichor, Player 2 a Sea Lord (Str 6), both active. Pick either Creature, then a target Player: commandeer P2's Sea Lord and aim it at Player 2 to smash them for 6 with their own Creature — and it stays in P2's zone (not discarded).",
+            hand: ['FireSteam', 'GoldSteam', 'LaserSteam'],
+            p1creatures: [{ name: 'Ichor', damageTaken: 0 }],
+            p2creatures: [{ name: 'Sea Lord', damageTaken: 0 }],
+        },
         'Confiscation': {
             phase: 1,
             desc: "Confiscation (G+G+L+L) in Bazaar S4 (buy it there to test). Player 2 has 3 cards — look at hand, take one.",
@@ -621,6 +629,7 @@ document.addEventListener('DOMContentLoaded', () => {
     };
 
     const devLogData = [
+        { date: '2026-07-10', msg: "Tele Control (Duality S3) — implemented (active): 'Use an active Creature to attack a Player of your choice. The controlled Creature is not discarded.' Registered in sparkEffects (buy-and-play path). resolveTeleControl() gathers every ACTIVE Creature on BOTH boards — face-up and able to act, using the same canAct rule the attack flow/AI use (summonedOnTurn < totalTurns, or Cravus/Rampadon), so an opponent's Creature always qualifies on your turn — the whole point of the card is to commandeer their Creature and turn it on them. With one it auto-advances; with several it pulses each red behind a 'TELE CONTROL — CHOOSE A CREATURE TO COMMAND' bar (capture-click, no CANCEL — a Spark is committed). chooseTeleControlTarget() then offers EVERY seat as the strike target ('a Player of your choice' is literal, self included). launchTeleControlAttack() runs the strike through the NORMAL pipeline — beginAttack (Entrophy/Meridius scaling intact) → defense screen, so the target can still block and respond with Artifacts — tagged { ...card, teleControlled:true }. Two engine hooks make it correct: (1) finishAttacker short-circuits at the top when teleControlled && !defeated — the Creature stays in its owner's zone instead of being spent to History (only a genuine mutual-destruction defeat, which really hit 0 HP, still discards it — JUDGMENT CALL); (2) initiateDefense now filters the attacker slot out of the blocker list (a Creature can never block itself — matters when you aim a commandeered Creature back at its own owner, who might otherwise be offered it as a blocker; a harmless no-op in normal cross-board combat). Sim preset (Duality active; P1 Ichor, P2 Sea Lord Str 6, both active). Verified live BOTH directions: buying Tele Control from S3 spent FGL, sent it to the Abyss and pulsed both creatures; commandeering P2's OWN Sea Lord and aiming it at Player 2 struck for 6 (P2 Day 12→6, block disabled since its only Creature was the attacker), and the Sea Lord STAYED in P2's zone with P2's History empty; a re-run commandeering your own Ichor vs P2 left P2 able to block with Sea Lord, resolved a direct strike for 2, and the Ichor stayed in P1's zone (History held only the FGL payment, no Ichor). No console errors. V1: the Computer doesn't buy Sparks, so it never casts Tele Control (its Creatures are valid targets). NOTE FOR SIMON: 'not discarded' is read as surviving the normal after-attack spend; a controlled Creature that dies in mutual destruction still goes to History. Tell me if it should be immune to that too." },
         { date: '2026-07-10', msg: "Tame Beast (Duality S2) — implemented (active): 'Reduce the Health Points of any Creature in play to 1 and gain the deduced Time Points.' Registered in sparkEffects, so it rides the buy-and-play Spark path (click Bazaar tile → pay GGG → resolve → Abyss). resolveTameBeast() gathers every FACE-UP Creature in either Creature Zone (face-down ones are excluded — their stats are a mystery, same rule as Hyperscope aiming); with one it auto-applies, with several it pulses each with the red threat-target glow behind a docked 'TAME BEAST — CHOOSE ANY CREATURE' bar and a capture-click picks (the Sleep Potion / Repo Station picker pattern; no CANCEL — a Spark is committed once bought, like Threat). applyTameBeast() reads the Creature's current effective HP — base (baseResistance ?? baseHealth) + Cabin/Meridia buffs − damage already taken — and JUDGMENT CALL applies the reduction AS DAMAGE (card.damageTaken += HP−1): the engine's single-HP model, so it drops attack Strength and block Resistance together, the stat badge repaints to 1 via updateCreatureVisuals, and (like any damage) a Fountain-of-Youth heal could restore it. The caster then gains TP equal to the HP removed (oldHP − 1) through gainTimePoints (respects the 12 cap and the active die). Cross-board by design — you may tame your OWN Creature too (e.g. to cash a big body for TP). Sim preset (Duality active; P1 Ichor 2 HP, P2 Sea Lord 6 HP, P1 Day pinned to 6). Verified live both targets: buying Tame Beast from S2 spent GGG, sent it to the Abyss and pulsed BOTH creatures behind the bar; taming P2's Sea Lord set its damageTaken 0→5, badge → 1, and P1's Day die 6→11 (+5 TP); a re-run taming your own Ichor set damageTaken 1, badge → 1, Day 6→7 (+1 TP) with the Sea Lord untouched. No console errors. V1: the Computer doesn't buy Sparks, so it never casts Tame Beast (its Creatures are valid targets). NOTE FOR SIMON: 'reduce to 1' is modeled as damage (healable) rather than a hard stat rewrite — tell me if a tamed Creature should stay at 1 HP permanently even through a heal." },
         { date: '2026-07-10', msg: "Alchemy (Duality S1) — implemented (active), the first Duality Spark: 'A Player of your choice has to discard all Cards from their Landmark Zone.' Registered in the sparkEffects table next to Reversal/Faith/Threat/Confiscation, so it rides the existing buy-and-play-a-Spark path (click its Bazaar tile → pay cost → resolveSparkEffect → Abyss) with zero new plumbing. resolveAlchemy() differs from Confiscation/Dark Matter in one deliberate way: 'a Player of YOUR CHOICE' INCLUDES yourself, so the picker (same landmark-choice-overlay styling as Reversal's) offers EVERY seat — 'Player 1 (You) — N Landmarks' and 'Player 2 — N Landmarks' — with a live count, letting you torch your own Landmarks on purpose or pick a player who owns none (a legal, empty choice); it always asks rather than auto-resolving. discardAllLandmarks(owner) then sends every occupied Landmark-Zone card to that owner's OWN History Pile — JUDGMENT CALL on 'discard': the game's discard destination is History (Threat's explicit 'to the Abyss' is the exception, not the rule), so, exactly like a Hyperscope-destroyed Landmark, each discarded Landmark cycles and rebuilds itself on a later draw — Alchemy is a tempo swing, not permanent removal. Because it routes through the shared clearSlot chokepoint, Atlantica parked cards and Hand of Rhone charges tear down with their Landmark automatically; Atlantica 'cannot be deactivated' but IS discardable, so it goes too. V1: the Computer doesn't buy Sparks, so it never casts Alchemy (but is a valid target). Sim preset (P1: Fountain of Youth; P2: Pandorama + Clone Factory; hand F+G+G+G to buy from Bazaar S1 — Duality set active). Verified live both target paths: buying Alchemy spent FGGG, sent it to the Abyss and opened the picker reading exactly '1 Landmark' / '2 Landmarks'; picking Player 2 discarded BOTH Pandorama and Clone Factory to P2's History and emptied their Landmark Zone with P1's Fountain untouched; a re-run picking Player 1 (You) discarded Fountain of Youth to P1's own History with P2 untouched. No console errors. NOTE FOR SIMON: I read 'discard' as → History (cards cycle back on a later draw). Tell me if Alchemy should instead send Landmarks to the Abyss (permanent removal, like Threat)." },
         { date: '2026-07-09', msg: "Cell Shield (Duality A4) — implemented (active), completing all FOUR Duality Artifacts (I had miscounted A1-A3 and missed this one). 'When you're being attacked: Prevent all Time Points that you would lose from an attack and draw Cards equal to that amount.' It's a defensive response, so it rides the existing PLAY ARTIFACT step of the defense screen next to Smoke/Reflector/Talisman (any Artifact in the defender's hand already surfaces there — no new UI). Selecting it in the artifact-CONFIRM loop arms one module flag, cellShieldDefender = defenderNum; the effect then resolves at damage time via maybeCellShield(amount, defenderNum), guarded into all three attack→player damage sites (unblocked direct strike in resolveDamageDirect, blocked spillover in resolveCombat, and the no-blocker fallback in resolveBlock): when armed for that defender it prevents the hit entirely (the caller skips resolveDamageDirectly) and instead draws that many Cards. JUDGMENT CALL: 'Time Points you would lose' is capped at the Time Points you actually hold — Math.min(damage, totalTimePoints) — so a lethal-looking overkill only draws up to your remaining TP; tell me if you'd rather draw the raw attack amount. The flag is one-attack-only (cleared on use, in finishAttacker's terminal path so a repelled attack can't leak it, and in the per-turn reset). Because Cell Shield fully prevents, blocking is optional — playing it and taking the hit draws the full Strength. V1: the Computer doesn't play defensive Artifacts, so it never uses Cell Shield (it remains a valid target of nothing — it's the human's tool); Time Thief still gains his TP since the damage was 'dealt' before being prevented (Meridia precedent). Sim preset (Ichor Str 2 from P1, Cell Shield in P2's hand). Verified live hot-seat: P2 opened PLAY ARTIFACT, played Cell Shield (→ P2 History), took the strike, and the feedback read 'Cell Shield! 2 Time Points prevented — draw 2' — P2's Day stayed 12 (nothing lost), P2's Future dropped 5→3 as it drew FireSteam + Ichor into hand, and Ichor spent to P1's History as normal. No console errors." },
@@ -3064,6 +3073,14 @@ document.addEventListener('DOMContentLoaded', () => {
     // Move a spent attacker to History after its strike — unless Clone Factory is primed for a
     // first strike, in which case the creature stays in its zone to strike a second time.
     function finishAttacker(attackerSlot, attacker, attackerHistory, defeated = false) {
+        // Tele Control (Duality S3): a commandeered Creature that SURVIVES its strike is not
+        // discarded — it stays in its owner's zone (the card overrides the normal "attacked → to
+        // History" spend). Only a genuine defeat (mutual destruction, defeated=true) still sends
+        // it to History, since it actually hit 0 HP.
+        if (attacker.teleControlled && !defeated) {
+            if (cloneFactoryArmed) disarmCloneFactory();
+            return;
+        }
         // Looper: stays in his zone until the rolled strikes are used up; History after the last.
         if (attacker.name === 'Looper' && looperStrikesRemaining > 1) {
             looperStrikesRemaining--;
@@ -3514,6 +3531,7 @@ document.addEventListener('DOMContentLoaded', () => {
         'Confiscation': (pNum) => resolveConfiscation(pNum),
         'Alchemy': (pNum) => resolveAlchemy(pNum),
         'Tame Beast': (pNum) => resolveTameBeast(pNum),
+        'Tele Control': (pNum) => resolveTeleControl(pNum),
     };
 
     function resolveSparkEffect(pNum, card) {
@@ -3827,6 +3845,98 @@ document.addEventListener('DOMContentLoaded', () => {
             const board = document.getElementById(`player-${casterPNum}`);
             if (board) floatValue(board.querySelector(activeDieSel(casterPNum)), `+${removed} TP`, 'gain');
         }
+    }
+
+    // Tele Control: Use an active Creature to attack a Player of your choice. The controlled
+    // Creature is NOT discarded — it overrides the normal "attacked → to History" spend and stays
+    // in its owner's zone. You may commandeer EITHER board's Creature; the point of the card is to
+    // turn an opponent's Creature against them. "Active" = face-up and able to act (past summoning
+    // sickness; Cravus/Rampadon count the turn they arrive) — the same canAct rule the attack flow
+    // and the AI use.
+    function teleControlTargets() {
+        const found = [];
+        for (let p = 1; p <= activePlayerCount; p++) {
+            const board = document.getElementById(`player-${p}`);
+            if (!board) continue;
+            board.querySelectorAll('.creature-zone-main .card:not(.slot-empty)').forEach(slot => {
+                let c; try { c = JSON.parse(slot.dataset.cardData); } catch (e) { return; }
+                if (Array.isArray(c) || c.type !== 'Creature' || c.deactivated) return;
+                const canAct = (c.summonedOnTurn < totalTurns) || c.name.includes('Cravus') || c.name.includes('Rampadon');
+                if (!canAct) return;
+                found.push({ slot, owner: p });
+            });
+        }
+        return found;
+    }
+
+    function resolveTeleControl(casterPNum) {
+        const targets = teleControlTargets();
+        if (targets.length === 0) return; // no active Creature anywhere — the Spark fizzles
+        if (targets.length === 1) { chooseTeleControlTarget(targets[0].slot, casterPNum); return; }
+
+        // 2+ active Creatures — pulse each (red threat-target glow) behind a docked hint and let
+        // the caster click which one to command. No CANCEL: a Spark is committed once bought.
+        const bar = document.createElement('div');
+        bar.id = 'tele-control-bar';
+        bar.style.cssText = 'position:fixed;bottom:40px;left:50%;transform:translateX(-50%);display:flex;gap:10px;z-index:6000;';
+        const hint = document.createElement('div');
+        hint.className = 'menu-btn tech-font';
+        hint.style.cssText = 'pointer-events:none;opacity:0.85;';
+        hint.textContent = 'TELE CONTROL — CHOOSE A CREATURE TO COMMAND';
+        bar.appendChild(hint);
+        document.body.appendChild(bar);
+
+        const cleanup = () => {
+            targets.forEach(t => {
+                t.slot.classList.remove('threat-target');
+                if (t.slot._teleHandler) t.slot.removeEventListener('click', t.slot._teleHandler, true);
+                delete t.slot._teleHandler;
+            });
+            bar.remove();
+        };
+        targets.forEach(t => {
+            t.slot.classList.add('threat-target');
+            const handler = (e) => {
+                e.stopPropagation();
+                e.preventDefault();
+                cleanup();
+                chooseTeleControlTarget(t.slot, casterPNum);
+            };
+            t.slot._teleHandler = handler;
+            t.slot.addEventListener('click', handler, true); // capture: preempt the normal creature click
+        });
+    }
+
+    // Pick which Player the commandeered Creature strikes. "A Player of your choice" is literal —
+    // every seat is offered (you may even aim it at yourself), so a controlled opponent Creature
+    // can be turned on its own owner.
+    function chooseTeleControlTarget(creatureSlot, casterPNum) {
+        const overlay = document.createElement('div');
+        overlay.className = 'overlay landmark-choice-overlay';
+        const panel = document.createElement('div');
+        panel.className = 'glass-panel landmark-choice-panel';
+        const title = document.createElement('div');
+        title.className = 'fantasy-font glowing-text landmark-choice-title';
+        title.textContent = 'Tele Control — Attack Which Player?';
+        panel.appendChild(title);
+        for (let p = 1; p <= activePlayerCount; p++) {
+            const btn = document.createElement('button');
+            btn.className = 'menu-btn tech-font';
+            btn.textContent = `Player ${p}${p === casterPNum ? ' (You)' : ''}`;
+            const target = p;
+            btn.onclick = () => { overlay.remove(); launchTeleControlAttack(creatureSlot, target); };
+            panel.appendChild(btn);
+        }
+        overlay.appendChild(panel);
+        document.body.appendChild(overlay);
+    }
+
+    // Run the commandeered strike through the normal attack pipeline (beginAttack → Entrophy /
+    // Meridius scaling → defense screen), tagged teleControlled so finishAttacker keeps the
+    // Creature in its zone afterward instead of discarding it.
+    function launchTeleControlAttack(creatureSlot, targetPNum) {
+        let card; try { card = JSON.parse(creatureSlot.dataset.cardData); } catch (e) { return; }
+        beginAttack({ ...card, teleControlled: true }, creatureSlot, targetPNum);
     }
 
     // Confiscation: Look at target Opponent's Hand and take one Card to your Hand.
@@ -5732,7 +5842,10 @@ document.addEventListener('DOMContentLoaded', () => {
 
         decorateCombatScreen(attacker, attackerSlot, defenderNum);
 
-        const availableCreatures = Array.from(defenderBoard.querySelectorAll('.creature-zone-main .card:not(.slot-empty)'));
+        // A Creature can never block itself — matters for Tele Control, where the attacker may be
+        // one of the defender's own Creatures (commandeered and aimed back at its owner).
+        const availableCreatures = Array.from(defenderBoard.querySelectorAll('.creature-zone-main .card:not(.slot-empty)'))
+            .filter(s => s !== attackerSlot);
         const artifactsInHand = Array.from(defenderBoard.querySelectorAll('.hand-slot:not(.slot-empty)')).filter(s => {
             const dataStr = s.dataset.cardData;
             if (!dataStr) return false;
