@@ -285,7 +285,7 @@ document.addEventListener('DOMContentLoaded', () => {
         };
     }
 
-    const implementedCards = ["Pandorama", "Fountain of Youth", "Laser Catalyst", "Dragura's Wasteland", "Planetarium", "Lethargo's Temple", "Clone Factory", "Aetherlab", "Entrophy", "Meridius", "Meridia", "Time Thief", "Ichor", "Vulcanem", "Cravus", "Rampadon", "Smoke", "Dark Matter", "Reflector", "Talisman", "Reversal", "Faith", "Threat", "Confiscation", "Gravitas", "Time Bender", "Meridia's Cabin", "Repo Station", "Hand of Rhone", "Atlantica", "Hyperscope", "Mines of Pyralos", "Chrona", "Razo", "Looper", "Masiota", "Aromeas", "General Wave", "Namandi", "Sea Lord", "Sleep Potion", "Lotus", "Rush", "Cell Shield"];
+    const implementedCards = ["Pandorama", "Fountain of Youth", "Laser Catalyst", "Dragura's Wasteland", "Planetarium", "Lethargo's Temple", "Clone Factory", "Aetherlab", "Entrophy", "Meridius", "Meridia", "Time Thief", "Ichor", "Vulcanem", "Cravus", "Rampadon", "Smoke", "Dark Matter", "Reflector", "Talisman", "Reversal", "Faith", "Threat", "Confiscation", "Gravitas", "Time Bender", "Meridia's Cabin", "Repo Station", "Hand of Rhone", "Atlantica", "Hyperscope", "Mines of Pyralos", "Chrona", "Razo", "Looper", "Masiota", "Aromeas", "General Wave", "Namandi", "Sea Lord", "Sleep Potion", "Lotus", "Rush", "Cell Shield", "Alchemy"];
 
     // --- Intent Classification ---
     // auto: fires on its own when condition is met
@@ -336,6 +336,7 @@ document.addEventListener('DOMContentLoaded', () => {
         'Lotus': 'active',
         'Rush': 'active',
         'Cell Shield': 'active',
+        'Alchemy': 'active',
     };
 
     // --- Simulation Presets ---
@@ -463,6 +464,13 @@ document.addEventListener('DOMContentLoaded', () => {
             phase: 1,
             desc: "Threat (F+G+L) in Bazaar S3 (buy it there to test). Player 1 has 1 Landmark, Player 2 has 2 — pick either board's Landmark, including your own.",
             hand: ['FireSteam', 'GoldSteam', 'LaserSteam'],
+            landmarks: ['Fountain of Youth'],
+            p2landmarks: ['Pandorama', 'Clone Factory'],
+        },
+        'Alchemy': {
+            phase: 1,
+            desc: "Alchemy (F+G+G+G) in Bazaar S1 (buy it there to test). Player 1 has 1 Landmark, Player 2 has 2 — pick either player to discard ALL their Landmarks to their History (they cycle back on a later draw).",
+            hand: ['FireSteam', 'GoldSteam', 'GoldSteam', 'GoldSteam'],
             landmarks: ['Fountain of Youth'],
             p2landmarks: ['Pandorama', 'Clone Factory'],
         },
@@ -604,6 +612,7 @@ document.addEventListener('DOMContentLoaded', () => {
     };
 
     const devLogData = [
+        { date: '2026-07-10', msg: "Alchemy (Duality S1) — implemented (active), the first Duality Spark: 'A Player of your choice has to discard all Cards from their Landmark Zone.' Registered in the sparkEffects table next to Reversal/Faith/Threat/Confiscation, so it rides the existing buy-and-play-a-Spark path (click its Bazaar tile → pay cost → resolveSparkEffect → Abyss) with zero new plumbing. resolveAlchemy() differs from Confiscation/Dark Matter in one deliberate way: 'a Player of YOUR CHOICE' INCLUDES yourself, so the picker (same landmark-choice-overlay styling as Reversal's) offers EVERY seat — 'Player 1 (You) — N Landmarks' and 'Player 2 — N Landmarks' — with a live count, letting you torch your own Landmarks on purpose or pick a player who owns none (a legal, empty choice); it always asks rather than auto-resolving. discardAllLandmarks(owner) then sends every occupied Landmark-Zone card to that owner's OWN History Pile — JUDGMENT CALL on 'discard': the game's discard destination is History (Threat's explicit 'to the Abyss' is the exception, not the rule), so, exactly like a Hyperscope-destroyed Landmark, each discarded Landmark cycles and rebuilds itself on a later draw — Alchemy is a tempo swing, not permanent removal. Because it routes through the shared clearSlot chokepoint, Atlantica parked cards and Hand of Rhone charges tear down with their Landmark automatically; Atlantica 'cannot be deactivated' but IS discardable, so it goes too. V1: the Computer doesn't buy Sparks, so it never casts Alchemy (but is a valid target). Sim preset (P1: Fountain of Youth; P2: Pandorama + Clone Factory; hand F+G+G+G to buy from Bazaar S1 — Duality set active). Verified live both target paths: buying Alchemy spent FGGG, sent it to the Abyss and opened the picker reading exactly '1 Landmark' / '2 Landmarks'; picking Player 2 discarded BOTH Pandorama and Clone Factory to P2's History and emptied their Landmark Zone with P1's Fountain untouched; a re-run picking Player 1 (You) discarded Fountain of Youth to P1's own History with P2 untouched. No console errors. NOTE FOR SIMON: I read 'discard' as → History (cards cycle back on a later draw). Tell me if Alchemy should instead send Landmarks to the Abyss (permanent removal, like Threat)." },
         { date: '2026-07-09', msg: "Cell Shield (Duality A4) — implemented (active), completing all FOUR Duality Artifacts (I had miscounted A1-A3 and missed this one). 'When you're being attacked: Prevent all Time Points that you would lose from an attack and draw Cards equal to that amount.' It's a defensive response, so it rides the existing PLAY ARTIFACT step of the defense screen next to Smoke/Reflector/Talisman (any Artifact in the defender's hand already surfaces there — no new UI). Selecting it in the artifact-CONFIRM loop arms one module flag, cellShieldDefender = defenderNum; the effect then resolves at damage time via maybeCellShield(amount, defenderNum), guarded into all three attack→player damage sites (unblocked direct strike in resolveDamageDirect, blocked spillover in resolveCombat, and the no-blocker fallback in resolveBlock): when armed for that defender it prevents the hit entirely (the caller skips resolveDamageDirectly) and instead draws that many Cards. JUDGMENT CALL: 'Time Points you would lose' is capped at the Time Points you actually hold — Math.min(damage, totalTimePoints) — so a lethal-looking overkill only draws up to your remaining TP; tell me if you'd rather draw the raw attack amount. The flag is one-attack-only (cleared on use, in finishAttacker's terminal path so a repelled attack can't leak it, and in the per-turn reset). Because Cell Shield fully prevents, blocking is optional — playing it and taking the hit draws the full Strength. V1: the Computer doesn't play defensive Artifacts, so it never uses Cell Shield (it remains a valid target of nothing — it's the human's tool); Time Thief still gains his TP since the damage was 'dealt' before being prevented (Meridia precedent). Sim preset (Ichor Str 2 from P1, Cell Shield in P2's hand). Verified live hot-seat: P2 opened PLAY ARTIFACT, played Cell Shield (→ P2 History), took the strike, and the feedback read 'Cell Shield! 2 Time Points prevented — draw 2' — P2's Day stayed 12 (nothing lost), P2's Future dropped 5→3 as it drew FireSteam + Ichor into hand, and Ichor spent to P1's History as normal. No console errors." },
         { date: '2026-07-09', msg: "Rush (Duality A3) — implemented (active): 'In your Creature Phase: Make a Creature attack instantly.' Played from hand (a name branch in the hand-click dispatcher, gated to phase 2). triggerRush() collects your face-up zone Creatures; with one it applies automatically, with several it pulses them (red threat-target) behind a docked CHOOSE A CREATURE / CANCEL bar (the Repo Station / Sleep Potion picker pattern, capture-click to preempt the normal attack click). Applying spends Rush to your History (Artifacts return to History after use) and calls rushCreature(): it stamps the chosen Creature's summonedOnTurn to 0 so the summoning-sickness gate is bypassed for the rest of the turn (a cancelled attack can still be retried by clicking the Creature), then opens the standard ATTACK menu via showAttackMenu — so the whole existing attack pipeline (Entrophy/Looper/Namandi/Hyperscope, targeting, defense) runs unchanged. CANCEL leaves Rush in hand; no Creature in play alerts and spends nothing. V1: the Computer doesn't buy Artifacts, so it never plays Rush. Sim preset (Creature Phase: a just-summoned, summoning-sick Ichor + Rush in hand). Verified live: clicking Ichor first alerted 'Summoning sickness!'; playing Rush auto-applied (one Creature), stamped Ichor summonedOnTurn 0, sent Rush to History and opened the ATTACK menu; ATTACK then struck P2 directly for 2 (Day 12→10) and Ichor moved to History (History = Rush, Ichor). No console errors." },
         { date: '2026-07-09', msg: "Lotus (Duality A2) — implemented (active), per Simon's placement rulings. This also formalized the Creature-Zone geometry: the MIDDLE slot (index 2) is the only default Creature field, and Creatures are now CLICK-SUMMONED (click one in your Creature Phase → it lands in the middle) rather than dragged — the drag highlight for Creatures is likewise narrowed to the middle slot. Lotus is played by clicking it in your Construction Phase: placeLotusPad() lays it as a face-up Artifact pad in the first open slot in Simon's order [1,3,0,4] (left-adjacent, right-adjacent, outer-left, outer-right). An unoccupied pad already counts as an Artifact-in-zone for Meridia's Cabin (cabinBonus was pre-wired for exactly this). Summoning onto a pad: when the middle is taken, summonCreatureToZone() seats the additional Creature ON the first open Lotus pad, stacking it as a full Creature (baseStrength/badges/attack/block all normal — Simon: 'a fully functional second attacker AND blocker') with the Lotus riding along on card.lotusPad and a 🪷 corner marker. Fate-binding rides two hooks: the History write inside finishSingleCardPlacement discharges the Lotus alongside the Creature whenever a lotus-borne Creature is removed to History (covers Repo Station / Dark Matter sacrifice and every combat defeat in one chokepoint — the Creature and its Lotus both land in the owner's History, marker stripped so a redraw is clean); and finishAttacker special-cases the spent-after-attack path — JUDGMENT CALL per the literal card text ('when the Creature is defeated or sacrificed'): a Creature that merely ATTACKS and is spent leaves its Lotus pad BEHIND (empty, reusable next turn), so finishAttacker re-seats the pad and strips the marker, while a mutually-destroyed attacker (new attackerDefeated flag from resolveCombat) keeps the rider so the Lotus discharges. A creature-stat init guard (type === 'Creature') keeps a Lotus laid in the zone from picking up combat stats. V1: the Computer doesn't buy Artifacts, so it neither plays Lotus nor summons onto one. Sim preset (Construction Phase: Lotus + two Cravus in hand, Repo Station in play). Verified live all four paths: clicking Lotus laid a pad in slot 1 (Artifact, no stat pollution); advancing to the Creature Phase, clicking the first Cravus summoned it to the middle and the second seated on the pad with the 🪷 marker (onLotus, baseStrength 2); Repo-Station-sacrificing the Lotus Cravus sent BOTH Cravus and Lotus to History with the pad cleared; and in a re-run, ATTACKING with the Lotus Cravus struck P2 for 2 (Day 12→10), sent only the Cravus to History (no rider), and LEFT the empty Lotus pad in slot 1. No console errors. NOTE FOR SIMON: I read 'defeated or sacrificed' literally, so Lotus survives a plain attack and is reusable — tell me if instead the Lotus should discard whenever its Creature leaves the zone for any reason (including after attacking)." },
@@ -3493,6 +3502,7 @@ document.addEventListener('DOMContentLoaded', () => {
         'Faith': (pNum) => resolveFaith(pNum),
         'Threat': (pNum) => resolveThreat(pNum),
         'Confiscation': (pNum) => resolveConfiscation(pNum),
+        'Alchemy': (pNum) => resolveAlchemy(pNum),
     };
 
     function resolveSparkEffect(pNum, card) {
@@ -3676,6 +3686,53 @@ document.addEventListener('DOMContentLoaded', () => {
         if (vsComputer && owner === AI_PLAYER) {
             aiHandleThreat({ overlay, btnPay, btnDecline, canPay, cost, cardName: cardData.name });
         }
+    }
+
+    // Alchemy: A Player of your choice has to discard all Cards from their Landmark Zone.
+    // "A Player of your choice" INCLUDES yourself, so the picker offers every seat (unlike
+    // Confiscation/Dark Matter, which target opponents only) — you may torch your own Landmarks
+    // on purpose, or pick a player who owns none (a legal, empty choice). Always ask.
+    function resolveAlchemy(casterPNum) {
+        const overlay = document.createElement('div');
+        overlay.className = 'overlay landmark-choice-overlay';
+        const panel = document.createElement('div');
+        panel.className = 'glass-panel landmark-choice-panel';
+        const title = document.createElement('div');
+        title.className = 'fantasy-font glowing-text landmark-choice-title';
+        title.textContent = 'Alchemy — Which Player Discards Their Landmarks?';
+        panel.appendChild(title);
+
+        for (let p = 1; p <= activePlayerCount; p++) {
+            const count = countLandmarks(p);
+            const btn = document.createElement('button');
+            btn.className = 'menu-btn tech-font';
+            const selfTag = p === casterPNum ? ' (You)' : '';
+            btn.textContent = `Player ${p}${selfTag} — ${count} Landmark${count === 1 ? '' : 's'}`;
+            const pNum = p;
+            btn.onclick = () => { overlay.remove(); discardAllLandmarks(pNum); };
+            panel.appendChild(btn);
+        }
+        overlay.appendChild(panel);
+        document.body.appendChild(overlay);
+    }
+
+    // Discard every Landmark in a player's Landmark Zone to their OWN History Pile. Alchemy says
+    // "discard" (not Threat's explicit "to the Abyss"), and in this engine a discarded Landmark
+    // routes to History — so, exactly like a Hyperscope-destroyed Landmark, each one cycles and
+    // rebuilds itself on a later draw (a tempo hit, not permanent removal). clearSlot is the
+    // shared teardown chokepoint, so Atlantica parked cards and Hand of Rhone charges clean up
+    // with their Landmark. Atlantica "cannot be deactivated" but IS discardable, so it goes too.
+    function discardAllLandmarks(ownerNum) {
+        const board = document.getElementById(`player-${ownerNum}`);
+        if (!board) return;
+        const ownerHistory = board.querySelector('.history-pile');
+        const slots = Array.from(board.querySelectorAll('.landmark-zone-main .card:not(.slot-empty)'));
+        slots.forEach(slot => {
+            let card; try { card = JSON.parse(slot.dataset.cardData); } catch (e) { return; }
+            floatValue(slot, `${card.name} Discarded`, 'damage');
+            clearSlot(slot);
+            finishSingleCardPlacement(ownerHistory, card);
+        });
     }
 
     // Confiscation: Look at target Opponent's Hand and take one Card to your Hand.
