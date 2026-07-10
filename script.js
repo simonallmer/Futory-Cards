@@ -285,7 +285,7 @@ document.addEventListener('DOMContentLoaded', () => {
         };
     }
 
-    const implementedCards = ["Pandorama", "Fountain of Youth", "Laser Catalyst", "Dragura's Wasteland", "Planetarium", "Lethargo's Temple", "Clone Factory", "Aetherlab", "Entrophy", "Meridius", "Meridia", "Time Thief", "Ichor", "Vulcanem", "Cravus", "Rampadon", "Smoke", "Dark Matter", "Reflector", "Talisman", "Reversal", "Faith", "Threat", "Confiscation", "Gravitas", "Time Bender", "Meridia's Cabin", "Repo Station", "Hand of Rhone", "Atlantica", "Hyperscope", "Mines of Pyralos", "Chrona", "Razo", "Looper", "Masiota", "Aromeas", "General Wave", "Namandi", "Sea Lord", "Sleep Potion", "Lotus", "Rush", "Cell Shield", "Alchemy", "Tame Beast", "Tele Control"];
+    const implementedCards = ["Pandorama", "Fountain of Youth", "Laser Catalyst", "Dragura's Wasteland", "Planetarium", "Lethargo's Temple", "Clone Factory", "Aetherlab", "Entrophy", "Meridius", "Meridia", "Time Thief", "Ichor", "Vulcanem", "Cravus", "Rampadon", "Smoke", "Dark Matter", "Reflector", "Talisman", "Reversal", "Faith", "Threat", "Confiscation", "Gravitas", "Time Bender", "Meridia's Cabin", "Repo Station", "Hand of Rhone", "Atlantica", "Hyperscope", "Mines of Pyralos", "Chrona", "Razo", "Looper", "Masiota", "Aromeas", "General Wave", "Namandi", "Sea Lord", "Sleep Potion", "Lotus", "Rush", "Cell Shield", "Alchemy", "Tame Beast", "Tele Control", "Burden of Wealth"];
 
     // --- Intent Classification ---
     // auto: fires on its own when condition is met
@@ -339,6 +339,7 @@ document.addEventListener('DOMContentLoaded', () => {
         'Alchemy': 'active',
         'Tame Beast': 'active',
         'Tele Control': 'active',
+        'Burden of Wealth': 'active',
     };
 
     // --- Simulation Presets ---
@@ -491,6 +492,12 @@ document.addEventListener('DOMContentLoaded', () => {
             p1creatures: [{ name: 'Ichor', damageTaken: 0 }],
             p2creatures: [{ name: 'Sea Lord', damageTaken: 0 }],
         },
+        'Burden of Wealth': {
+            phase: 1,
+            desc: "Burden of Wealth (G+G+L+L) in Bazaar S4 (Duality set active — buy it there). Player 2 holds 5 Cards (Sea Lord, LaserSteam, GoldSteam, Cravus, FireSteam) → 5 damage. P2 may discard their most expensive Cards (Sea Lord first, then LaserSteam > GoldSteam > Cravus > FireSteam) to cut it 1-per-Card.",
+            hand: ['GoldSteam', 'GoldSteam', 'LaserSteam', 'LaserSteam'],
+            p2hand: ['Sea Lord', 'LaserSteam', 'GoldSteam', 'Cravus', 'FireSteam'],
+        },
         'Confiscation': {
             phase: 1,
             desc: "Confiscation (G+G+L+L) in Bazaar S4 (buy it there to test). Player 2 has 3 cards — look at hand, take one.",
@@ -629,6 +636,7 @@ document.addEventListener('DOMContentLoaded', () => {
     };
 
     const devLogData = [
+        { date: '2026-07-10', msg: "Burden of Wealth (Duality S4) — implemented (active), completing all FOUR Duality Sparks (and the whole Duality Bazaar): 'Target damage to a Player equal to the Cards in their Hand. They may reduce damage by discarding Cards, from most expensive to least.' resolveBurden() offers a player picker (all seats, self included — 'a Player', faithful) with each seat's live Hand count. beginBurden() sorts the target's Hand most-expensive-first and sets damage = Hand size N. The expensiveness comparator burdenExpensiveness() encodes the PRINTED rule — FIRST total Steams used (a Card's Bazaar-cost pip count), THEN Steam value (Laser > Gold > Fire > AllSteam): so FFL > GGG (equal count, Laser outranks Gold) and FFF > GL (3 pips beat 2, count dominates). This is deliberately the OPPOSITE priority to the existing cardCostValue() auto-discard heuristic (where tier dominates count), so Burden gets its own comparator; Steam Cards rank by their own printed Bazaar cost (LaserSteam 'FGG' > GoldSteam 'AAA' > FireSteam '-'), landing them in a sensible order with zero special-casing. The target then chooses how many of their TOP Cards to shed (each −1 damage) — promptBurdenDiscard() shows a glass overlay listing the Hand in expensiveness order as clickable chips (click a chip to discard the whole prefix through it, click the current boundary to step back one), with the selected Cards struck through red and a live 'Discard k → Take N−k damage' readout; most-expensive-first is enforced by construction (you can only take the top k). applyBurden() discards the k Cards to the target's OWN History and deals the remaining N−k through the standard resolveDamageDirectly (active die first). The Computer decides for itself when targeted (aiHoards: keep all Cards unless the hit is lethal, in which case shed just enough of its most expensive to survive). Sim preset (Duality active; P2 holds Sea Lord/LaserSteam/GoldSteam/Cravus/FireSteam = 5 damage). Verified live: buying from S4 spent GGLL → Abyss, picker read '0 Cards' / '5 Cards'; targeting P2 opened the stepper with chips ordered EXACTLY Sea Lord (GGGLL) > LaserSteam (FGG) > GoldSteam (AAA) > Cravus (GG) > FireSteam; discarding the top 3 sent Sea Lord/LaserSteam/GoldSteam to P2's History, left Cravus + FireSteam, and dealt 2 (P2 Day 12→10); a re-run confirming 0 discards took the full 5 with the Hand intact. No console errors. NOTE FOR SIMON: expensiveness is read off each Card's Bazaar cost pips (so a LaserSteam, cost FGG, outranks a GoldSteam, cost AAA) — tell me if you'd rather a Steam Card rank by its own emitted Steam (its type) instead of its purchase cost." },
         { date: '2026-07-10', msg: "Tele Control (Duality S3) — implemented (active): 'Use an active Creature to attack a Player of your choice. The controlled Creature is not discarded.' Registered in sparkEffects (buy-and-play path). resolveTeleControl() gathers every ACTIVE Creature on BOTH boards — face-up and able to act, using the same canAct rule the attack flow/AI use (summonedOnTurn < totalTurns, or Cravus/Rampadon), so an opponent's Creature always qualifies on your turn — the whole point of the card is to commandeer their Creature and turn it on them. With one it auto-advances; with several it pulses each red behind a 'TELE CONTROL — CHOOSE A CREATURE TO COMMAND' bar (capture-click, no CANCEL — a Spark is committed). chooseTeleControlTarget() then offers EVERY seat as the strike target ('a Player of your choice' is literal, self included). launchTeleControlAttack() runs the strike through the NORMAL pipeline — beginAttack (Entrophy/Meridius scaling intact) → defense screen, so the target can still block and respond with Artifacts — tagged { ...card, teleControlled:true }. Two engine hooks make it correct: (1) finishAttacker short-circuits at the top when teleControlled && !defeated — the Creature stays in its owner's zone instead of being spent to History (only a genuine mutual-destruction defeat, which really hit 0 HP, still discards it — JUDGMENT CALL); (2) initiateDefense now filters the attacker slot out of the blocker list (a Creature can never block itself — matters when you aim a commandeered Creature back at its own owner, who might otherwise be offered it as a blocker; a harmless no-op in normal cross-board combat). Sim preset (Duality active; P1 Ichor, P2 Sea Lord Str 6, both active). Verified live BOTH directions: buying Tele Control from S3 spent FGL, sent it to the Abyss and pulsed both creatures; commandeering P2's OWN Sea Lord and aiming it at Player 2 struck for 6 (P2 Day 12→6, block disabled since its only Creature was the attacker), and the Sea Lord STAYED in P2's zone with P2's History empty; a re-run commandeering your own Ichor vs P2 left P2 able to block with Sea Lord, resolved a direct strike for 2, and the Ichor stayed in P1's zone (History held only the FGL payment, no Ichor). No console errors. V1: the Computer doesn't buy Sparks, so it never casts Tele Control (its Creatures are valid targets). NOTE FOR SIMON: 'not discarded' is read as surviving the normal after-attack spend; a controlled Creature that dies in mutual destruction still goes to History. Tell me if it should be immune to that too." },
         { date: '2026-07-10', msg: "Tame Beast (Duality S2) — implemented (active): 'Reduce the Health Points of any Creature in play to 1 and gain the deduced Time Points.' Registered in sparkEffects, so it rides the buy-and-play Spark path (click Bazaar tile → pay GGG → resolve → Abyss). resolveTameBeast() gathers every FACE-UP Creature in either Creature Zone (face-down ones are excluded — their stats are a mystery, same rule as Hyperscope aiming); with one it auto-applies, with several it pulses each with the red threat-target glow behind a docked 'TAME BEAST — CHOOSE ANY CREATURE' bar and a capture-click picks (the Sleep Potion / Repo Station picker pattern; no CANCEL — a Spark is committed once bought, like Threat). applyTameBeast() reads the Creature's current effective HP — base (baseResistance ?? baseHealth) + Cabin/Meridia buffs − damage already taken — and JUDGMENT CALL applies the reduction AS DAMAGE (card.damageTaken += HP−1): the engine's single-HP model, so it drops attack Strength and block Resistance together, the stat badge repaints to 1 via updateCreatureVisuals, and (like any damage) a Fountain-of-Youth heal could restore it. The caster then gains TP equal to the HP removed (oldHP − 1) through gainTimePoints (respects the 12 cap and the active die). Cross-board by design — you may tame your OWN Creature too (e.g. to cash a big body for TP). Sim preset (Duality active; P1 Ichor 2 HP, P2 Sea Lord 6 HP, P1 Day pinned to 6). Verified live both targets: buying Tame Beast from S2 spent GGG, sent it to the Abyss and pulsed BOTH creatures behind the bar; taming P2's Sea Lord set its damageTaken 0→5, badge → 1, and P1's Day die 6→11 (+5 TP); a re-run taming your own Ichor set damageTaken 1, badge → 1, Day 6→7 (+1 TP) with the Sea Lord untouched. No console errors. V1: the Computer doesn't buy Sparks, so it never casts Tame Beast (its Creatures are valid targets). NOTE FOR SIMON: 'reduce to 1' is modeled as damage (healable) rather than a hard stat rewrite — tell me if a tamed Creature should stay at 1 HP permanently even through a heal." },
         { date: '2026-07-10', msg: "Alchemy (Duality S1) — implemented (active), the first Duality Spark: 'A Player of your choice has to discard all Cards from their Landmark Zone.' Registered in the sparkEffects table next to Reversal/Faith/Threat/Confiscation, so it rides the existing buy-and-play-a-Spark path (click its Bazaar tile → pay cost → resolveSparkEffect → Abyss) with zero new plumbing. resolveAlchemy() differs from Confiscation/Dark Matter in one deliberate way: 'a Player of YOUR CHOICE' INCLUDES yourself, so the picker (same landmark-choice-overlay styling as Reversal's) offers EVERY seat — 'Player 1 (You) — N Landmarks' and 'Player 2 — N Landmarks' — with a live count, letting you torch your own Landmarks on purpose or pick a player who owns none (a legal, empty choice); it always asks rather than auto-resolving. discardAllLandmarks(owner) then sends every occupied Landmark-Zone card to that owner's OWN History Pile — JUDGMENT CALL on 'discard': the game's discard destination is History (Threat's explicit 'to the Abyss' is the exception, not the rule), so, exactly like a Hyperscope-destroyed Landmark, each discarded Landmark cycles and rebuilds itself on a later draw — Alchemy is a tempo swing, not permanent removal. Because it routes through the shared clearSlot chokepoint, Atlantica parked cards and Hand of Rhone charges tear down with their Landmark automatically; Atlantica 'cannot be deactivated' but IS discardable, so it goes too. V1: the Computer doesn't buy Sparks, so it never casts Alchemy (but is a valid target). Sim preset (P1: Fountain of Youth; P2: Pandorama + Clone Factory; hand F+G+G+G to buy from Bazaar S1 — Duality set active). Verified live both target paths: buying Alchemy spent FGGG, sent it to the Abyss and opened the picker reading exactly '1 Landmark' / '2 Landmarks'; picking Player 2 discarded BOTH Pandorama and Clone Factory to P2's History and emptied their Landmark Zone with P1's Fountain untouched; a re-run picking Player 1 (You) discarded Fountain of Youth to P1's own History with P2 untouched. No console errors. NOTE FOR SIMON: I read 'discard' as → History (cards cycle back on a later draw). Tell me if Alchemy should instead send Landmarks to the Abyss (permanent removal, like Threat)." },
@@ -3532,6 +3540,7 @@ document.addEventListener('DOMContentLoaded', () => {
         'Alchemy': (pNum) => resolveAlchemy(pNum),
         'Tame Beast': (pNum) => resolveTameBeast(pNum),
         'Tele Control': (pNum) => resolveTeleControl(pNum),
+        'Burden of Wealth': (pNum) => resolveBurden(pNum),
     };
 
     function resolveSparkEffect(pNum, card) {
@@ -3937,6 +3946,163 @@ document.addEventListener('DOMContentLoaded', () => {
     function launchTeleControlAttack(creatureSlot, targetPNum) {
         let card; try { card = JSON.parse(creatureSlot.dataset.cardData); } catch (e) { return; }
         beginAttack({ ...card, teleControlled: true }, creatureSlot, targetPNum);
+    }
+
+    // Burden of Wealth: Target damage to a Player equal to the Cards in their Hand. They may
+    // reduce the damage by discarding Cards, from MOST EXPENSIVE to least (1 damage per Card).
+    //
+    // Expensiveness (per the printed card) is measured FIRST by total Steams used (the pip count
+    // of a Card's Bazaar cost), THEN by the value of those Steams (Laser > Gold > Fire > AllSteam):
+    // "FFL beats GGG" (equal count, but a Laser outranks Golds) and "FFF beats GL" (3 pips beats 2,
+    // count dominates). NOTE this is the OPPOSITE priority to cardCostValue() (the internal
+    // auto-discard heuristic, where tier dominates count), so Burden needs its own comparator.
+    // Steam Cards rank by their own Bazaar cost too (LaserSteam 'FGG' > GoldSteam 'AAA' > FireSteam
+    // '-'), which lands them in a sensible order with no special-casing.
+    function burdenExpensiveness(card) {
+        const cost = (card && card.cost) ? String(card.cost) : '';
+        let nF = 0, nG = 0, nL = 0, nA = 0;
+        for (const ch of cost) {
+            if (ch === 'F') nF++;
+            else if (ch === 'G') nG++;
+            else if (ch === 'L') nL++;
+            else if (ch === 'A') nA++;
+        }
+        const total = nF + nG + nL + nA;
+        // total (pip count) dominates; ties broken by Laser count, then Gold, then Fire, then All.
+        return total * 1e8 + nL * 1e6 + nG * 1e4 + nF * 1e2 + nA;
+    }
+
+    function resolveBurden(casterPNum) {
+        // "Target ... a Player" — offer every seat (self included, faithful to the wording).
+        const overlay = document.createElement('div');
+        overlay.className = 'overlay landmark-choice-overlay';
+        const panel = document.createElement('div');
+        panel.className = 'glass-panel landmark-choice-panel';
+        const title = document.createElement('div');
+        title.className = 'fantasy-font glowing-text landmark-choice-title';
+        title.textContent = 'Burden of Wealth — Target Which Player?';
+        panel.appendChild(title);
+        for (let p = 1; p <= activePlayerCount; p++) {
+            const count = document.getElementById(`player-${p}`).querySelectorAll('.hand-slot:not(.slot-empty)').length;
+            const btn = document.createElement('button');
+            btn.className = 'menu-btn tech-font';
+            btn.textContent = `Player ${p}${p === casterPNum ? ' (You)' : ''} — ${count} Card${count === 1 ? '' : 's'}`;
+            const target = p;
+            btn.onclick = () => { overlay.remove(); beginBurden(target); };
+            panel.appendChild(btn);
+        }
+        overlay.appendChild(panel);
+        document.body.appendChild(overlay);
+    }
+
+    // The target is chosen — damage = their hand size. Sort their Hand most-expensive-first; the
+    // target decides how many of those top Cards to discard (each −1 damage). Human targets get a
+    // stepper overlay; the Computer decides for itself (keeps its Cards unless the hit is lethal).
+    function beginBurden(targetPNum) {
+        const board = document.getElementById(`player-${targetPNum}`);
+        if (!board) return;
+        const ranked = Array.from(board.querySelectorAll('.hand-slot:not(.slot-empty)'))
+            .map(slot => { let c; try { c = JSON.parse(slot.dataset.cardData); } catch (e) { c = {}; } return { slot, card: c }; })
+            .sort((a, b) => burdenExpensiveness(b.card) - burdenExpensiveness(a.card)); // most expensive first
+        const N = ranked.length;
+        if (N === 0) return; // empty Hand → 0 damage, the Spark fizzles
+
+        if (vsComputer && targetPNum === AI_PLAYER) {
+            // AI hoards its Cards — discard only enough (of the most expensive) to survive a
+            // lethal hit; otherwise take the whole thing.
+            const tp = totalTimePoints(targetPNum);
+            const k = N >= tp ? Math.min(N, N - tp + 1) : 0;
+            applyBurden(targetPNum, ranked, k);
+            return;
+        }
+        promptBurdenDiscard(targetPNum, ranked);
+    }
+
+    // Human target's decision: a stepper over how many of the most-expensive Cards to discard,
+    // with the ordered Hand shown (top Cards highlighted as they're selected) and a live damage
+    // readout. Enforces most-expensive-first by construction — you can only discard the top k.
+    function promptBurdenDiscard(targetPNum, ranked) {
+        const N = ranked.length;
+        let k = 0;
+
+        const overlay = document.createElement('div');
+        overlay.className = 'overlay landmark-choice-overlay';
+        const panel = document.createElement('div');
+        panel.className = 'glass-panel landmark-choice-panel';
+        panel.style.maxWidth = '460px';
+
+        const title = document.createElement('div');
+        title.className = 'fantasy-font glowing-text landmark-choice-title';
+        title.textContent = `Burden of Wealth — Player ${targetPNum}`;
+        panel.appendChild(title);
+
+        const sub = document.createElement('div');
+        sub.className = 'tech-font';
+        sub.style.cssText = 'font-size:11px;opacity:0.8;margin:-4px 0 8px;';
+        sub.textContent = `You take ${N} damage — 1 per Card in Hand. Discard your most expensive Cards (in order) to reduce it, 1 damage each.`;
+        panel.appendChild(sub);
+
+        const list = document.createElement('div');
+        list.style.cssText = 'display:flex;flex-wrap:wrap;gap:6px;justify-content:center;margin-bottom:8px;';
+        const chips = ranked.map(({ card }, i) => {
+            const chip = document.createElement('div');
+            chip.className = 'tech-font';
+            chip.style.cssText = 'padding:4px 8px;border:1px solid rgba(255,255,255,0.25);border-radius:6px;font-size:11px;cursor:pointer;transition:all .12s;';
+            chip.textContent = `${card.name || '?'}${card.cost && card.cost !== '-' ? ` (${card.cost})` : ''}`;
+            // Click a Card to discard the whole prefix up to it; click the current boundary to step back one.
+            chip.onclick = () => { k = (k === i + 1) ? i : i + 1; render(); };
+            list.appendChild(chip);
+            return chip;
+        });
+        panel.appendChild(list);
+
+        const readout = document.createElement('div');
+        readout.className = 'tech-font';
+        readout.style.cssText = 'font-size:13px;margin-bottom:8px;';
+        panel.appendChild(readout);
+
+        const render = () => {
+            chips.forEach((chip, i) => {
+                const on = i < k;
+                chip.style.background = on ? 'rgba(255,90,90,0.35)' : 'transparent';
+                chip.style.borderColor = on ? 'rgba(255,90,90,0.9)' : 'rgba(255,255,255,0.25)';
+                chip.style.textDecoration = on ? 'line-through' : 'none';
+                chip.style.opacity = on ? '0.7' : '1';
+            });
+            readout.innerHTML = `Discard <b>${k}</b> → Take <b>${N - k}</b> damage`;
+        };
+        render();
+
+        const confirm = document.createElement('button');
+        confirm.className = 'menu-btn tech-font';
+        confirm.textContent = 'CONFIRM';
+        confirm.onclick = () => { overlay.remove(); applyBurden(targetPNum, ranked, k); };
+        panel.appendChild(confirm);
+
+        overlay.appendChild(panel);
+        document.body.appendChild(overlay);
+    }
+
+    // Resolve: discard the k most-expensive Cards to the target's History, then deal the remaining
+    // (N − k) damage to the target through the standard direct-damage path (active die first).
+    function applyBurden(targetPNum, ranked, k) {
+        const board = document.getElementById(`player-${targetPNum}`);
+        if (!board) return;
+        const history = board.querySelector('.history-pile');
+        for (let i = 0; i < k; i++) {
+            const { slot, card } = ranked[i];
+            floatValue(slot, `${card.name} Discarded`, 'damage');
+            clearSlot(slot);
+            finishSingleCardPlacement(history, card);
+        }
+        updateHandLayout(targetPNum);
+
+        const damage = ranked.length - k;
+        if (damage > 0) {
+            resolveDamageDirectly(damage, targetPNum);
+            const dieSel = activeDieSel(targetPNum);
+            floatValue(board.querySelector(dieSel), `-${damage} TP`, 'damage');
+        }
     }
 
     // Confiscation: Look at target Opponent's Hand and take one Card to your Hand.
