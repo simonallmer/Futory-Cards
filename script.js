@@ -285,7 +285,7 @@ document.addEventListener('DOMContentLoaded', () => {
         };
     }
 
-    const implementedCards = ["Pandorama", "Fountain of Youth", "Laser Catalyst", "Dragura's Wasteland", "Planetarium", "Lethargo's Temple", "Clone Factory", "Aetherlab", "Entrophy", "Meridius", "Meridia", "Time Thief", "Ichor", "Vulcanem", "Cravus", "Rampadon", "Smoke", "Dark Matter", "Reflector", "Talisman", "Reversal", "Faith", "Threat", "Confiscation", "Gravitas", "Time Bender", "Meridia's Cabin", "Repo Station", "Hand of Rhone", "Atlantica", "Hyperscope", "Mines of Pyralos", "Chrona", "Razo", "Looper", "Masiota", "Aromeas", "General Wave", "Namandi", "Sea Lord", "Sleep Potion", "Lotus", "Rush", "Cell Shield", "Alchemy"];
+    const implementedCards = ["Pandorama", "Fountain of Youth", "Laser Catalyst", "Dragura's Wasteland", "Planetarium", "Lethargo's Temple", "Clone Factory", "Aetherlab", "Entrophy", "Meridius", "Meridia", "Time Thief", "Ichor", "Vulcanem", "Cravus", "Rampadon", "Smoke", "Dark Matter", "Reflector", "Talisman", "Reversal", "Faith", "Threat", "Confiscation", "Gravitas", "Time Bender", "Meridia's Cabin", "Repo Station", "Hand of Rhone", "Atlantica", "Hyperscope", "Mines of Pyralos", "Chrona", "Razo", "Looper", "Masiota", "Aromeas", "General Wave", "Namandi", "Sea Lord", "Sleep Potion", "Lotus", "Rush", "Cell Shield", "Alchemy", "Tame Beast"];
 
     // --- Intent Classification ---
     // auto: fires on its own when condition is met
@@ -337,6 +337,7 @@ document.addEventListener('DOMContentLoaded', () => {
         'Rush': 'active',
         'Cell Shield': 'active',
         'Alchemy': 'active',
+        'Tame Beast': 'active',
     };
 
     // --- Simulation Presets ---
@@ -473,6 +474,14 @@ document.addEventListener('DOMContentLoaded', () => {
             hand: ['FireSteam', 'GoldSteam', 'GoldSteam', 'GoldSteam'],
             landmarks: ['Fountain of Youth'],
             p2landmarks: ['Pandorama', 'Clone Factory'],
+        },
+        'Tame Beast': {
+            phase: 1,
+            day: 6,
+            desc: "Tame Beast (G+G+G) in Bazaar S2 (Duality set active — buy it there). Player 1 has an Ichor (2 HP), Player 2 a Sea Lord (6 HP). Pick either Creature — it drops to 1 HP and you gain the removed HP as Time Points (Sea Lord 6→1 = +5 TP; your Day die starts at 6).",
+            hand: ['GoldSteam', 'GoldSteam', 'GoldSteam'],
+            p1creatures: [{ name: 'Ichor', damageTaken: 0 }],
+            p2creatures: [{ name: 'Sea Lord', damageTaken: 0 }],
         },
         'Confiscation': {
             phase: 1,
@@ -612,6 +621,7 @@ document.addEventListener('DOMContentLoaded', () => {
     };
 
     const devLogData = [
+        { date: '2026-07-10', msg: "Tame Beast (Duality S2) — implemented (active): 'Reduce the Health Points of any Creature in play to 1 and gain the deduced Time Points.' Registered in sparkEffects, so it rides the buy-and-play Spark path (click Bazaar tile → pay GGG → resolve → Abyss). resolveTameBeast() gathers every FACE-UP Creature in either Creature Zone (face-down ones are excluded — their stats are a mystery, same rule as Hyperscope aiming); with one it auto-applies, with several it pulses each with the red threat-target glow behind a docked 'TAME BEAST — CHOOSE ANY CREATURE' bar and a capture-click picks (the Sleep Potion / Repo Station picker pattern; no CANCEL — a Spark is committed once bought, like Threat). applyTameBeast() reads the Creature's current effective HP — base (baseResistance ?? baseHealth) + Cabin/Meridia buffs − damage already taken — and JUDGMENT CALL applies the reduction AS DAMAGE (card.damageTaken += HP−1): the engine's single-HP model, so it drops attack Strength and block Resistance together, the stat badge repaints to 1 via updateCreatureVisuals, and (like any damage) a Fountain-of-Youth heal could restore it. The caster then gains TP equal to the HP removed (oldHP − 1) through gainTimePoints (respects the 12 cap and the active die). Cross-board by design — you may tame your OWN Creature too (e.g. to cash a big body for TP). Sim preset (Duality active; P1 Ichor 2 HP, P2 Sea Lord 6 HP, P1 Day pinned to 6). Verified live both targets: buying Tame Beast from S2 spent GGG, sent it to the Abyss and pulsed BOTH creatures behind the bar; taming P2's Sea Lord set its damageTaken 0→5, badge → 1, and P1's Day die 6→11 (+5 TP); a re-run taming your own Ichor set damageTaken 1, badge → 1, Day 6→7 (+1 TP) with the Sea Lord untouched. No console errors. V1: the Computer doesn't buy Sparks, so it never casts Tame Beast (its Creatures are valid targets). NOTE FOR SIMON: 'reduce to 1' is modeled as damage (healable) rather than a hard stat rewrite — tell me if a tamed Creature should stay at 1 HP permanently even through a heal." },
         { date: '2026-07-10', msg: "Alchemy (Duality S1) — implemented (active), the first Duality Spark: 'A Player of your choice has to discard all Cards from their Landmark Zone.' Registered in the sparkEffects table next to Reversal/Faith/Threat/Confiscation, so it rides the existing buy-and-play-a-Spark path (click its Bazaar tile → pay cost → resolveSparkEffect → Abyss) with zero new plumbing. resolveAlchemy() differs from Confiscation/Dark Matter in one deliberate way: 'a Player of YOUR CHOICE' INCLUDES yourself, so the picker (same landmark-choice-overlay styling as Reversal's) offers EVERY seat — 'Player 1 (You) — N Landmarks' and 'Player 2 — N Landmarks' — with a live count, letting you torch your own Landmarks on purpose or pick a player who owns none (a legal, empty choice); it always asks rather than auto-resolving. discardAllLandmarks(owner) then sends every occupied Landmark-Zone card to that owner's OWN History Pile — JUDGMENT CALL on 'discard': the game's discard destination is History (Threat's explicit 'to the Abyss' is the exception, not the rule), so, exactly like a Hyperscope-destroyed Landmark, each discarded Landmark cycles and rebuilds itself on a later draw — Alchemy is a tempo swing, not permanent removal. Because it routes through the shared clearSlot chokepoint, Atlantica parked cards and Hand of Rhone charges tear down with their Landmark automatically; Atlantica 'cannot be deactivated' but IS discardable, so it goes too. V1: the Computer doesn't buy Sparks, so it never casts Alchemy (but is a valid target). Sim preset (P1: Fountain of Youth; P2: Pandorama + Clone Factory; hand F+G+G+G to buy from Bazaar S1 — Duality set active). Verified live both target paths: buying Alchemy spent FGGG, sent it to the Abyss and opened the picker reading exactly '1 Landmark' / '2 Landmarks'; picking Player 2 discarded BOTH Pandorama and Clone Factory to P2's History and emptied their Landmark Zone with P1's Fountain untouched; a re-run picking Player 1 (You) discarded Fountain of Youth to P1's own History with P2 untouched. No console errors. NOTE FOR SIMON: I read 'discard' as → History (cards cycle back on a later draw). Tell me if Alchemy should instead send Landmarks to the Abyss (permanent removal, like Threat)." },
         { date: '2026-07-09', msg: "Cell Shield (Duality A4) — implemented (active), completing all FOUR Duality Artifacts (I had miscounted A1-A3 and missed this one). 'When you're being attacked: Prevent all Time Points that you would lose from an attack and draw Cards equal to that amount.' It's a defensive response, so it rides the existing PLAY ARTIFACT step of the defense screen next to Smoke/Reflector/Talisman (any Artifact in the defender's hand already surfaces there — no new UI). Selecting it in the artifact-CONFIRM loop arms one module flag, cellShieldDefender = defenderNum; the effect then resolves at damage time via maybeCellShield(amount, defenderNum), guarded into all three attack→player damage sites (unblocked direct strike in resolveDamageDirect, blocked spillover in resolveCombat, and the no-blocker fallback in resolveBlock): when armed for that defender it prevents the hit entirely (the caller skips resolveDamageDirectly) and instead draws that many Cards. JUDGMENT CALL: 'Time Points you would lose' is capped at the Time Points you actually hold — Math.min(damage, totalTimePoints) — so a lethal-looking overkill only draws up to your remaining TP; tell me if you'd rather draw the raw attack amount. The flag is one-attack-only (cleared on use, in finishAttacker's terminal path so a repelled attack can't leak it, and in the per-turn reset). Because Cell Shield fully prevents, blocking is optional — playing it and taking the hit draws the full Strength. V1: the Computer doesn't play defensive Artifacts, so it never uses Cell Shield (it remains a valid target of nothing — it's the human's tool); Time Thief still gains his TP since the damage was 'dealt' before being prevented (Meridia precedent). Sim preset (Ichor Str 2 from P1, Cell Shield in P2's hand). Verified live hot-seat: P2 opened PLAY ARTIFACT, played Cell Shield (→ P2 History), took the strike, and the feedback read 'Cell Shield! 2 Time Points prevented — draw 2' — P2's Day stayed 12 (nothing lost), P2's Future dropped 5→3 as it drew FireSteam + Ichor into hand, and Ichor spent to P1's History as normal. No console errors." },
         { date: '2026-07-09', msg: "Rush (Duality A3) — implemented (active): 'In your Creature Phase: Make a Creature attack instantly.' Played from hand (a name branch in the hand-click dispatcher, gated to phase 2). triggerRush() collects your face-up zone Creatures; with one it applies automatically, with several it pulses them (red threat-target) behind a docked CHOOSE A CREATURE / CANCEL bar (the Repo Station / Sleep Potion picker pattern, capture-click to preempt the normal attack click). Applying spends Rush to your History (Artifacts return to History after use) and calls rushCreature(): it stamps the chosen Creature's summonedOnTurn to 0 so the summoning-sickness gate is bypassed for the rest of the turn (a cancelled attack can still be retried by clicking the Creature), then opens the standard ATTACK menu via showAttackMenu — so the whole existing attack pipeline (Entrophy/Looper/Namandi/Hyperscope, targeting, defense) runs unchanged. CANCEL leaves Rush in hand; no Creature in play alerts and spends nothing. V1: the Computer doesn't buy Artifacts, so it never plays Rush. Sim preset (Creature Phase: a just-summoned, summoning-sick Ichor + Rush in hand). Verified live: clicking Ichor first alerted 'Summoning sickness!'; playing Rush auto-applied (one Creature), stamped Ichor summonedOnTurn 0, sent Rush to History and opened the ATTACK menu; ATTACK then struck P2 directly for 2 (Day 12→10) and Ichor moved to History (History = Rush, Ichor). No console errors." },
@@ -3503,6 +3513,7 @@ document.addEventListener('DOMContentLoaded', () => {
         'Threat': (pNum) => resolveThreat(pNum),
         'Confiscation': (pNum) => resolveConfiscation(pNum),
         'Alchemy': (pNum) => resolveAlchemy(pNum),
+        'Tame Beast': (pNum) => resolveTameBeast(pNum),
     };
 
     function resolveSparkEffect(pNum, card) {
@@ -3733,6 +3744,89 @@ document.addEventListener('DOMContentLoaded', () => {
             clearSlot(slot);
             finishSingleCardPlacement(ownerHistory, card);
         });
+    }
+
+    // Tame Beast: Reduce the Health Points of any Creature in play to 1 and gain the deducted
+    // Time Points. "Health Points" is the Creature's current effective HP (base + Cabin/Meridia
+    // buffs − damage already taken). The reduction is applied AS DAMAGE — the engine's single-HP
+    // model, so it drops both attack Strength and block Resistance together (and, like any damage,
+    // a later heal could restore it). The caster gains TP equal to how much HP was removed
+    // (oldHP − 1). Face-down Creatures aren't targetable — their stats are a mystery, same rule
+    // as Hyperscope aiming.
+    function tameBeastTargets() {
+        const found = [];
+        for (let p = 1; p <= activePlayerCount; p++) {
+            const board = document.getElementById(`player-${p}`);
+            if (!board) continue;
+            board.querySelectorAll('.creature-zone-main .card:not(.slot-empty)').forEach(slot => {
+                let c; try { c = JSON.parse(slot.dataset.cardData); } catch (e) { return; }
+                if (Array.isArray(c) || c.type !== 'Creature' || c.deactivated) return;
+                found.push({ slot, owner: p });
+            });
+        }
+        return found;
+    }
+
+    function resolveTameBeast(casterPNum) {
+        const targets = tameBeastTargets();
+        if (targets.length === 0) return; // no Creature in play — the Spark fizzles
+        if (targets.length === 1) { applyTameBeast(targets[0], casterPNum); return; }
+
+        // 2+ Creatures — pulse each (red threat-target glow) behind a docked hint and let the
+        // caster click one. No CANCEL: a Spark is committed once bought (same as Threat).
+        const bar = document.createElement('div');
+        bar.id = 'tame-beast-bar';
+        bar.style.cssText = 'position:fixed;bottom:40px;left:50%;transform:translateX(-50%);display:flex;gap:10px;z-index:6000;';
+        const hint = document.createElement('div');
+        hint.className = 'menu-btn tech-font';
+        hint.style.cssText = 'pointer-events:none;opacity:0.85;';
+        hint.textContent = 'TAME BEAST — CHOOSE ANY CREATURE';
+        bar.appendChild(hint);
+        document.body.appendChild(bar);
+
+        const cleanup = () => {
+            targets.forEach(t => {
+                t.slot.classList.remove('threat-target');
+                if (t.slot._tameHandler) t.slot.removeEventListener('click', t.slot._tameHandler, true);
+                delete t.slot._tameHandler;
+            });
+            bar.remove();
+        };
+        targets.forEach(t => {
+            t.slot.classList.add('threat-target');
+            const handler = (e) => {
+                e.stopPropagation();
+                e.preventDefault();
+                cleanup();
+                applyTameBeast(t, casterPNum);
+            };
+            t.slot._tameHandler = handler;
+            t.slot.addEventListener('click', handler, true); // capture: preempt the normal creature click
+        });
+    }
+
+    function applyTameBeast(target, casterPNum) {
+        const { slot } = target;
+        let card; try { card = JSON.parse(slot.dataset.cardData); } catch (e) { return; }
+
+        const base = parseInt(card.baseResistance ?? card.baseHealth ?? card.resistance ?? card.health) || 0;
+        let bonus = cabinBonus(slot.closest('.player-zone'));
+        if (card.name === 'Meridia') bonus += meridiaArtifactBonus(slot.closest('.player-zone').querySelector('.history-pile'));
+        const currentHp = Math.max(0, base + bonus - (card.damageTaken || 0));
+        const removed = Math.max(0, currentHp - 1);
+
+        // Bring the Creature down to 1 HP by applying (HP − 1) damage.
+        card.damageTaken = (card.damageTaken || 0) + removed;
+        slot.dataset.cardData = JSON.stringify(card);
+        updateCreatureVisuals(slot);
+        floatValue(slot, 'Tamed → 1 HP', 'damage');
+
+        // Gain Time Points equal to the HP removed (respects the 12 cap and the active die).
+        if (removed > 0) {
+            gainTimePoints(casterPNum, removed);
+            const board = document.getElementById(`player-${casterPNum}`);
+            if (board) floatValue(board.querySelector(activeDieSel(casterPNum)), `+${removed} TP`, 'gain');
+        }
     }
 
     // Confiscation: Look at target Opponent's Hand and take one Card to your Hand.
