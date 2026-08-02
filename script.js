@@ -2801,8 +2801,12 @@ document.addEventListener('DOMContentLoaded', () => {
 
         // Bazaar card hover logic
         cardContainer.addEventListener('mouseenter', () => {
+            // On touch there's no hover — a tap fires mouseenter and this 750ms timer
+            // would pop the fullscreen card modal on every tap. Mobile inspects via
+            // long-press instead (see the delegated handler in the mobile module).
+            const onMobile = document.body.classList.contains('mobile-mode');
             const availableCards = cardData.filter(c => selectedSets.includes(c.set) && c.location === loc);
-            if (availableCards.length > 0) {
+            if (!onMobile && availableCards.length > 0) {
                 hoverTimer = setTimeout(() => {
                     showCardDetails(availableCards[availableCards.length-1], true);
                 }, 750);
@@ -8445,6 +8449,52 @@ document.addEventListener('DOMContentLoaded', () => {
                 e.preventDefault();
             }
         }, true);
+
+        // ---- Long-press to inspect a card (replaces desktop hover on mobile) ----
+        // A quick tap grabs/places; press-and-hold ~450ms opens the fullscreen detail
+        // modal instead, and suppresses the trailing tap so it doesn't also grab.
+        function cardDataFromEl(el) {
+            const card = el.closest && el.closest('.card');
+            if (!card || card.classList.contains('slot-empty')) return null;
+            if (card.dataset.cardData) {
+                try { const d = JSON.parse(card.dataset.cardData); if (d && !Array.isArray(d)) return { card: d, stack: false }; } catch (e) {}
+            }
+            const loc = card.dataset.loc;
+            if (loc && loc !== 'AB') {
+                const avail = cardData.filter(c => selectedSets.includes(c.set) && c.location === loc);
+                if (avail.length) return { card: avail[avail.length - 1], stack: true };
+            }
+            return null;
+        }
+        let lpTimer = null, lpStart = null;
+        document.addEventListener('touchstart', (e) => {
+            if (!mobileActive || e.touches.length !== 1) return;
+            const card = e.target.closest && e.target.closest('.card');
+            if (!card) return;
+            const t = e.touches[0];
+            lpStart = { x: t.clientX, y: t.clientY };
+            clearTimeout(lpTimer);
+            lpTimer = setTimeout(() => {
+                const info = cardDataFromEl(card);
+                if (info && info.card) {
+                    showCardDetails(info.card, info.stack);
+                    clickGuardUntil = Date.now() + 700;   // hold = inspect only, never grab
+                    if (navigator.vibrate) { try { navigator.vibrate(12); } catch (e) {} }
+                }
+                lpTimer = null;
+            }, 450);
+        }, { passive: true });
+        document.addEventListener('touchmove', (e) => {
+            if (!lpTimer || !lpStart) return;
+            const t = e.touches[0];
+            if (Math.hypot(t.clientX - lpStart.x, t.clientY - lpStart.y) > 10) { clearTimeout(lpTimer); lpTimer = null; }
+        }, { passive: true });
+        document.addEventListener('touchend', () => { clearTimeout(lpTimer); lpTimer = null; }, { passive: true });
+
+        // Tap the fullscreen card preview to dismiss it (no hover-out on touch).
+        document.getElementById('card-modal')?.addEventListener('click', () => {
+            if (mobileActive) document.getElementById('card-modal').classList.add('hidden');
+        });
 
         // ---- Keep the mobile chrome in sync with game state (decoupled poll) ----
         function syncChrome() {
