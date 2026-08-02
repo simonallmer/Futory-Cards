@@ -3533,7 +3533,7 @@ body.mobile-mode #game-field[class*="turn-p"] .player-zone:not(.active-player) {
 #mobile-nav {
   position: fixed;
   left: 0; right: 0;
-  bottom: var(--vv-bottom, 0px);           /* sit above Safari's bottom address bar */
+  bottom: var(--nav-bottom-offset, 0px);   /* sit above Safari's bottom address bar */
   height: calc(60px + env(safe-area-inset-bottom));
   padding: 0 8px env(safe-area-inset-bottom) 8px;
   align-items: center;
@@ -3591,7 +3591,7 @@ body.mobile-mode #game-field[class*="turn-p"] .player-zone:not(.active-player) {
 /* ---- Reposition floating helpers for mobile ---- */
 body.mobile-mode #ai-feed {
   top: auto;
-  bottom: calc(70px + var(--vv-bottom, 0px) + env(safe-area-inset-bottom));
+  bottom: calc(70px + var(--nav-bottom-offset, 0px) + env(safe-area-inset-bottom));
   right: 10px;
   left: auto;
   width: 190px;

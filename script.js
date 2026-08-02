@@ -8225,19 +8225,29 @@ document.addEventListener('DOMContentLoaded', () => {
         // force true fullscreen in mobile Safari, so instead we anchor the bottom
         // chrome to the VISUAL viewport: --vv-bottom is the height Safari's bars
         // steal from the bottom, --vv-top from the top. Kept live as the bars move.
+        // How much the browser bars steal from the bottom. When VisualViewport can
+        // measure it (page is the top-level document) we use that exact value. But on
+        // simonallmer.com the game runs inside an iframe, so VisualViewport reports the
+        // iframe's own box and can't see Safari's toolbar — there we fall back to a
+        // portrait-only guess so the bottom nav still clears the address bar.
+        const SAFARI_PORTRAIT_GUESS = 64; // px — tune if the nav sits too low/high
+        function currentBottomInset() {
+            const vv = window.visualViewport;
+            const vvBottom = vv ? Math.max(0, window.innerHeight - vv.height - vv.offsetTop) : 0;
+            if (vvBottom > 4) return vvBottom; // real, accurate measurement
+            return window.matchMedia('(orientation: portrait)').matches ? SAFARI_PORTRAIT_GUESS : 0;
+        }
         function updateViewportInsets() {
             const vv = window.visualViewport;
             const root = document.documentElement;
-            if (!vv) { root.style.setProperty('--vv-bottom', '0px'); root.style.setProperty('--vv-top', '0px'); return; }
-            const bottom = Math.max(0, window.innerHeight - vv.height - vv.offsetTop);
-            const top = Math.max(0, vv.offsetTop);
-            root.style.setProperty('--vv-bottom', bottom.toFixed(1) + 'px');
-            root.style.setProperty('--vv-top', top.toFixed(1) + 'px');
+            root.style.setProperty('--vv-top', vv ? Math.max(0, vv.offsetTop).toFixed(1) + 'px' : '0px');
+            root.style.setProperty('--nav-bottom-offset', currentBottomInset().toFixed(1) + 'px');
         }
         if (window.visualViewport) {
             window.visualViewport.addEventListener('resize', () => { updateViewportInsets(); reframe(); });
             window.visualViewport.addEventListener('scroll', updateViewportInsets);
         }
+        window.matchMedia('(orientation: portrait)').addEventListener('change', () => { updateViewportInsets(); reframe(); });
         updateViewportInsets();
 
         // Which seat is the human's, and their opponent's (V1 = 2 players).
@@ -8287,12 +8297,12 @@ document.addEventListener('DOMContentLoaded', () => {
         }
         function getBand() {
             const vv = window.visualViewport;
-            const visH = vv ? vv.height : window.innerHeight;   // area not covered by Safari bars
             const topOff = vv ? vv.offsetTop : 0;
             const barH = topbar.getBoundingClientRect().height || 52;
             const navH = nav.getBoundingClientRect().height || 60;
+            const bottomInset = currentBottomInset();   // Safari bar (measured or guessed)
             const availTop = topOff + barH + 6;
-            const availBottom = topOff + visH - navH - 8;
+            const availBottom = window.innerHeight - bottomInset - navH - 8;
             const availH = Math.max(80, availBottom - availTop);
             const availW = window.innerWidth - 16;
             return { availTop, availH, availW, cx: window.innerWidth / 2, cy: availTop + availH / 2 };
