@@ -8216,6 +8216,26 @@ document.addEventListener('DOMContentLoaded', () => {
         let currentSection = 'you';   // start on the human board (Start Game lives there)
         let mobileActive = false;
 
+        // iOS Safari keeps its bottom address bar permanently expanded on a
+        // scroll-locked page, overlapping anything at bottom:0. There's no way to
+        // force true fullscreen in mobile Safari, so instead we anchor the bottom
+        // chrome to the VISUAL viewport: --vv-bottom is the height Safari's bars
+        // steal from the bottom, --vv-top from the top. Kept live as the bars move.
+        function updateViewportInsets() {
+            const vv = window.visualViewport;
+            const root = document.documentElement;
+            if (!vv) { root.style.setProperty('--vv-bottom', '0px'); root.style.setProperty('--vv-top', '0px'); return; }
+            const bottom = Math.max(0, window.innerHeight - vv.height - vv.offsetTop);
+            const top = Math.max(0, vv.offsetTop);
+            root.style.setProperty('--vv-bottom', bottom.toFixed(1) + 'px');
+            root.style.setProperty('--vv-top', top.toFixed(1) + 'px');
+        }
+        if (window.visualViewport) {
+            window.visualViewport.addEventListener('resize', () => { updateViewportInsets(); reframe(); });
+            window.visualViewport.addEventListener('scroll', updateViewportInsets);
+        }
+        updateViewportInsets();
+
         // Which seat is the human's, and their opponent's (V1 = 2 players).
         function humanSeat() {
             if (typeof vsComputer !== 'undefined' && vsComputer) {
@@ -8262,10 +8282,14 @@ document.addEventListener('DOMContentLoaded', () => {
             };
         }
         function getBand() {
+            const vv = window.visualViewport;
+            const visH = vv ? vv.height : window.innerHeight;   // area not covered by Safari bars
+            const topOff = vv ? vv.offsetTop : 0;
             const barH = topbar.getBoundingClientRect().height || 52;
             const navH = nav.getBoundingClientRect().height || 60;
-            const availTop = barH + 6;
-            const availH = Math.max(80, window.innerHeight - navH - 8 - availTop);
+            const availTop = topOff + barH + 6;
+            const availBottom = topOff + visH - navH - 8;
+            const availH = Math.max(80, availBottom - availTop);
             const availW = window.innerWidth - 16;
             return { availTop, availH, availW, cx: window.innerWidth / 2, cy: availTop + availH / 2 };
         }
