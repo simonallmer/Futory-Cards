@@ -97,7 +97,7 @@
     <div id="pass-device-overlay" class="hidden">
         <div class="overlay-backdrop"></div>
         <div class="overlay-content">
-            <h1 class="tech-font">PASS DEVICE</h1>
+            <h1 id="pass-device-title" class="tech-font">PASS DEVICE</h1>
             <p id="next-player-hint" class="tech-font">To Player 2</p>
             <button id="start-turn-btn" class="tech-font">START TURN</button>
         </div>
@@ -666,6 +666,24 @@
         </div>
     </div>
 
+    <!-- Destiny Reveal Overlay -->
+    <div id="destiny-overlay" class="overlay hidden">
+        <div class="modal-content glass-panel destiny-modal">
+            <h2 class="fantasy-font glowing-text destiny-title">DESTINY</h2>
+            <p id="destiny-trigger" class="tech-font destiny-trigger"></p>
+            <div class="destiny-body">
+                <div id="destiny-card-art" class="destiny-card-art"></div>
+                <div class="destiny-info">
+                    <h3 id="destiny-name" class="fantasy-font"></h3>
+                    <p id="destiny-text" class="tech-font"></p>
+                </div>
+            </div>
+            <div id="destiny-prompt" class="tech-font destiny-prompt"></div>
+            <div id="destiny-picker" class="destiny-picker"></div>
+            <div id="destiny-controls" class="destiny-controls"></div>
+        </div>
+    </div>
+
     <!-- Dev Log Screen -->
     <div id="devlog-screen" class="screen hidden">
         <div class="glass-panel database-panel devlog-panel">
@@ -682,6 +700,9 @@
             </div>
 
             <div id="devlog-checklist" class="tech-font log-list">
+                <div id="devlog-progress" class="devlog-progress">
+                    <!-- Implementation progress bars injected here -->
+                </div>
                 <div class="checklist-grid">
                     <!-- Cards with status icons will be injected here -->
                 </div>

@@ -285,7 +285,7 @@ document.addEventListener('DOMContentLoaded', () => {
         };
     }
 
-    const implementedCards = ["Pandorama", "Fountain of Youth", "Laser Catalyst", "Dragura's Wasteland", "Planetarium", "Lethargo's Temple", "Clone Factory", "Aetherlab", "Entrophy", "Meridius", "Meridia", "Time Thief", "Ichor", "Vulcanem", "Cravus", "Rampadon", "Smoke", "Dark Matter", "Reflector", "Talisman", "Reversal", "Faith", "Threat", "Confiscation", "Gravitas", "Time Bender", "Meridia's Cabin", "Repo Station", "Hand of Rhone", "Atlantica", "Hyperscope", "Mines of Pyralos", "Chrona", "Razo", "Looper", "Masiota", "Aromeas", "General Wave", "Namandi", "Sea Lord", "Sleep Potion", "Lotus", "Rush", "Cell Shield", "Alchemy", "Tame Beast", "Tele Control", "Burden of Wealth"];
+    const implementedCards = ["Pandorama", "Fountain of Youth", "Laser Catalyst", "Dragura's Wasteland", "Planetarium", "Lethargo's Temple", "Clone Factory", "Aetherlab", "Entrophy", "Meridius", "Meridia", "Time Thief", "Ichor", "Vulcanem", "Cravus", "Rampadon", "Smoke", "Dark Matter", "Reflector", "Talisman", "Reversal", "Faith", "Threat", "Confiscation", "Gravitas", "Time Bender", "Meridia's Cabin", "Repo Station", "Hand of Rhone", "Atlantica", "Hyperscope", "Mines of Pyralos", "Chrona", "Razo", "Looper", "Masiota", "Aromeas", "General Wave", "Namandi", "Sea Lord", "Sleep Potion", "Lotus", "Rush", "Cell Shield", "Alchemy", "Tame Beast", "Tele Control", "Burden of Wealth", "Healing Tree", "Freeze", "Chrono Machine", "Dragon Throne"];
 
     // --- Intent Classification ---
     // auto: fires on its own when condition is met
@@ -340,6 +340,11 @@ document.addEventListener('DOMContentLoaded', () => {
         'Tame Beast': 'active',
         'Tele Control': 'active',
         'Burden of Wealth': 'active',
+        // Destiny cards reveal and fire themselves — the choices INSIDE them are manual.
+        'Healing Tree': 'auto',
+        'Freeze': 'auto',
+        'Chrono Machine': 'auto',
+        'Dragon Throne': 'auto',
     };
 
     // --- Simulation Presets ---
@@ -536,6 +541,54 @@ document.addEventListener('DOMContentLoaded', () => {
             p1creatures: [{ name: 'Cravus', damageTaken: 0 }, { name: 'Vulcanem', damageTaken: 0 }],
             p2creatures: [{ name: 'Ichor', damageTaken: 1 }],
         },
+        'Healing Tree': {
+            phase: 0,
+            // Day at 9 leaves only 3 TP of headroom on the active die, so discarding all
+            // 4 cards also exercises the "capped — N wasted" path; picking 1-3 shows the
+            // clean trade. P2's clock is low enough that the Computer takes the deal.
+            day: 9,
+            night: 12,
+            p2day: 3,
+            p2night: 2,
+            desc: "Player 1's Future Pile is empty — the turn start reveals Healing Tree. Each player may discard any number of Hand cards for an equal number of Time Points. Day is at 9, so discarding all 4 caps out at +3.",
+            destiny: 'Healing Tree',
+            hand: ['FireSteam', 'FireSteam', 'GoldSteam', 'Ichor'],
+            p1future: [],
+            p1history: ['FireSteam', 'GoldSteam'],
+            p2hand: ['FireSteam', 'FireSteam', 'GoldSteam', 'LaserSteam', 'Ichor'],
+        },
+        'Freeze': {
+            phase: 0,
+            // A Steam card sits in the Future Pile so the End Phase has something to draw
+            // — proving it draws exactly 1, not the usual 2.
+            desc: "Player 1's Future Pile is empty — the turn start reveals Freeze. The turn should jump straight to the End Phase (no Steam/Construction/Creature) and draw only 1 card.",
+            destiny: 'Freeze',
+            hand: ['FireSteam', 'GoldSteam'],
+            p1future: [],
+            p1history: ['FireSteam', 'GoldSteam', 'LaserSteam', 'Ichor'],
+        },
+        'Chrono Machine': {
+            phase: 0,
+            // Future Pile empty so the turn start reveals it; History stocked so the End
+            // Phase draw has something to reshuffle. Play the turn out normally — instead
+            // of passing to the Computer it should come straight back to Player 1.
+            desc: "Player 1's Future Pile is empty — the turn start reveals Chrono Machine. Play the turn out: when you End Turn it should NOT pass to the Computer, it comes back to you as an extra turn.",
+            destiny: 'Chrono Machine',
+            hand: ['FireSteam', 'GoldSteam'],
+            p1future: [],
+            p1history: ['FireSteam', 'GoldSteam', 'LaserSteam', 'Ichor'],
+        },
+        'Dragon Throne': {
+            phase: 0,
+            // Four distinctly-named cards in the Computer's hand so the random pick is
+            // obvious, and a nearly-empty hand of your own so the arrival is easy to see.
+            desc: "Player 1's Future Pile is empty — the turn start reveals Dragon Throne. A RANDOM card out of the Computer's four (Ichor / Cravus / Vulcanem / LaserSteam) jumps into your hand. Re-run it a few times: it should not always be the same card.",
+            destiny: 'Dragon Throne',
+            hand: ['FireSteam'],
+            p1future: [],
+            p1history: ['FireSteam', 'GoldSteam'],
+            p2hand: ['Ichor', 'Cravus', 'Vulcanem', 'LaserSteam'],
+        },
         'Hand of Rhone': {
             phase: 1,
             day: 9,
@@ -636,6 +689,11 @@ document.addEventListener('DOMContentLoaded', () => {
     };
 
     const devLogData = [
+        { date: '2026-08-14', msg: "Destiny 027 Dragon Throne — implemented (auto), 4/24. 'Choose an opponent. Take a random Card from their Hand and place it in yours.' The card is RANDOM, so neither player picks it — the only decision is WHICH opponent, and in 2-player V1 there isn't one, so it auto-resolves. REUSE over reinvention: Confiscation (S4) already did the take-a-card-from-their-Hand move, so rather than writing a second copy, that logic was extracted into a shared takeCardToHand(slot, fromPNum, toPNum) — clear the source slot, re-layout both hands, drop it into the receiver's first empty Hand slot (opening a temporary one if the hand is already full, which the End Phase hand-limit gate then trims) and float '+ CardName'. Confiscation now calls the same helper, so the two effects can't drift apart. The opponent picker is deliberately NOT the shared #target-player-overlay that Confiscation and Dark Matter use for 3-4 players: that overlay sits on the same z-index layer as the Destiny screen and would render UNDERNEATH it. New destinyChooseOpponent() asks inside the Destiny overlay itself via the existing destinyButtons() dock, walking seats in clockwise order, and skips the question entirely when there's only one opponent. Naming the taken card in the resolution notice leaks nothing — the victim watched it leave their hand and the thief is holding it. Works in both directions: the Computer as revealer takes from you through the identical path (and logs 'Dragon Throne: <card> changes hands' to its feed). Verified live via the new sim (your hand: 1 FireSteam; the opponent's: Ichor / Cravus / Vulcanem / LaserSteam): the reveal moved exactly one card across — opponent 4 → 3, yours 1 → 2 — and four re-runs took LaserSteam, Cravus, Cravus, Vulcanem, confirming it's actually random rather than always the first or last slot. Regression-checked Confiscation after the extraction: buying it from Bazaar S4 still opened 'Confiscation — P2's Hand' listing Ichor/Cravus/Smoke, and taking Smoke moved it correctly. No console errors. Destiny progress panel now reads 4/24, next 028 Unstoppable Force." },
+        { date: '2026-08-14', msg: "Destiny 047 Chrono Machine — implemented (auto), 3/24. 'After your turn ends, you get an additional turn.' The mirror image of Freeze: where Freeze rewrites the CURRENT turn, this one resolves later and leaves the current turn completely alone. resolveChronoMachine just posts a claim on the seat (pendingExtraTurn = revealer); finishTurn consumes it and skips the seat advance, so play stays put instead of passing. THE SUBTLE PART is totalTurns: it is NOT incremented for an extra turn, because despite the name it counts ROUNDS (it only ticks when play cycles back to Player 1) and it's what drives summoning sickness via `summonedOnTurn < totalTurns`. An extra turn is not a full round — nobody else played — so a Creature summoned this round still can't act in the bonus turn, which is the correct reading of 'after a full round in the zone'. Leaving totalTurns alone gets that for free. The extra turn is a real turn start, so it re-runs the Destiny check: a revealer whose Future Pile is still empty flips another card. That's correct and self-limiting (the End Phase draw reshuffles History back into the Future) and a second Chrono Machine simply chains, since the flag is consumed before the new one is set. COMPUTER: this exposed a live deadlock. finishTurn called beginComputerTurn() straight out of a .then, which is microtask-timed — when the Computer chains its own extra turn, the beginComputerTurn() that just ended is still unwinding and aiTurnInProgress doesn't clear until its finally block runs, so the new call would hit the `if (aiTurnInProgress) return` guard and the AI would silently freeze mid-game. Moved to setTimeout(beginComputerTurn, 0): a macrotask runs after every pending microtask has drained, so the guard is always clear by then. Also stopped the feed logging 'Your turn' when the Computer is about to take another one. HOT SEAT: an extra turn is not a hand-off, so the pass screen now reads EXTRA TURN / 'Player N plays again' / TAKE EXTRA TURN instead of PASS DEVICE (h1 given an id; passDevice resets the title so a later mid-combat hand-off can't inherit it). Fixed a Dev Log sim bug found while testing: runSimulation resets the per-turn flags but knew nothing about Destiny state, so an unspent Chrono Machine claim survived a preset reload and handed the extra turn to whoever ran the NEXT sim — it now clears destinyDrawOverride, pendingExtraTurn and destinyResolving alongside the others, and resetGameToStart does the same. Verified live in BOTH modes. Vs Computer: Player 1 revealed Chrono, played a normal full turn (Steam → Construction → Creature → End, unlike Freeze), and End Turn came straight back to PLAYER 1 at the Steam Phase with an empty AI feed — the Computer never played — while the NEXT End Turn passed to it normally, proving the claim is consumed not sticky. Then, by leaving Chrono on the deck and handing the Computer an empty Future Pile, its turn revealed Chrono and it took TWO consecutive turns (feed: Destiny revealed → extra turn follows → COMPUTER'S TURN → buys/summons/draws → COMPUTER'S TURN → buys/builds/draws) with no freeze — the deadlock fix holding. Hot seat: the EXTRA TURN screen appeared with 'Player 1 plays again', and the following turn correctly reverted to PASS DEVICE / To Player 2. No console errors. Shipped in the first Destiny commit (card 3 of 4 in that batch)." },
+        { date: '2026-08-14', msg: "Destiny 026 Freeze — implemented (auto), 2/24. 'This turn ends directly. Draw only 1 Card in your End Phase.' The first Destiny card that needed a real engine hook rather than just the reveal framework, because it rewrites the turn itself. Since Destiny fires at turn START, Freeze costs the revealer the entire Steam / Construction / Creature stretch before they have done anything — resolveFreeze sets currentPhase = 3 directly. It does NOT skip the End Phase: the card explicitly still draws, so the End Phase runs with a new destinyDrawOverride (null = the normal 2, or 3 after a Skip Turn) that triggerEndPhaseDrawing reads FIRST, and the hand limit is still enforced on the way out. Freeze therefore outranks Skip Turn's 3-card draw — in practice they can't collide, because turnSkipped can only be set in the Steam Phase which this turn never reaches, but the precedence is explicit so it holds if a later card ever sets both. destinyDrawOverride clears in finishTurn with the rest of the per-turn state, so the rewrite lasts exactly one turn. WHERE THE PHASE RE-SYNC LIVES: first draft put it in startTurn, which worked in a real game and silently did NOTHING under the Dev Log sim — the sim calls maybeTriggerDestiny() directly, so the phase changed but no UI ever re-rendered and Freeze looked like a no-op. Moved into maybeTriggerDestiny itself (compare currentPhase before/after the reveal, updatePhaseUI if it moved), so every entry point gets it — and that re-sync is also what fires the single draw. COMPUTER: beginComputerTurn now checks for currentPhase >= 3 up front and, if a Destiny card already ended its turn, skips straight to the End Phase instead of playing over the top of it; the End Phase tail (wait out the draw, trim to the hand limit, pass back) was extracted into aiEndPhaseWrapUp() and is shared by both paths, so the frozen path can't drift from the normal one. Its feed line now reports the real draw count rather than a hard-coded 'Draws 2 cards'. DEV LOG: added an implementation progress panel above the Card Implementation grid — separate bars for Bazaar cards (24/24) and Destiny cards (2/24, naming the next card up), scoped to the active sets, with Steam excluded since the currency has no effect to implement. That count is not decoration: initBazaarInventory builds the live Destiny deck from exactly the same implementedCards list, so the bar literally shows what the deck contains. Both Destiny cards have '▶ Sim' presets and run standalone from here (sim.destiny stacks the chosen card on the deck and lets the ordinary empty-Future-Pile trigger fire it). Verified live BOTH seats: Player 1's sim revealed Freeze, jumped 0 → End Phase, drew exactly 1 (hand 2→3, History's 4 reshuffled into an empty Future leaving 3) with the button reading 'End Turn'; and, by draining the deck to Freeze and handing the Computer an empty Future Pile, its turn revealed Freeze and the feed read 'Destiny revealed: Freeze → Freeze: turn ends immediately, draws only 1 → Computer's turn → Its turn was frozen — straight to the End Phase → Draws 1 card', with P2 hand 3→4, Future 0→2, History 3→0 and no buy, summon or attack, then the turn passed back to Player 1. Both cards sit face up in the Destiny Abyss, deck empty. No console errors. Shipped in the first Destiny commit (card 2 of 4 in that batch)." },
+        { date: '2026-08-14', msg: "DESTINY — the subsystem, plus card 1 of 24. Destiny cards were deferred through all of V1; this lands the whole engine they ride on, then the first card. TRIGGER: a player who BEGINS their turn with an EXACTLY empty Future Pile reveals the top Destiny card. The hook is startTurn(), the single chokepoint that runs for both the hot-seat pass-device path and the vs-Computer path, and it fires before updatePhaseUI so nothing in the Steam Phase has happened yet; startTurn is now async and the Computer's beginComputerTurn() chains off it, so the AI no longer plays over the top of the overlay. A History Pile with cards in it is irrelevant — History only folds back in during a draw, so an empty Future at turn start is genuinely empty. DECK: activeBazaar['D'] is now shuffled on every game start (shuffleBazaarPilesForFusion deliberately skips it — that function only cares which SET a buyable pile serves, and Destiny is a face-down deck, not a sale pile), and per Simon's call it holds ONLY Destiny cards whose effect is wired up (filtered in initBazaarInventory against implementedCards) so a playtest never flips a blank; the filter becomes a no-op once all 24 are done. Also closed a pre-existing leak: clicking the face-down Destiny deck used to open the location stack modal and list every remaining event — it now does nothing at all, while the Destiny Abyss is public and lists what's already been dealt (shared showPileListModal, extracted from the Abyss's own list view). The Destiny Abyss renders its top card FACE UP (renderBazaar special-case + new destinyArtUrl, the other half of cardArtUrl's deliberate null for Destiny). FRAMEWORK for the three effect shapes Simon described: automatic ones just run; 'Each Player…' ones use forEachPlayerClockwise(revealer, handler), an async walk over seats starting at the revealer that AWAITS each seat's decision before moving on — and between two humans it passes the device first (and back to the revealer at the end) so nobody chooses with someone else's hand on screen (vs Computer this no-ops); odd ones out drive the overlay themselves. destinyEffects is a name-keyed table mirroring sparkEffects, so card 2 onwards is a row plus one function. New #destiny-overlay (Cinzel DESTINY heading, violet key light, back-to-front flip on reveal) registered in the mobile relocate-to-<body> list so it can't hit the transformed-ancestor trap. Fixed a real pre-existing bug found on the way: passDevice() permanently clobbered #start-turn-btn.onclick and never restored it, so after any mid-combat hand-off the NEXT turn's START TURN button re-ran the stale callback — it now hands the button back to startTurn. THE TIME POINT SYSTEM IS UNTOUCHED — gainTimePoints/adjustPlayerDie/resolveDamageDirectly are byte-identical to before this change. A first draft of this work added a second gainTimePoints() (the existing one was missed on the first pass) which would have silently shadowed the original for every caller in the game; that was caught and removed, and where Destiny needs to know how much TP actually landed it measures totalTimePoints() itself around the call rather than changing the shared helper. The only new TP code is previewTimePointGain(), a read-only twin that touches no dice and lives inside the Destiny section. CARD 025 Healing Tree — 'Each Player may discard any number of Cards on their Hand to obtain an equal number of Time Points.' Clockwise from the revealer; the 'may' is real, every seat can take the deal, part of it, or walk. The board is behind the backdrop while Destiny is open, so each player's hand is rendered as clickable mini-cards INSIDE the overlay (multi-select, green check, live counter). JUDGMENT CALL: hand slots only — Atlantica-parked cards are excluded, matching Dark Matter's discard rather than the resource paths (parked cards are a resource, not hand count). Discards go to that player's OWN History Pile, not the Abyss. The 1:1 trade is capped by the dice, so the picker quotes what you will ACTUALLY get before you commit (new previewTimePointGain) rather than the nominal number, and the resolution names the shortfall. Computer heuristic: TP are life but a spendable card usually beats 1 TP, so it only cashes in dead weight — Easy never bothers, Normal trades below 8 TP, Hard tops up below 14, never stripping below 3 cards, and going all-in under 5 TP. Sim preset added ('Healing Tree', with a new sim.destiny key that stacks a chosen card on the deck and lets the ordinary turn-start trigger fire it, plus new p2day/p2night so presets can set the opponent's clock — Destiny events compare seats' TP). Verified live: reveal fired from an empty Future Pile with the flip and the trigger line; picking 1/2/3 of 4 read +1/+2/+3, picking all 4 correctly read '+3 TP — your dice can't hold the other 1' (Day was at 9) and resolved to 'discards 4 and gains 3 Time Points (capped — 1 wasted)', Day 9→12 with all four cards landing in P1's own History; DECLINE left the hand untouched at 4; the Computer at 5 TP took the deal, discarded its 2 cheapest FireSteam to its own History and went 5→7 TP; the card then went face up to the Destiny Abyss (deck emptied), clicking the deck did nothing, clicking the Abyss listed '025 Healing Tree'; turn resumed in the Steam Phase. No console errors. Shipped in the first Destiny commit (card 1 of 4 in that batch)." },
+        { date: '2026-08-13', msg: "Rules fix — Landmarks no longer stack, and the Hand Limit is hard-capped at 7. Playtest report: someone stood up TWO Pandoramas and ended a turn holding 14 cards. Both halves of that came from the same hole — the +2 was summed PER Pandorama in play, and nothing anywhere refused a second copy of a Landmark you already owned. (1) One copy of a name per board. New ownsLandmarkNamed(pNum, name) is the single gate, and unlike findLandmark it counts DEACTIVATED copies too — a face-down Pandorama still occupies the zone, so you can't build a second one on top of a sleeping first. Wired into every route a Landmark can reach the zone: grabCard refuses the Bazaar buy outright with an 'Already Built' float (better than letting you carry a card with nowhere legal to land), highlightValidZones offers no Landmark-Zone slots, placeCard rejects the drop, landmarkRebuildSlot (the Hyperscope rebuild draw) and the AI's buy list + aiBuyFromBazaar now share the same helper instead of their own copies. Dev Mode still bypasses it for testing. (2) The Hand Limit lives in ONE place. The old code recomputed '5 + 2 per Pandorama' inline in five separate spots (canEndTurn, checkHandLimit twice, autoDiscardToLimit's getMaxHand, updateHandLayout) — and updateHandLayout's copy didn't even check the deactivated flag, so a sleeping Pandorama still widened the hand fan. All five now call getMaxHand(board), which is a flat one-time +2 (some(), not a sum) clamped by Math.min to HAND_LIMIT_MAX = 7. (3) Backstop: finishTurn() now calls autoDiscardToLimit() before passing the turn, so any route that reaches it over the limit — a card gained mid-End-Phase, a skipped turn, an effect that hands you cards — trims anyway; the End-Phase 'Discard (N)' gate stays the normal path, and Dev Mode is exempt so seeded test hands survive. Atlantica is untouched: parked cards were never .hand-slot, so they still don't count against the limit. Verified live on the Pandorama sim: clicking Bazaar L1 with Pandorama already in play floated 'Already Built' and grabbed nothing (0 drop targets), while a different Landmark still grabbed normally and lit its 4 empty slots; Dev-Mode forcing a SECOND Pandorama into the zone left the hand at 7 slots, not 9; and an 11-card hand in the End Phase read 'Discard (4)' and trimmed to exactly 7. No console errors." },
         { date: '2026-08-03', msg: "Fix — mobile menu tools opened but rendered as an invisible sliver (\"I can open the menu but nothing happens when I click something\"). Root cause was the same transformed-ancestor trap that #card-modal was already pulled out of: the mobile camera puts a CSS transform on #game-field, which makes it the containing block for EVERY position:fixed descendant. Only #card-modal had been relocated — the eleven remaining full-screen panels & combat overlays (database-screen/\"all cards\", keywords-list-modal, rules-modal, keyword-modal, options-modal, location-modal, attack-action-menu, defense-overlay, darkmatter-overlay, target-player-overlay, devlog-screen) were still inside the field, so 'position:fixed; inset:0' sized them to the scaled ~900px board box instead of the viewport and centred their content ~329px ABOVE the screen — they opened, but as a tiny transparent corner box that reads as 'nothing happened'. Fix relocates that whole set to <body> once in initMobileMode(), so their fixed positioning resolves against the viewport. Safe on desktop (no transform there — fixed is viewport-relative regardless of DOM location) and every one is reached via document.getElementById, so no lookup or handler breaks. Verified live at 375×812: Menu → Keywords now fills the screen (A–Z list + Abyss detail + search + close), Menu → Database opens the full scrollable Card Database (001 Pandorama, 002 Fountain of Youth…); all eleven overlays now parent to <body>; no console errors." },
         { date: '2026-08-02', msg: "System — SMARTPHONE MODE (bird's-eye + section camera). The desktop tabletop (a 3-row grid: rival top / Bazaar middle / you bottom, ~900px wide) was unusable on a phone — the top menu overflowed and cards spilled off both edges. New mobile mode activates only on small/touch screens (matchMedia '(max-width:820px)' OR '(pointer:coarse)', re-checked on change) by adding body.mobile-mode; the whole desktop layout is untouched otherwise. Instead of reflowing the board, it keeps the real DOM and drives a CSS-transform 'camera' over #game-field (translate+scale via --cam-x/y/s), so every existing interaction and animation still works. Views: OVERVIEW (bird's-eye of the whole table), plus zoomed BAZAAR / YOU / RIVAL sections that fill the screen; switch with the bottom nav arrows or tappable chips (Field/Rival/Bazaar/You). Free one-finger PAN and two-finger PINCH-zoom explore each section (a userAdjusted flag stops auto-reframes from fighting a manual pan; a MutationObserver + resize/orientation re-fit otherwise). Local-coordinate math reads the field's LIVE matrix scale so framing stays exact even mid-animation. Chrome: a compact top bar (☰ menu · turn+phase mirror · Next/Skip proxying the real phase buttons), a top 'Carrying <card> — tap a glowing slot' banner with Cancel (the desktop follow-ghost can't track a finger), and the section nav. The ☰ opens the shared game menu (now given pointer-events — as a .modal it was silently click-through on BOTH platforms; reused the game-over overlay's positioning instead) with Resume/New Game + a tool grid (Rules/Keywords/Database/Options/Dev Log/Help) proxying the hidden desktop buttons, and backdrop-tap-to-close. Two structural fixes a transformed field forced: (1) moved #card-modal OUT of #game-field — a transform makes it the containing block for position:fixed descendants, which had trapped & scaled the detail modal inside the board; (2) disabled the 750ms hover-preview on mobile — touch fires mouseenter with no matching mouseleave, so it popped the card modal on every tap and never dismissed. Also a gesture click-guard swallows the click a pan/pinch leaves behind so navigation never grabs a card. Verified live at 375×812: all four views frame correctly and are distinct; grab-in-Bazaar → switch to You → auto-drop places the card and advances the phase; pan moved the camera 1:1 (+100px) and pinch zoomed (clamped 1.7×); menu + Database open contained/scrollable; no console errors. KNOWN LIMIT for Simon: the tool panels were built at fixed desktop sizes — Database/Options/Keywords are clamped to the viewport and scroll fine, but the 900×600 Rules FLIP-BOOK still needs a dedicated single-column mobile layout (it opens but renders cramped). Want me to redesign the Rules book (and polish the tool panels) for mobile next?" },
         { date: '2026-08-02', msg: "System — Play Again / new in-game Menu. Fixed the reported bug where finishing a game left you unable to start a new one without a full page refresh: the old 'Play Again' button re-dealt the boards but never cleared gameWon, and gameWon gates ALL phase interaction (updatePhaseUI/turn control) plus the entire AI loop — so the 'fresh' game booted frozen. Extracted one shared resetGameToStart() that clears every game-level flag (gameWon, gameStarted, aiTurnInProgress, currentPlayer/currentPhase/totalTurns) and the per-turn flags that only ever reset inside finishTurn (planetarium/lethargo/aetherlab/mines/rhone/cloneFactory/looper/hyperscope/strDebuff/cellShield, plus cancelGrab + closeLandmarkContext), resets each seat to 12/12 Day-active with 0 Rhone charge, REFILLS the Bazaar (initBazaarInventory — a finished game has piles sold down) and rebuilds all boards, then hides every leftover overlay (.overlay + game-over/pass-device/landmark-context/phase panel) and strips the appended SWITCH VIEW button. Game Over 'Play Again' now calls resetGameToStart() then window.handleStartGame() for one-click replay. Added a persistent 'Menu' button to the top bar (between ? and Rules) opening a glass overlay — Resume Game / New Game / Back to Arcade — so a game can be restarted mid-play too; New Game confirm()s before discarding a game in progress. Verified live: Menu opens/closes; New Game mid-game returns the exact fresh-load state (Start Game button present, game-field turn-p1, zero open overlays), then Start Game deals P1+P2 their opening 3 with all 28 Bazaar piles refilled and the phase panel live — no console errors, board fully interactive (not frozen)." },
@@ -719,10 +777,46 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
+    // Progress bars above the checklist. Destiny gets its own row because it's the
+    // active workstream — Simon needs to see "how many have we tackled" at a glance,
+    // and the Destiny deck itself is built from exactly this count (initBazaarInventory
+    // only deals cards that are on implementedCards).
+    function renderChecklistProgress() {
+        const host = document.getElementById('devlog-progress');
+        if (!host) return;
+
+        const inSets = c => selectedSets.includes(c.set);
+        const tally = (label, list, note) => {
+            const done = list.filter(c => implementedCards.includes(c.name)).length;
+            const total = list.length;
+            const pct = total ? Math.round((done / total) * 100) : 0;
+            return `
+                <div class="progress-row">
+                    <div class="progress-head">
+                        <span class="progress-label">${label}</span>
+                        <span class="progress-count">${done} / ${total}${note ? ` <em>${note}</em>` : ''}</span>
+                    </div>
+                    <div class="progress-track"><div class="progress-fill" style="width:${pct}%"></div></div>
+                </div>`;
+        };
+
+        // Steam is the currency — it has no effect to implement, so it isn't scored.
+        const active = cardData.filter(c => inSets(c) && c.type !== 'Steam');
+        const destiny = active.filter(c => c.type === 'Destiny');
+        const bazaar = active.filter(c => c.type !== 'Destiny');
+        const nextUp = destiny.find(c => !implementedCards.includes(c.name));
+
+        host.innerHTML =
+            tally('Bazaar cards', bazaar) +
+            tally('Destiny cards', destiny, nextUp ? `next: ${nextUp.number} ${nextUp.name}` : 'complete') +
+            `<p class="progress-note tech-font">Only implemented Destiny cards enter the live deck, so a playtest never flips a blank. Every implemented card with a <strong>▶ Sim</strong> button can be run on its own from here.</p>`;
+    }
+
     function renderChecklist() {
         const container = document.querySelector('#devlog-checklist .checklist-grid');
         if (!container) return;
         container.innerHTML = '';
+        renderChecklistProgress();
 
         cardData.forEach(card => {
             const isDone = implementedCards.includes(card.name);
@@ -888,8 +982,13 @@ document.addEventListener('DOMContentLoaded', () => {
                 future: sim.p1future,
             });
 
-            if (sim.p2landmarks || sim.p2hand || sim.p2creatures || sim.p2future) {
+            if (sim.p2landmarks || sim.p2hand || sim.p2creatures || sim.p2future ||
+                sim.p2day !== undefined || sim.p2night !== undefined) {
                 setupBoard(2, {
+                    // Destiny events read and compare both seats' Time Points, so a preset
+                    // has to be able to set the opponent's clock as well as your own.
+                    day: sim.p2day,
+                    night: sim.p2night,
                     landmarks: sim.p2landmarks,
                     hand: sim.p2hand,
                     creatures: sim.p2creatures,
@@ -900,6 +999,11 @@ document.addEventListener('DOMContentLoaded', () => {
             // Per-phase/turn flags don't survive a preset reload (the sim skips finishTurn).
             minesUsedThisPhase = false;
             resetLooper();
+            // Destiny state too, or one preset contaminates the next: an unspent Chrono
+            // Machine claim would hand the extra turn to whoever runs the NEXT sim.
+            destinyDrawOverride = null;
+            pendingExtraTurn = null;
+            destinyResolving = false;
 
             // Pre-charge Hand of Rhone (its auto +1 then fires via updatePhaseUI below).
             if (sim.rhoneCharge !== undefined) {
@@ -913,6 +1017,19 @@ document.addEventListener('DOMContentLoaded', () => {
             updatePhaseUI();
             updateBazaarLighting();
             checkHandLimit();
+
+            // Destiny presets: stack the named card on top of the face-down deck, then
+            // let the ordinary turn-start trigger reveal it (the preset leaves Player 1's
+            // Future Pile empty, which is the real in-game condition).
+            if (sim.destiny) {
+                const pile = activeBazaar['D'] || (activeBazaar['D'] = []);
+                const existing = pile.findIndex(c => c.name === sim.destiny);
+                if (existing !== -1) pile.splice(existing, 1);
+                const found = cardData.find(c => c.name === sim.destiny);
+                if (found) pile.push({ ...found });
+                renderBazaar();
+                setTimeout(() => maybeTriggerDestiny(), 500);
+            }
 
             // Toast notification
             const toast = document.createElement('div');
@@ -1448,6 +1565,14 @@ document.addEventListener('DOMContentLoaded', () => {
             return;
         }
 
+        // Landmarks don't stack: refuse the buy outright when you already own a copy,
+        // rather than letting you carry a card that has nowhere legal to land.
+        if (!devMode && isFromBazaar && card.type === 'Landmark' &&
+            ownsLandmarkNamed(currentPlayer, card.name)) {
+            floatValue(sourceEl, 'Already Built', 'damage');
+            return;
+        }
+
         if (isFromBazaar) {
             heldCards = [];
             heldCardSources = [];
@@ -1649,7 +1774,11 @@ document.addEventListener('DOMContentLoaded', () => {
         if (!activeBoard) return;
 
         if (card.type === 'Landmark') {
-            targets = Array.from(activeBoard.querySelectorAll('.landmark-zone-main .card.slot-empty'));
+            // No duplicates: if a copy of this Landmark is already in your zone, the
+            // zone offers no slots (the card can still be sent to Future/History below).
+            targets = ownsLandmarkNamed(currentPlayer, card.name)
+                ? []
+                : Array.from(activeBoard.querySelectorAll('.landmark-zone-main .card.slot-empty'));
             color = 'green';
         } else if (card.type === 'Artifact') {
             // Artifacts from bazaar go ONLY to the History pile
@@ -1780,7 +1909,9 @@ document.addEventListener('DOMContentLoaded', () => {
         } else {
             // Non-Sparks can go to stacks (Future/History) OR their specialized zones, but NOT Abyss here
             isValid = isFuture || isHistory ||
-                      (topCard.type === 'Landmark' && isLandmarkZone) ||
+                      // Landmarks don't stack — one copy of a name per board.
+                      (topCard.type === 'Landmark' && isLandmarkZone &&
+                       !ownsLandmarkNamed(currentPlayer, topCard.name)) ||
                       (topCard.type === 'Artifact' && (isHistory || isHandAction)) ||
                       (topCard.type === 'Creature' && (isHandAction || isCreatureZone)) ||
                       (topCard.type === 'Steam' && isHandAction) ||
@@ -2461,8 +2592,13 @@ document.addEventListener('DOMContentLoaded', () => {
     function initBazaarInventory() {
         activeBazaar = {};
         cardData.forEach(card => {
+            // Destiny: only cards whose effect is actually wired up enter the live
+            // deck, so a playtest never flips a blank. This filter quietly becomes a
+            // no-op once all 24 are implemented, and can be deleted then.
+            if (card.type === 'Destiny' && !implementedCards.includes(card.name)) return;
+
             if (!activeBazaar[card.location]) activeBazaar[card.location] = [];
-            
+
             let count = parseInt(card.rarity);
             if (card.type === 'Landmark') count = 3;
             if (card.type === 'Spark') count = 6;
@@ -2475,6 +2611,17 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         });
         shuffleBazaarPilesForFusion();
+        // The Destiny deck is a face-down deck, not a sale pile — it is always
+        // shuffled, at any set count (shuffleBazaarPilesForFusion skips it because
+        // it only cares about which SET a buyable pile serves up).
+        const destinyPile = activeBazaar['D'];
+        if (destinyPile) {
+            for (let i = destinyPile.length - 1; i > 0; i--) {
+                const j = Math.floor(Math.random() * (i + 1));
+                [destinyPile[i], destinyPile[j]] = [destinyPile[j], destinyPile[i]];
+            }
+        }
+        activeBazaar['DA'] = [];
     }
 
     // Fusion Play: with more than one set active, each Bazaar position holds the
@@ -2537,8 +2684,11 @@ document.addEventListener('DOMContentLoaded', () => {
                 }
 
                 // With multiple sets active the piles are shuffled, so the top card
-                // (and its art) can come from any selected set.
-                const art = (!isDestiny && !isAbyss && !isSteam) ? cardArtUrl(topCard) : null;
+                // (and its art) can come from any selected set. The Destiny Abyss is
+                // the one Destiny slot that shows a FRONT: revealed cards lie there
+                // face up, while the deck itself keeps its back.
+                const art = loc === 'DA' ? destinyArtUrl(topCard)
+                          : (!isDestiny && !isAbyss && !isSteam) ? cardArtUrl(topCard) : null;
                 if (art) {
                     card.style.backgroundImage = `url('${art}')`;
                     card.style.backgroundColor = 'transparent';
@@ -2681,6 +2831,32 @@ document.addEventListener('DOMContentLoaded', () => {
     renderBazaar();
     updateBazaarLighting();
 
+    // Read-only list of a public pile (Abyss, Destiny Abyss) in the location modal.
+    // These piles are looked at, never bought from — so no click handlers on the rows.
+    function showPileListModal(title, cardList) {
+        if (!cardList || cardList.length === 0) return;
+        const locationTitle = document.getElementById('location-title');
+        const locationCards = document.getElementById('location-cards');
+        locationTitle.textContent = title;
+        locationCards.innerHTML = '';
+        locationCardPreview.classList.add('hidden');
+
+        cardList.forEach(c => {
+            const cardDiv = document.createElement('div');
+            cardDiv.className = 'location-card-item glass-panel';
+            cardDiv.innerHTML = `
+                <div class="loc-card-header">
+                    <span class="loc-card-num">${c.number || ''}</span>
+                    <span class="loc-card-name">${c.name}</span>
+                </div>
+                <div class="loc-card-cost">${c.cost || '-'}</div>
+            `;
+            bindHoverToElement(cardDiv, c);
+            locationCards.appendChild(cardDiv);
+        });
+        locationModal.classList.remove('hidden');
+    }
+
     // --- Interaction Logic ---
     // --- Interaction Logic Rebinding ---
     cards.forEach(cardContainer => {
@@ -2707,28 +2883,17 @@ document.addEventListener('DOMContentLoaded', () => {
             if (loc === 'AB') {
                 let abyssCards = [];
                 try { abyssCards = JSON.parse(cardContainer.dataset.cardData || '[]'); } catch (e) { /* empty */ }
-                if (abyssCards.length === 0) return;
+                showPileListModal('Abyss — Out of Game', abyssCards);
+                return;
+            }
 
-                const locationTitle = document.getElementById('location-title');
-                const locationCards = document.getElementById('location-cards');
-                locationTitle.textContent = 'Abyss — Out of Game';
-                locationCards.innerHTML = '';
-                locationCardPreview.classList.add('hidden');
-
-                abyssCards.forEach(c => {
-                    const cardDiv = document.createElement('div');
-                    cardDiv.className = 'location-card-item glass-panel';
-                    cardDiv.innerHTML = `
-                        <div class="loc-card-header">
-                            <span class="loc-card-num">${c.number || ''}</span>
-                            <span class="loc-card-name">${c.name}</span>
-                        </div>
-                        <div class="loc-card-cost">${c.cost || '-'}</div>
-                    `;
-                    bindHoverToElement(cardDiv, c);
-                    locationCards.appendChild(cardDiv);
-                });
-                locationModal.classList.remove('hidden');
+            // The Destiny deck is face DOWN — nobody reads it, not even its owner, so a
+            // click does nothing at all (without this it would open the stack modal and
+            // spoil every remaining event). Its Abyss is public: revealed cards lie there
+            // face up, so clicking it lists what Destiny has already dealt out.
+            if (loc === 'D') return;
+            if (loc === 'DA') {
+                showPileListModal('Destiny Abyss — Already Revealed', (activeBazaar['DA'] || []).slice().reverse());
                 return;
             }
 
@@ -3011,6 +3176,20 @@ document.addEventListener('DOMContentLoaded', () => {
             } catch (e) { /* skip */ }
         }
         return null;
+    }
+
+    // Landmarks don't stack: a player may own at most ONE copy of a given Landmark name.
+    // Unlike findLandmark this counts DEACTIVATED copies too — a face-down Pandorama is
+    // still occupying the zone (it just grants nothing), so you can't build a second one
+    // on top of it to double the effect. Used by every path that puts a Landmark in play:
+    // the Bazaar buy, the drop-target highlighting, placeCard, the Hyperscope rebuild draw
+    // and the AI's buy list.
+    function ownsLandmarkNamed(pNum, cardName) {
+        const board = document.getElementById(`player-${pNum}`);
+        if (!board) return false;
+        return Array.from(board.querySelectorAll('.landmark-zone-main .card:not(.slot-empty)')).some(s => {
+            try { return JSON.parse(s.dataset.cardData).name === cardName; } catch (e) { return false; }
+        });
     }
 
     // Briefly glow a landmark card (by name, on a player's board) to signal it fired.
@@ -4126,6 +4305,31 @@ document.addEventListener('DOMContentLoaded', () => {
     // Confiscation: Look at target Opponent's Hand and take one Card to your Hand.
     // 2-player V1: the opponent is automatic. With 3-4 players, reuse the same
     // target-player-overlay the attack flow and Dark Matter already use to pick which one.
+    // Move one card from a player's Hand into another player's Hand — the shared body of
+    // every "take a card from their Hand" effect (Confiscation S4, Dragon Throne 027).
+    // Opens a temporary slot when the receiving hand is already full; the End Phase
+    // hand-limit gate trims it back down. Returns the card moved, or null.
+    function takeCardToHand(slot, fromPNum, toPNum) {
+        let data;
+        try { data = JSON.parse(slot.dataset.cardData); } catch (e) { return null; }
+        clearSlot(slot);
+        updateHandLayout(fromPNum);
+
+        const toBoard = document.getElementById(`player-${toPNum}`);
+        if (!toBoard) return null;
+        const handSlots = Array.from(toBoard.querySelectorAll('.hand-slot'));
+        let dest = handSlots.find(s => s.classList.contains('slot-empty'));
+        if (!dest) {
+            dest = createSlot('hand');
+            dest.classList.add('temporary-slot');
+            toBoard.querySelector('.hand-slots').appendChild(dest);
+        }
+        finishSingleCardPlacement(dest, data);
+        updateHandLayout(toPNum);
+        floatValue(dest, `+ ${data.name}`, 'gain');
+        return data;
+    }
+
     function resolveConfiscation(casterPNum) {
         if (activePlayerCount === 2) {
             const opponent = casterPNum === 1 ? 2 : 1;
@@ -4158,24 +4362,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const handSlots = Array.from(targetBoard.querySelectorAll('.hand-slot:not(.slot-empty)'));
         if (handSlots.length === 0) return;
 
-        const takeFrom = (slot) => {
-            let data;
-            try { data = JSON.parse(slot.dataset.cardData); } catch (e) { return; }
-            clearSlot(slot);
-            updateHandLayout(targetPNum);
-
-            const casterBoard = document.getElementById(`player-${casterPNum}`);
-            const casterHandSlots = Array.from(casterBoard.querySelectorAll('.hand-slot'));
-            let dest = casterHandSlots.find(s => s.classList.contains('slot-empty'));
-            if (!dest) {
-                dest = createSlot('hand');
-                dest.classList.add('temporary-slot');
-                casterBoard.querySelector('.hand-slots').appendChild(dest);
-            }
-            finishSingleCardPlacement(dest, data);
-            updateHandLayout(casterPNum);
-            floatValue(dest, `+ ${data.name}`, 'gain');
-        };
+        const takeFrom = (slot) => { takeCardToHand(slot, targetPNum, casterPNum); };
 
         if (handSlots.length === 1) { takeFrom(handSlots[0]); return; }
 
@@ -6389,12 +6576,17 @@ document.addEventListener('DOMContentLoaded', () => {
         const hint = document.getElementById('next-player-hint');
         const btn = document.getElementById('start-turn-btn');
         
+        const title = document.getElementById('pass-device-title');
+        if (title) title.textContent = 'PASS DEVICE'; // finishTurn may have left "EXTRA TURN"
         hint.textContent = `PLAYER ${toPlayer}`;
         btn.textContent = customBtnText;
         overlay.classList.remove('hidden');
         
         btn.onclick = () => {
             overlay.classList.add('hidden');
+            // Hand the button back to its resting job. Without this the last hand-off's
+            // callback stays bound and the NEXT turn's START TURN re-runs it.
+            btn.onclick = startTurn;
             if (callback) callback();
         };
     }
@@ -6970,15 +7162,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const board = document.getElementById(`player-${currentPlayer}`);
         if (!board) return true;
 
-        let maxHand = 5;
-        const landmarks = Array.from(board.querySelectorAll('.landmark-zone-main .card:not(.slot-empty)'));
-        landmarks.forEach(s => {
-            try {
-                const data = JSON.parse(s.dataset.cardData);
-                if (data.name === 'Pandorama' && !data.deactivated) maxHand += 2;
-            } catch(e) {}
-        });
-
+        const maxHand = getMaxHand(board);
         const handSlots = Array.from(board.querySelectorAll('.hand-slot'));
         const occupiedCount = handSlots.filter(s => !s.classList.contains('slot-empty')).length;
 
@@ -7034,12 +7218,23 @@ document.addEventListener('DOMContentLoaded', () => {
         return nL * 1e6 + nG * 1e4 + nF * 1e2 + nA;
     }
 
+    // The Hand Limit, single source of truth. Base 5, raised to 7 by an active
+    // Pandorama — and NEVER higher: Landmarks don't stack (one copy of a name per
+    // board, enforced at placement), and the boost is a flat one-time +2 rather than
+    // a per-copy sum, so no combination of cards can push the limit past HAND_LIMIT_MAX.
+    const HAND_LIMIT_BASE = 5;
+    const HAND_LIMIT_MAX = 7;
+
     function getMaxHand(board) {
-        let maxHand = 5;
-        board.querySelectorAll('.landmark-zone-main .card:not(.slot-empty)').forEach(s => {
-            try { const d = JSON.parse(s.dataset.cardData); if (d.name === 'Pandorama' && !d.deactivated) maxHand += 2; } catch (e) {}
-        });
-        return maxHand;
+        if (!board) return HAND_LIMIT_BASE;
+        let maxHand = HAND_LIMIT_BASE;
+        const hasPandorama = Array.from(board.querySelectorAll('.landmark-zone-main .card:not(.slot-empty)'))
+            .some(s => {
+                try { const d = JSON.parse(s.dataset.cardData); return d.name === 'Pandorama' && !d.deactivated; }
+                catch (e) { return false; }
+            });
+        if (hasPandorama) maxHand += 2;
+        return Math.min(maxHand, HAND_LIMIT_MAX);
     }
 
     // Discard the cheapest cards from the current player's hand down to the hand limit.
@@ -7072,16 +7267,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const board = document.getElementById(`player-${currentPlayer}`);
         if (!board) return;
         
-        let maxHand = 5;
-        // Check for Pandorama in Landmark Zone
-        const landmarks = Array.from(board.querySelectorAll('.landmark-zone-main .card:not(.slot-empty)'));
-        landmarks.forEach(s => {
-            try {
-                const data = JSON.parse(s.dataset.cardData);
-                if (data.name === 'Pandorama' && !data.deactivated) maxHand += 2;
-            } catch(e) {}
-        });
-
+        const maxHand = getMaxHand(board);
         const handSlots = Array.from(board.querySelectorAll('.hand-slot'));
         const occupiedSlots = handSlots.filter(s => !s.classList.contains('slot-empty'));
         const occupiedCount = occupiedSlots.length;
@@ -7100,19 +7286,6 @@ document.addEventListener('DOMContentLoaded', () => {
             const currentOK = canEndTurn();
             
             if (!currentOK) {
-                // Determine how many to discard
-                const board = document.getElementById(`player-${currentPlayer}`);
-                let maxHand = 5;
-                const landmarks = Array.from(board.querySelectorAll('.landmark-zone-main .card:not(.slot-empty)'));
-                landmarks.forEach(s => {
-                    try {
-                        const data = JSON.parse(s.dataset.cardData);
-                        if (data.name === 'Pandorama' && !data.deactivated) maxHand += 2;
-                    } catch(e) {}
-                });
-                const handSlots = Array.from(board.querySelectorAll('.hand-slot'));
-                const occupiedCount = handSlots.filter(s => !s.classList.contains('slot-empty')).length;
-
                 // Keep clickable: clicking it auto-discards the cheapest cards
                 btn.disabled = false;
                 btn.classList.remove('disabled');
@@ -7166,7 +7339,10 @@ document.addEventListener('DOMContentLoaded', () => {
     async function triggerEndPhaseDrawing() {
         if (endPhaseTriggered) return;
         endPhaseTriggered = true;
-        const drawCount = turnSkipped ? 3 : 2;
+        // A Destiny card can rewrite this turn's draw (Freeze: "Draw only 1 Card in your
+        // End Phase"), and it outranks the Skip Turn bonus — Freeze already took the turn.
+        const drawCount = destinyDrawOverride !== null ? destinyDrawOverride
+                        : turnSkipped ? 3 : 2;
         await drawCards(currentPlayer, drawCount);
     }
 
@@ -7274,12 +7450,8 @@ document.addEventListener('DOMContentLoaded', () => {
     function landmarkRebuildSlot(pNum, card) {
         const board = document.getElementById(`player-${pNum}`);
         if (!board) return null;
+        if (ownsLandmarkNamed(pNum, card.name)) return null;
         const slots = Array.from(board.querySelectorAll('.landmark-zone-main .card'));
-        const duplicate = slots.some(s => {
-            if (s.classList.contains('slot-empty')) return false;
-            try { return JSON.parse(s.dataset.cardData).name === card.name; } catch (e) { return false; }
-        });
-        if (duplicate) return null;
         return slots.find(s => s.classList.contains('slot-empty')) || null;
     }
 
@@ -7378,21 +7550,10 @@ document.addEventListener('DOMContentLoaded', () => {
         const board = document.getElementById(`player-${playerNum}`);
         if (!board) return;
         
-        // --- Card Effect: Pandorama ---
-        let handLimitBoost = 0;
-        const landmarkSlots = board.querySelectorAll('.landmark-zone-main .card:not(.slot-empty)');
-        landmarkSlots.forEach(slot => {
-            try {
-                const data = JSON.parse(slot.dataset.cardData);
-                if (data.name === 'Pandorama') {
-                    handLimitBoost += 2;
-                }
-            } catch(e) {}
-        });
-
+        // --- Card Effect: Pandorama --- (capped at the Hand Limit, see getMaxHand)
         const handSlots = Array.from(board.querySelectorAll('.hand-slot'));
-        const activeLimit = 5 + handLimitBoost;
-        
+        const activeLimit = getMaxHand(board);
+
         // Calculate the total number of slots that NEED to be shown (limit slots + any occupied overflow slots)
         const visibleSlots = handSlots.filter((slot, index) => index < activeLimit || !slot.classList.contains('slot-empty'));
         const totalDisplayedCount = visibleSlots.length;
@@ -7431,10 +7592,26 @@ document.addEventListener('DOMContentLoaded', () => {
 
     function finishTurn() {
         cancelGrab();
-        const nextP = (currentPlayer % activePlayerCount) + 1;
-        
+
+        // Hard safety net for the Hand Limit. The End Phase "Discard (N)" gate is the
+        // normal path, but any route that reaches finishTurn with an oversized hand
+        // (a card gained mid-End-Phase, a skipped turn, an effect that hands you cards)
+        // trims here too — so a hand can never carry more than the limit into the next
+        // turn. Dev Mode is exempt so seeded test hands stay intact.
+        if (!devMode) autoDiscardToLimit();
+
+        // Chrono Machine (047): the revealer takes another turn instead of passing, so
+        // the seat doesn't move. totalTurns deliberately does NOT advance either — it
+        // counts ROUNDS (it only ticks when play cycles back to Player 1) and drives
+        // summoning sickness, and an extra turn is not a full round: nobody else played,
+        // so a Creature summoned this round still can't act in the bonus turn.
+        const extraTurn = pendingExtraTurn === currentPlayer;
+        if (extraTurn) pendingExtraTurn = null;
+
+        const nextP = extraTurn ? currentPlayer : (currentPlayer % activePlayerCount) + 1;
+
         // If we full-cycled back to Player 1, increment total turns
-        if (nextP === 1) {
+        if (!extraTurn && nextP === 1) {
             totalTurns++;
         }
 
@@ -7456,6 +7633,7 @@ document.addEventListener('DOMContentLoaded', () => {
         resetHyperscopeTurnDamage();
         minesUsedThisPhase = false;
         resetLooper();
+        destinyDrawOverride = null; // a Destiny draw rewrite lasts exactly one turn
 
         const hint = document.getElementById('next-player-hint');
         if (hint) hint.textContent = `To Player ${currentPlayer}`;
@@ -7489,26 +7667,497 @@ document.addEventListener('DOMContentLoaded', () => {
                 label.textContent = currentPlayer === AI_PLAYER ? 'COMPUTER' : 'PLAYER 1';
                 label.classList.toggle('ai-active', currentPlayer === AI_PLAYER);
             }
-            startTurn();
-            if (currentPlayer === AI_PLAYER) beginComputerTurn();
+            // A Destiny reveal happens BEFORE the turn proper, so the Computer waits
+            // for it to resolve rather than playing over the top of the overlay.
+            // setTimeout rather than straight into the .then: when the Computer chains a
+            // Chrono Machine turn, the beginComputerTurn() that just ended is still
+            // unwinding and aiTurnInProgress doesn't clear until its finally block runs —
+            // a microtask-timed call would hit that guard and silently freeze the AI.
+            startTurn().then(() => {
+                if (currentPlayer === AI_PLAYER) setTimeout(beginComputerTurn, 0);
+            });
             return;
         }
 
         const overlay = document.getElementById('pass-device-overlay');
-        if (overlay) overlay.classList.remove('hidden');
+        if (overlay) {
+            // An extra turn is not a hand-off — same player, same device. Say so.
+            const title = document.getElementById('pass-device-title');
+            const btn = document.getElementById('start-turn-btn');
+            if (title) title.textContent = extraTurn ? 'EXTRA TURN' : 'PASS DEVICE';
+            if (hint) hint.textContent = extraTurn
+                ? `Player ${currentPlayer} plays again`
+                : `To Player ${currentPlayer}`;
+            if (btn) btn.textContent = extraTurn ? 'TAKE EXTRA TURN' : 'START TURN';
+            overlay.classList.remove('hidden');
+        }
     }
 
-    function startTurn() {
+    async function startTurn() {
         const overlay = document.getElementById('pass-device-overlay');
         if (overlay) overlay.classList.add('hidden');
-        
+
         const phaseDisplay = document.getElementById('game-phase-display');
         if (phaseDisplay) phaseDisplay.classList.remove('hidden');
-        
+
         updatePhaseUI();
         if (window.updateBazaarLighting) window.updateBazaarLighting();
         consolidateHand(currentPlayer);
+
+        // "Begins their turn" — before the Steam Phase, before anything else.
+        await maybeTriggerDestiny();
     }
+
+    // ==================== DESTINY ====================
+    // Destiny cards are the game's global events and the only cards nobody buys.
+    // A player who BEGINS their turn with an empty Future Pile reveals the top card
+    // of the face-down Destiny deck and resolves it — clockwise from the revealer
+    // when it touches everyone — then it goes face up to the Destiny Abyss.
+    //
+    // Effects come in three shapes, and this section carries one piece of plumbing
+    // for each: automatic ones just run; "Each Player…" ones use
+    // forEachPlayerClockwise; the odd ones out drive the overlay themselves.
+    //
+    // The live deck holds only Destiny cards whose effect is wired up (filtered in
+    // initBazaarInventory), so a playtest never flips a blank.
+
+    let destinyResolving = false;
+    // Set by a Destiny card that rewrites this turn's End Phase draw (Freeze). null =
+    // the normal 2 (or 3 after a Skip Turn). Cleared with the rest of the turn state.
+    let destinyDrawOverride = null;
+    // Seat number owed another turn once this one ends (Chrono Machine). Consumed by
+    // finishTurn, so a second Chrono Machine during the extra turn simply chains.
+    let pendingExtraTurn = null;
+
+    // A revealed Destiny card shows its FRONT. cardArtUrl deliberately returns null
+    // for Destiny so the deck in the Bazaar keeps its back — this is the other half.
+    function destinyArtUrl(card) {
+        const slug = slugify(card && card.name);
+        if (!slug) return null;
+        return card.set === 'Duality' ? `assets/cards/duality/${slug}.png` : `assets/cards/${slug}.png`;
+    }
+
+    // Take the top card of the deck, honoring the active sets. Removes it from the pile.
+    function takeTopDestiny() {
+        const pile = activeBazaar['D'] || [];
+        for (let i = pile.length - 1; i >= 0; i--) {
+            if (selectedSets.includes(pile[i].set)) return pile.splice(i, 1)[0];
+        }
+        return null;
+    }
+
+    function sendToDestinyAbyss(card) {
+        if (!activeBazaar['DA']) activeBazaar['DA'] = [];
+        activeBazaar['DA'].push(card);
+        renderBazaar();
+    }
+
+    // Seats in play order starting with the revealer — the "clockwise, starting with
+    // you" that every 'Each Player' Destiny card means.
+    function seatsClockwise(from) {
+        const seats = [];
+        for (let i = 0; i < activePlayerCount; i++) {
+            seats.push(((from - 1 + i) % activePlayerCount) + 1);
+        }
+        return seats;
+    }
+
+    // Run one handler per seat in clockwise order, waiting for each player's decision
+    // before moving on. Between two humans the device is passed first, so a seat never
+    // makes its choice with someone else's hand on screen (vs Computer this no-ops).
+    async function forEachPlayerClockwise(from, handler) {
+        let passed = false;
+        for (const pNum of seatsClockwise(from)) {
+            if (gameWon) return;
+            const isAI = vsComputer && pNum === AI_PLAYER;
+            if (pNum !== from && !isAI) {
+                await new Promise(res => passDevice(pNum, res, 'MY CHOICE'));
+                passed = true;
+            }
+            await handler(pNum);
+        }
+        // The turn still belongs to the revealer — give the device back before play resumes.
+        if (passed && !gameWon) await new Promise(res => passDevice(from, res, 'RESUME TURN'));
+    }
+
+    const destinyPause = (ms) => new Promise(r => setTimeout(r, ms));
+
+    // --- Overlay plumbing ---------------------------------------------------
+    // The board is behind the backdrop while Destiny is open, so anything a player
+    // must choose from is rendered INSIDE the overlay.
+
+    function destinyEls() {
+        return {
+            overlay: document.getElementById('destiny-overlay'),
+            art: document.getElementById('destiny-card-art'),
+            trigger: document.getElementById('destiny-trigger'),
+            name: document.getElementById('destiny-name'),
+            text: document.getElementById('destiny-text'),
+            prompt: document.getElementById('destiny-prompt'),
+            picker: document.getElementById('destiny-picker'),
+            controls: document.getElementById('destiny-controls'),
+        };
+    }
+
+    function clearDestinyChoice() {
+        const { picker, controls, prompt } = destinyEls();
+        if (picker) picker.innerHTML = '';
+        if (controls) controls.innerHTML = '';
+        if (prompt) prompt.textContent = '';
+    }
+
+    function setDestinyPrompt(text) {
+        const { prompt } = destinyEls();
+        if (prompt) prompt.textContent = text;
+    }
+
+    // Dock buttons under the revealed card; resolves with the chosen value.
+    function destinyButtons(options) {
+        const { controls } = destinyEls();
+        return new Promise(resolve => {
+            controls.innerHTML = '';
+            options.forEach(opt => {
+                const btn = document.createElement('button');
+                btn.className = 'menu-btn tech-font' + (opt.primary ? '' : ' secondary-btn');
+                btn.textContent = opt.label;
+                btn.disabled = !!opt.disabled;
+                if (opt.disabled) btn.style.opacity = '0.5';
+                btn.onclick = (ev) => {
+                    ev.stopPropagation();
+                    controls.innerHTML = '';
+                    resolve(opt.value);
+                };
+                controls.appendChild(btn);
+            });
+        });
+    }
+
+    // A message the player has to acknowledge before the reveal moves on.
+    async function destinyNotice(text, label = 'CONTINUE') {
+        setDestinyPrompt(text);
+        await destinyButtons([{ label, value: true, primary: true }]);
+        setDestinyPrompt('');
+    }
+
+    // Multi-select over a set of card slots, rendered as mini cards in the overlay.
+    // Resolves with the chosen slots ([] when the player declines).
+    function destinyPickCards(slots, { title, confirmLabel, declineLabel, live }) {
+        const { picker } = destinyEls();
+        return new Promise(resolve => {
+            picker.innerHTML = '';
+            const selected = new Set();
+
+            const refresh = () => {
+                setDestinyPrompt(live ? live(selected.size) : title);
+                confirmBtn.textContent = confirmLabel(selected.size);
+            };
+
+            slots.forEach(slot => {
+                let card = {};
+                try { card = JSON.parse(slot.dataset.cardData); } catch (e) { /* blank */ }
+                const tile = document.createElement('div');
+                tile.className = 'destiny-pick-card';
+                const art = cardArtUrl(card);
+                if (art) tile.style.backgroundImage = `url('${art}')`;
+                else tile.textContent = card.name || '';
+                tile.title = card.name || '';
+                tile.onclick = (ev) => {
+                    ev.stopPropagation();
+                    if (selected.has(slot)) { selected.delete(slot); tile.classList.remove('selected'); }
+                    else { selected.add(slot); tile.classList.add('selected'); }
+                    refresh();
+                };
+                picker.appendChild(tile);
+            });
+
+            const { controls } = destinyEls();
+            controls.innerHTML = '';
+            const confirmBtn = document.createElement('button');
+            confirmBtn.className = 'menu-btn tech-font';
+            confirmBtn.onclick = (ev) => {
+                ev.stopPropagation();
+                const out = slots.filter(s => selected.has(s));
+                picker.innerHTML = '';
+                controls.innerHTML = '';
+                setDestinyPrompt('');
+                resolve(out);
+            };
+            const declineBtn = document.createElement('button');
+            declineBtn.className = 'menu-btn secondary-btn tech-font';
+            declineBtn.textContent = declineLabel;
+            declineBtn.onclick = (ev) => {
+                ev.stopPropagation();
+                picker.innerHTML = '';
+                controls.innerHTML = '';
+                setDestinyPrompt('');
+                resolve([]);
+            };
+            controls.appendChild(confirmBtn);
+            controls.appendChild(declineBtn);
+            refresh();
+        });
+    }
+
+    // --- Trigger & reveal ---------------------------------------------------
+
+    async function maybeTriggerDestiny() {
+        if (!gameStarted || gameWon || destinyResolving) return;
+        const board = document.getElementById(`player-${currentPlayer}`);
+        if (!board) return;
+        const futurePile = board.querySelector('.future-pile');
+        if (!futurePile) return;
+
+        let future = [];
+        try { future = JSON.parse(futurePile.dataset.cardData || '[]'); } catch (e) { future = []; }
+        // EXACTLY empty — a Future Pile with even one card left doesn't summon Destiny,
+        // and the History Pile is irrelevant (it only folds back in during a draw).
+        if (future.length !== 0) return;
+
+        const card = takeTopDestiny();
+        if (!card) return; // deck exhausted — nothing left to reveal
+
+        destinyResolving = true;
+        const phaseBefore = currentPhase;
+        try {
+            await revealDestiny(card, currentPlayer);
+        } finally {
+            destinyResolving = false;
+        }
+
+        // A Destiny card can move the turn on before it has begun (Freeze jumps straight
+        // to the End Phase). Re-sync here rather than in startTurn so EVERY entry point
+        // gets it — including the Dev Log sim, which calls this directly.
+        if (currentPhase !== phaseBefore) updatePhaseUI();
+    }
+
+    async function revealDestiny(card, revealer) {
+        const els = destinyEls();
+        if (!els.overlay) return;
+
+        clearDestinyChoice();
+        els.trigger.textContent = `Player ${revealer}'s Future Pile is empty`;
+        els.name.textContent = card.name;
+        els.text.textContent = card.description || '';
+        els.art.style.backgroundImage = "url('assets/destiny_back.png')";
+        els.art.classList.add('flipping');
+        els.overlay.classList.remove('hidden');
+
+        // Flip: back → front.
+        await destinyPause(320);
+        const art = destinyArtUrl(card);
+        els.art.style.backgroundImage = art ? `url('${art}')` : '';
+        els.art.classList.remove('flipping');
+        await destinyPause(650);
+
+        if (vsComputer) aiLog(`Destiny revealed: ${card.name}`, 'system');
+
+        const effect = destinyEffects[card.name];
+        if (effect) await effect(card, revealer);
+        else await destinyNotice('No effect is wired up for this card yet.');
+
+        sendToDestinyAbyss(card);
+        clearDestinyChoice();
+        els.overlay.classList.add('hidden');
+    }
+
+    // --- Effects -------------------------------------------------------------
+    // One entry per implemented card. Keep this table and implementedCards in step:
+    // initBazaarInventory uses implementedCards to decide what enters the deck.
+
+    // Read-only twin of gainTimePoints: what it WOULD add, without touching a die.
+    // Lets a Destiny picker quote the real number up front instead of the nominal one —
+    // someone about to trade 4 cards for time deserves to know only 3 will land before
+    // they commit. Kept here rather than beside gainTimePoints because nothing outside
+    // Destiny needs it, and the TP system itself stays untouched.
+    function previewTimePointGain(pNum, amount) {
+        const st = playersState[pNum];
+        if (!st || amount <= 0) return 0;
+        const first = activeDieType(pNum);
+        const second = first === 'day' ? 'night' : 'day';
+        let rem = amount, gained = 0;
+        if (st[first] > 0) { const add = Math.min(12 - st[first], rem); gained += add; rem -= add; }
+        if (rem > 0 && st[second] > 0) gained += Math.min(12 - st[second], rem);
+        return gained;
+    }
+
+    // 025 Healing Tree — "Each Player may discard any number of Cards on their Hand
+    // to obtain an equal number of Time Points." Clockwise from the revealer, and the
+    // "may" is real: any seat can take the deal, part of it, or walk away.
+    // Cards on the HAND only — Atlantica-parked cards are deliberately excluded, the
+    // same call Dark Matter's discard makes (parked cards are a resource, not hand
+    // count). Discarded cards go to that player's own History Pile, not the Abyss.
+    async function resolveHealingTree(card, revealer) {
+        await forEachPlayerClockwise(revealer, async (pNum) => {
+            const board = document.getElementById(`player-${pNum}`);
+            if (!board) return;
+            const isAI = vsComputer && pNum === AI_PLAYER;
+            const seatName = isAI ? 'The Computer' : `Player ${pNum}`;
+
+            const hand = Array.from(board.querySelectorAll('.hand-slot:not(.slot-empty)'));
+            if (hand.length === 0) {
+                await destinyNotice(`${seatName} has no cards to offer.`);
+                return;
+            }
+
+            const picked = isAI
+                ? aiHealingTreePick(hand)
+                : await destinyPickCards(hand, {
+                    title: `Player ${pNum}: choose any number of cards to discard.`,
+                    // Quote what the dice will ACTUALLY take, not the nominal 1:1 — a maxed
+                    // or lost die silently eats the difference.
+                    live: (n) => {
+                        if (n === 0) return `Player ${pNum}: pick cards to trade for Time Points — or decline.`;
+                        const gain = previewTimePointGain(pNum, n);
+                        const cards = `${n} card${n === 1 ? '' : 's'}`;
+                        const tp = `${gain} Time Point${gain === 1 ? '' : 's'}`;
+                        return gain < n
+                            ? `Discard ${cards} → gain ${tp} — your dice can't hold the other ${n - gain}.`
+                            : `Discard ${cards} → gain ${tp}.`;
+                    },
+                    confirmLabel: (n) => n === 0
+                        ? 'DISCARD NOTHING'
+                        : `DISCARD ${n} → +${previewTimePointGain(pNum, n)} TP`,
+                    declineLabel: 'DECLINE',
+                });
+
+            if (picked.length === 0) {
+                if (isAI) aiLog('Healing Tree: keeps its hand', 'info');
+                await destinyNotice(`${seatName} declines the Healing Tree.`);
+                return;
+            }
+
+            const history = board.querySelector('.history-pile');
+            picked.forEach(slot => {
+                let data = {};
+                try { data = JSON.parse(slot.dataset.cardData); } catch (e) { /* blank */ }
+                clearSlot(slot);
+                if (history) finishSingleCardPlacement(history, data);
+            });
+            updateHandLayout(pNum);
+
+            // Measure the gain here rather than making gainTimePoints report it — the
+            // shared TP helper stays exactly as the rest of the game already uses it.
+            const tpBefore = totalTimePoints(pNum);
+            gainTimePoints(pNum, picked.length);
+            const gained = totalTimePoints(pNum) - tpBefore;
+            floatValue(board.querySelector(activeDieSel(pNum)), `+${gained} TP`, 'gain');
+            if (isAI) aiLog(`Healing Tree: discards ${picked.length} → +${gained} TP`, 'draw');
+
+            // Gained can fall short of the cards spent once a die is maxed or lost —
+            // say so rather than silently short-changing the player.
+            const shortfall = picked.length - gained;
+            await destinyNotice(shortfall > 0
+                ? `${seatName} discards ${picked.length} and gains ${gained} Time Points (capped — ${shortfall} wasted).`
+                : `${seatName} discards ${picked.length} and gains ${gained} Time Points.`);
+        });
+    }
+
+    // The Computer's Healing Tree call. Time Points are life, but a card it can still
+    // spend is usually worth more than 1 TP — so it only cashes in dead weight, and
+    // gets greedier the closer its clock runs to zero.
+    function aiHealingTreePick(handSlots) {
+        const tp = totalTimePoints(AI_PLAYER);
+        // Easy never bothers; Normal trades when hurt; Hard also tops up early.
+        const threshold = aiLevel === 'hard' ? 14 : aiLevel === 'normal' ? 8 : 0;
+        if (tp >= threshold) return [];
+
+        const ranked = handSlots.map(slot => {
+            let card = {};
+            try { card = JSON.parse(slot.dataset.cardData); } catch (e) { /* blank */ }
+            return { slot, value: cardCostValue(card) };
+        }).sort((a, b) => a.value - b.value);
+
+        // Never strip the hand bare — it still has to play the game afterwards.
+        const spare = Math.max(0, ranked.length - 3);
+        const want = tp <= 4 ? spare : Math.min(spare, 2);
+        return ranked.slice(0, want).map(r => r.slot);
+    }
+
+    // 026 Freeze — "This turn ends directly. Draw only 1 Card in your End Phase."
+    // The revealer alone is hit, and it lands before they have done anything: Destiny
+    // fires at turn start, so Freeze costs them the whole Steam / Construction / Creature
+    // stretch. It does NOT skip the End Phase — the card explicitly still draws, just 1
+    // instead of 2, and the hand limit is still enforced on the way out.
+    //
+    // Freeze outranks Skip Turn's 3-card draw: turnSkipped can only be set in the Steam
+    // Phase, which this turn never reaches, so the two can't actually collide — but
+    // triggerEndPhaseDrawing reads the override first regardless, so the rule holds if a
+    // later card ever sets both.
+    async function resolveFreeze(card, revealer) {
+        destinyDrawOverride = 1;
+        await destinyNotice(
+            `Player ${revealer}'s turn ends immediately — no Steam, Construction or Creature Phase. Only 1 card is drawn in the End Phase.`,
+            'END THE TURN'
+        );
+        // Jump the turn to its End Phase. startTurn re-syncs the phase UI once the
+        // overlay closes, and that re-sync is what fires the (single) draw.
+        currentPhase = 3;
+        if (vsComputer) aiLog('Freeze: turn ends immediately, draws only 1', 'info');
+    }
+
+    // "Choose an opponent", asked inside the Destiny overlay itself rather than through the
+    // shared #target-player-overlay — that one sits on the same z-index layer and would
+    // render UNDERNEATH this screen. At 2 players there is only one opponent, so no
+    // question is asked; the seat walk keeps clockwise order for 3-4p.
+    async function destinyChooseOpponent(revealer, prompt) {
+        const others = seatsClockwise(revealer).filter(p => p !== revealer);
+        if (others.length === 0) return null;
+        if (others.length === 1) return others[0];
+        setDestinyPrompt(prompt);
+        const pick = await destinyButtons(others.map(p => ({ label: `PLAYER ${p}`, value: p, primary: true })));
+        setDestinyPrompt('');
+        return pick;
+    }
+
+    // 027 Dragon Throne — "Choose an opponent. Take a random Card from their Hand and place
+    // it in yours." The card is RANDOM, so neither player picks it — the only decision is
+    // which opponent, and at 2 players there isn't one. Naming the taken card in the notice
+    // leaks nothing: the victim watched it leave their hand and the thief is holding it.
+    // If the thief's hand is already full the card still arrives (temporary slot) and the
+    // End Phase hand-limit gate settles it, same as Confiscation.
+    async function resolveDragonThrone(card, revealer) {
+        const target = await destinyChooseOpponent(revealer, 'Dragon Throne — take a card from which opponent?');
+        if (!target) { await destinyNotice('There is no opponent to take from.'); return; }
+
+        const targetBoard = document.getElementById(`player-${target}`);
+        const hand = targetBoard
+            ? Array.from(targetBoard.querySelectorAll('.hand-slot:not(.slot-empty)'))
+            : [];
+        const targetName = (vsComputer && target === AI_PLAYER) ? 'The Computer' : `Player ${target}`;
+        if (hand.length === 0) {
+            await destinyNotice(`${targetName}'s hand is empty — there is nothing to take.`);
+            return;
+        }
+
+        const taken = takeCardToHand(hand[Math.floor(Math.random() * hand.length)], target, revealer);
+        if (!taken) return;
+        if (vsComputer) aiLog(`Dragon Throne: ${taken.name} changes hands`, 'play');
+        const thief = (vsComputer && revealer === AI_PLAYER) ? 'The Computer' : `Player ${revealer}`;
+        await destinyNotice(`${thief} takes ${taken.name} at random from ${targetName}'s hand.`);
+    }
+
+    // 047 Chrono Machine — "After your turn ends, you get an additional turn."
+    // The revealer alone benefits, and it resolves later rather than now: all this does
+    // is post a claim on the seat, which finishTurn consumes when the turn actually ends.
+    // Deliberately NOT a phase jump like Freeze — the current turn plays out in full
+    // first, and only then does play stay put instead of passing.
+    //
+    // The extra turn is a real turn start, so it re-runs the Destiny check: if the
+    // revealer's Future Pile is still empty they flip another card, which is correct and
+    // self-limiting (the End Phase draw reshuffles History back into the Future, and the
+    // Destiny deck is finite either way). A second Chrono Machine simply chains.
+    async function resolveChronoMachine(card, revealer) {
+        pendingExtraTurn = revealer;
+        await destinyNotice(`Player ${revealer} takes an additional turn once this one ends.`);
+        if (vsComputer) aiLog('Chrono Machine: an extra turn follows this one', 'info');
+    }
+
+    const destinyEffects = {
+        'Healing Tree': resolveHealingTree,
+        'Freeze': resolveFreeze,
+        'Chrono Machine': resolveChronoMachine,
+        'Dragon Throne': resolveDragonThrone,
+    };
 
     // ==================== COMPUTER OPPONENT ====================
     // Player 2 can be driven by a built-in opponent ("Computer") at three
@@ -7691,9 +8340,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function aiOwnsLandmark(name) {
-        return Array.from(aiBoard().querySelectorAll('.landmark-zone-main .card:not(.slot-empty)')).some(s => {
-            try { return JSON.parse(s.dataset.cardData).name === name; } catch (e) { return false; }
-        });
+        return ownsLandmarkNamed(AI_PLAYER, name);
     }
 
     // --- Decision making ---
@@ -7764,6 +8411,7 @@ document.addEventListener('DOMContentLoaded', () => {
         let targetEl, place, logText, logKind;
 
         if (cardCopy.type === 'Landmark') {
+            if (aiOwnsLandmark(cardCopy.name)) return; // no duplicate Landmarks
             const slot = aiBoard().querySelector('.landmark-zone-main .card.slot-empty');
             if (!slot) return;
             targetEl = slot;
@@ -7852,6 +8500,14 @@ document.addEventListener('DOMContentLoaded', () => {
         try {
             await aiThink();
 
+            // A Destiny card can end the turn before the Computer gets to act (Freeze
+            // pushes straight to the End Phase). Honor that instead of playing over it.
+            if (currentPhase >= 3) {
+                aiLog('Its turn was frozen — straight to the End Phase', 'info');
+                if (!gameWon) await aiEndPhaseWrapUp();
+                return;
+            }
+
             // Steam Phase — up to one Steam purchase (free FireSteam included).
             if (!gameWon) {
                 const steamPick = aiChooseSteamBuy();
@@ -7880,22 +8536,30 @@ document.addEventListener('DOMContentLoaded', () => {
 
             if (!gameWon) await aiCreaturePhase();
 
-            aiAdvancePhase(); // → End (draws 2 automatically)
-            if (!gameWon) {
-                aiLog('Draws 2 cards', 'draw');
-                await aiSleep(3000); // covers both deal animations plus a possible reshuffle
-                if (!canEndTurn()) {
-                    aiLog('Discards down to the hand limit', 'info');
-                    aiAdvancePhase(); // auto-discards the cheapest, stays in End Phase
-                    await aiSleep(800);
-                }
-                aiAdvancePhase(); // → finishTurn, back to Player 1
-            }
+            aiAdvancePhase(); // → End (the phase change draws automatically)
+            if (!gameWon) await aiEndPhaseWrapUp();
         } finally {
             aiTurnInProgress = false;
             document.body.classList.remove('ai-turn');
         }
-        if (!gameWon) aiLog('Your turn', 'turn');
+        // Not always your turn next: a Chrono Machine claim keeps the seat, and announcing
+        // "Your turn" only to log "Computer's turn" a beat later reads as a bug.
+        if (!gameWon && currentPlayer !== AI_PLAYER) aiLog('Your turn', 'turn');
+    }
+
+    // The End Phase tail: wait out the automatic draw, trim to the hand limit, pass back.
+    // Shared by the normal turn and the frozen one, which arrives here already in phase 3
+    // (so it must NOT advance into the End Phase again — it's standing in it).
+    async function aiEndPhaseWrapUp() {
+        const drawn = destinyDrawOverride !== null ? destinyDrawOverride : (turnSkipped ? 3 : 2);
+        aiLog(`Draws ${drawn} card${drawn === 1 ? '' : 's'}`, 'draw');
+        await aiSleep(3000); // covers the deal animations plus a possible reshuffle
+        if (!canEndTurn()) {
+            aiLog('Discards down to the hand limit', 'info');
+            aiAdvancePhase(); // auto-discards the cheapest, stays in End Phase
+            await aiSleep(800);
+        }
+        aiAdvancePhase(); // → finishTurn, back to Player 1
     }
 
     // --- Reactions to the human's plays ---
@@ -8041,8 +8705,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 document.getElementById('player-1')?.classList.add('active-player');
                 const label = document.getElementById('active-player-label');
                 if (label) { label.textContent = 'COMPUTER'; label.classList.add('ai-active'); }
-                startTurn();
-                beginComputerTurn();
+                startTurn().then(() => beginComputerTurn());
             }
         }));
 
@@ -8091,6 +8754,9 @@ document.addEventListener('DOMContentLoaded', () => {
         aetherlabUsedThisPhase = false;
         minesUsedThisPhase = false;
         rhoneChargedThisPhase = false;
+        destinyDrawOverride = null;
+        pendingExtraTurn = null;
+        destinyResolving = false;
         disarmCloneFactory();
         deactivateAetherlab();
         resetLooper();
@@ -8234,6 +8900,7 @@ document.addEventListener('DOMContentLoaded', () => {
             'options-modal', 'location-modal',
             'attack-action-menu', 'defense-overlay',
             'darkmatter-overlay', 'target-player-overlay',
+            'destiny-overlay',
         ].forEach(id => {
             const el = document.getElementById(id);
             if (el && el.parentElement !== document.body) document.body.appendChild(el);

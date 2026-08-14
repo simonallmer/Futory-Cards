@@ -3637,3 +3637,191 @@ body.mobile-mode .rules-book-panel {
   transform: scale(0.4);
   transform-origin: center center;
 }
+
+/* ==================== DESTINY REVEAL ==================== */
+/* The Destiny overlay is the only screen that interrupts a turn before it has
+   begun, so it leans on the display face (Cinzel) and a violet key light to read
+   as an event rather than a normal prompt. Layout matches .combat-modal's width
+   so it sits in the same visual family as the defense/Dark Matter screens. */
+.destiny-modal {
+  max-width: 560px;
+  text-align: center;
+  border-color: rgba(160, 110, 255, 0.35);
+  box-shadow: 0 0 60px rgba(120, 70, 220, 0.35);
+}
+
+.destiny-title {
+  font-size: 30px;
+  letter-spacing: 6px;
+  margin-bottom: 2px;
+}
+
+.destiny-trigger {
+  font-size: 11px;
+  letter-spacing: 1.5px;
+  text-transform: uppercase;
+  opacity: 0.6;
+  margin-bottom: 18px;
+}
+
+.destiny-body {
+  display: flex;
+  align-items: center;
+  gap: 22px;
+  text-align: left;
+  margin-bottom: 16px;
+}
+
+.destiny-card-art {
+  width: 132px;
+  height: 185px;
+  flex: 0 0 132px;
+  border-radius: 10px;
+  background-size: cover;
+  background-position: center;
+  background-color: #0a0a0c;
+  border: 2px solid rgba(160, 110, 255, 0.4);
+  box-shadow: 0 0 26px rgba(120, 70, 220, 0.4);
+  /* The card lands face down, then flips to its front on reveal. */
+  transition: transform 0.45s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+}
+.destiny-card-art.flipping { transform: rotateY(90deg) scale(0.94); }
+
+.destiny-info { flex: 1 1 auto; }
+.destiny-info h3 {
+  font-size: 21px;
+  margin-bottom: 8px;
+  color: #d9c2ff;
+}
+.destiny-info p {
+  font-size: 13px;
+  line-height: 1.5;
+  opacity: 0.85;
+}
+
+.destiny-prompt {
+  font-size: 13px;
+  letter-spacing: 0.5px;
+  min-height: 18px;
+  margin-bottom: 10px;
+}
+
+/* Hand picker — the player's own cards rendered inside the overlay, because the
+   board itself is behind the backdrop and can't be clicked while this is open. */
+.destiny-picker {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 8px;
+  margin-bottom: 14px;
+}
+.destiny-picker:empty { display: none; }
+
+.destiny-pick-card {
+  width: 66px;
+  height: 92px;
+  border-radius: 6px;
+  background-size: cover;
+  background-position: center;
+  background-color: rgba(255, 255, 255, 0.08);
+  border: 2px solid rgba(255, 255, 255, 0.2);
+  cursor: pointer;
+  position: relative;
+  transition: all 0.18s ease;
+  font-size: 8px;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  overflow: hidden;
+}
+.destiny-pick-card:hover { transform: translateY(-4px); border-color: rgba(255, 255, 255, 0.5); }
+.destiny-pick-card.selected {
+  border-color: #7be0a0;
+  box-shadow: 0 0 18px rgba(123, 224, 160, 0.6);
+  transform: translateY(-6px);
+}
+.destiny-pick-card.selected::after {
+  content: '✔';
+  position: absolute;
+  top: 2px;
+  right: 4px;
+  color: #7be0a0;
+  font-size: 13px;
+  text-shadow: 0 0 6px #000;
+}
+
+.destiny-controls {
+  display: flex;
+  justify-content: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+.destiny-controls:empty { display: none; }
+.destiny-controls .menu-btn { min-width: 130px; }
+
+body.mobile-mode .destiny-modal { max-width: 94vw; max-height: 88vh; overflow: auto; }
+body.mobile-mode .destiny-body { flex-direction: column; text-align: center; gap: 12px; }
+
+/* ---- Dev Log: implementation progress ---- */
+/* Sits above the Card Implementation grid. Destiny has its own row because it is the
+   active workstream and the live Destiny deck is built from exactly this count. */
+.devlog-progress {
+  margin-bottom: 18px;
+  padding: 14px 16px;
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid var(--glass-border);
+}
+
+.progress-row + .progress-row { margin-top: 12px; }
+
+.progress-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  margin-bottom: 5px;
+  gap: 12px;
+}
+
+.progress-label {
+  font-size: 12px;
+  letter-spacing: 1.5px;
+  text-transform: uppercase;
+  opacity: 0.8;
+}
+
+.progress-count {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--accent-color);
+  white-space: nowrap;
+}
+.progress-count em {
+  font-style: normal;
+  font-weight: 400;
+  opacity: 0.55;
+  color: #fff;
+  margin-left: 6px;
+}
+
+.progress-track {
+  height: 5px;
+  border-radius: 3px;
+  background: rgba(255, 255, 255, 0.1);
+  overflow: hidden;
+}
+
+.progress-fill {
+  height: 100%;
+  border-radius: 3px;
+  background: linear-gradient(90deg, rgba(0, 255, 255, 0.5), var(--accent-color));
+  box-shadow: 0 0 10px rgba(0, 255, 255, 0.5);
+  transition: width 0.4s ease;
+}
+
+.progress-note {
+  margin-top: 12px;
+  font-size: 11px;
+  line-height: 1.5;
+  opacity: 0.55;
+}
