@@ -582,7 +582,7 @@ document.addEventListener('DOMContentLoaded', () => {
             phase: 0,
             // Four distinctly-named cards in the Computer's hand so the random pick is
             // obvious, and a nearly-empty hand of your own so the arrival is easy to see.
-            desc: "Player 1's Future Pile is empty — the turn start reveals Dragon Throne. A RANDOM card out of the Computer's four (Ichor / Cravus / Vulcanem / LaserSteam) jumps into your hand. Re-run it a few times: it should not always be the same card.",
+            desc: "Player 1's Future Pile is empty — the turn start reveals Dragon Throne. The opponent's four cards (Ichor / Cravus / Vulcanem / LaserSteam) fan out FACE DOWN — pick one blind and it moves to your hand. The row length tells you their hand size; which card sits behind each back is shuffled, so re-runs should not always give the same card.",
             destiny: 'Dragon Throne',
             hand: ['FireSteam'],
             p1future: [],
@@ -689,6 +689,7 @@ document.addEventListener('DOMContentLoaded', () => {
     };
 
     const devLogData = [
+        { date: '2026-08-14', msg: "Destiny — Dragon Throne reworked to a blind pick, plus a dev-only deck refill. Both from Simon's playtest read. (1) DECK REFILL. He asked what happens when the deck dries up; the honest answer was nothing — takeTopDestiny() returned null and maybeTriggerDestiny() just returned, silently. With only 4 cards wired up the live deck empties after 4 reveals, and from then on every empty-Future turn start did nothing with no message, which in a playtest is indistinguishable from a broken trigger. Fixed as a DEV-ONLY refill per his call: an empty deck reshuffles the Destiny Abyss back in, gated on destinySetComplete() — so the moment all 24 cards are implemented the refill stops firing on its own and the deck runs out for real, which is the shipped rule. No flag to remember to turn off, and nothing to unpick later. The rulebook says only 'send it to the Destiny Abyss face up' and nothing about recycling, so this is explicitly scaffolding for the short deck, not a rules change. (2) DRAGON THRONE — 'take a RANDOM card' was, in Simon's words, anticlimactic as a silent dice roll. Now the theft is played out: the victim's hand fans FACE DOWN (new destinyPickFaceDown()) and the thief clicks one of the backs. The outcome is still random — you cannot know what you're taking — but the choosing is a moment, it invites the 'no, not that one' from across the table, and the length of the row is real information: everyone now learns how big that hand is, which the old dice roll threw away. JUDGMENT CALL worth knowing: which real card sits behind each back is SHUFFLED rather than left in hand order. Without that, a player who tracked what their opponent drew could aim at a known slot, and the card is printed 'random' — the drama is meant to come from the ritual, not from an information edge. Flip the shuffle if you'd rather reward hand-tracking. The Computer as thief just picks an index (it has no hand fanned at it either way). Verified live: the picker showed 4 identical backs labelled with the hand size, taking one moved it across (opponent 4 → 3, yours 1 → 2), and clicking the SAME tile position across four re-runs took Vulcanem / LaserSteam / Ichor / Cravus — proving the shuffle holds and slot-tracking buys nothing. Refill verified by emptying both seats' Future AND History piles so every turn start triggered: the deck counted down 3 → 2 → 0, then recycled the 8-card Abyss, dealt from it (deck 7, Abyss back to just the card that had resolved) and kept revealing. No console errors." },
         { date: '2026-08-14', msg: "Destiny 027 Dragon Throne — implemented (auto), 4/24. 'Choose an opponent. Take a random Card from their Hand and place it in yours.' The card is RANDOM, so neither player picks it — the only decision is WHICH opponent, and in 2-player V1 there isn't one, so it auto-resolves. REUSE over reinvention: Confiscation (S4) already did the take-a-card-from-their-Hand move, so rather than writing a second copy, that logic was extracted into a shared takeCardToHand(slot, fromPNum, toPNum) — clear the source slot, re-layout both hands, drop it into the receiver's first empty Hand slot (opening a temporary one if the hand is already full, which the End Phase hand-limit gate then trims) and float '+ CardName'. Confiscation now calls the same helper, so the two effects can't drift apart. The opponent picker is deliberately NOT the shared #target-player-overlay that Confiscation and Dark Matter use for 3-4 players: that overlay sits on the same z-index layer as the Destiny screen and would render UNDERNEATH it. New destinyChooseOpponent() asks inside the Destiny overlay itself via the existing destinyButtons() dock, walking seats in clockwise order, and skips the question entirely when there's only one opponent. Naming the taken card in the resolution notice leaks nothing — the victim watched it leave their hand and the thief is holding it. Works in both directions: the Computer as revealer takes from you through the identical path (and logs 'Dragon Throne: <card> changes hands' to its feed). Verified live via the new sim (your hand: 1 FireSteam; the opponent's: Ichor / Cravus / Vulcanem / LaserSteam): the reveal moved exactly one card across — opponent 4 → 3, yours 1 → 2 — and four re-runs took LaserSteam, Cravus, Cravus, Vulcanem, confirming it's actually random rather than always the first or last slot. Regression-checked Confiscation after the extraction: buying it from Bazaar S4 still opened 'Confiscation — P2's Hand' listing Ichor/Cravus/Smoke, and taking Smoke moved it correctly. No console errors. Destiny progress panel now reads 4/24, next 028 Unstoppable Force." },
         { date: '2026-08-14', msg: "Destiny 047 Chrono Machine — implemented (auto), 3/24. 'After your turn ends, you get an additional turn.' The mirror image of Freeze: where Freeze rewrites the CURRENT turn, this one resolves later and leaves the current turn completely alone. resolveChronoMachine just posts a claim on the seat (pendingExtraTurn = revealer); finishTurn consumes it and skips the seat advance, so play stays put instead of passing. THE SUBTLE PART is totalTurns: it is NOT incremented for an extra turn, because despite the name it counts ROUNDS (it only ticks when play cycles back to Player 1) and it's what drives summoning sickness via `summonedOnTurn < totalTurns`. An extra turn is not a full round — nobody else played — so a Creature summoned this round still can't act in the bonus turn, which is the correct reading of 'after a full round in the zone'. Leaving totalTurns alone gets that for free. The extra turn is a real turn start, so it re-runs the Destiny check: a revealer whose Future Pile is still empty flips another card. That's correct and self-limiting (the End Phase draw reshuffles History back into the Future) and a second Chrono Machine simply chains, since the flag is consumed before the new one is set. COMPUTER: this exposed a live deadlock. finishTurn called beginComputerTurn() straight out of a .then, which is microtask-timed — when the Computer chains its own extra turn, the beginComputerTurn() that just ended is still unwinding and aiTurnInProgress doesn't clear until its finally block runs, so the new call would hit the `if (aiTurnInProgress) return` guard and the AI would silently freeze mid-game. Moved to setTimeout(beginComputerTurn, 0): a macrotask runs after every pending microtask has drained, so the guard is always clear by then. Also stopped the feed logging 'Your turn' when the Computer is about to take another one. HOT SEAT: an extra turn is not a hand-off, so the pass screen now reads EXTRA TURN / 'Player N plays again' / TAKE EXTRA TURN instead of PASS DEVICE (h1 given an id; passDevice resets the title so a later mid-combat hand-off can't inherit it). Fixed a Dev Log sim bug found while testing: runSimulation resets the per-turn flags but knew nothing about Destiny state, so an unspent Chrono Machine claim survived a preset reload and handed the extra turn to whoever ran the NEXT sim — it now clears destinyDrawOverride, pendingExtraTurn and destinyResolving alongside the others, and resetGameToStart does the same. Verified live in BOTH modes. Vs Computer: Player 1 revealed Chrono, played a normal full turn (Steam → Construction → Creature → End, unlike Freeze), and End Turn came straight back to PLAYER 1 at the Steam Phase with an empty AI feed — the Computer never played — while the NEXT End Turn passed to it normally, proving the claim is consumed not sticky. Then, by leaving Chrono on the deck and handing the Computer an empty Future Pile, its turn revealed Chrono and it took TWO consecutive turns (feed: Destiny revealed → extra turn follows → COMPUTER'S TURN → buys/summons/draws → COMPUTER'S TURN → buys/builds/draws) with no freeze — the deadlock fix holding. Hot seat: the EXTRA TURN screen appeared with 'Player 1 plays again', and the following turn correctly reverted to PASS DEVICE / To Player 2. No console errors. Shipped in the first Destiny commit (card 3 of 4 in that batch)." },
         { date: '2026-08-14', msg: "Destiny 026 Freeze — implemented (auto), 2/24. 'This turn ends directly. Draw only 1 Card in your End Phase.' The first Destiny card that needed a real engine hook rather than just the reveal framework, because it rewrites the turn itself. Since Destiny fires at turn START, Freeze costs the revealer the entire Steam / Construction / Creature stretch before they have done anything — resolveFreeze sets currentPhase = 3 directly. It does NOT skip the End Phase: the card explicitly still draws, so the End Phase runs with a new destinyDrawOverride (null = the normal 2, or 3 after a Skip Turn) that triggerEndPhaseDrawing reads FIRST, and the hand limit is still enforced on the way out. Freeze therefore outranks Skip Turn's 3-card draw — in practice they can't collide, because turnSkipped can only be set in the Steam Phase which this turn never reaches, but the precedence is explicit so it holds if a later card ever sets both. destinyDrawOverride clears in finishTurn with the rest of the per-turn state, so the rewrite lasts exactly one turn. WHERE THE PHASE RE-SYNC LIVES: first draft put it in startTurn, which worked in a real game and silently did NOTHING under the Dev Log sim — the sim calls maybeTriggerDestiny() directly, so the phase changed but no UI ever re-rendered and Freeze looked like a no-op. Moved into maybeTriggerDestiny itself (compare currentPhase before/after the reveal, updatePhaseUI if it moved), so every entry point gets it — and that re-sync is also what fires the single draw. COMPUTER: beginComputerTurn now checks for currentPhase >= 3 up front and, if a Destiny card already ended its turn, skips straight to the End Phase instead of playing over the top of it; the End Phase tail (wait out the draw, trim to the hand limit, pass back) was extracted into aiEndPhaseWrapUp() and is shared by both paths, so the frozen path can't drift from the normal one. Its feed line now reports the real draw count rather than a hard-coded 'Draws 2 cards'. DEV LOG: added an implementation progress panel above the Card Implementation grid — separate bars for Bazaar cards (24/24) and Destiny cards (2/24, naming the next card up), scoped to the active sets, with Steam excluded since the currency has no effect to implement. That count is not decoration: initBazaarInventory builds the live Destiny deck from exactly the same implementedCards list, so the bar literally shows what the deck contains. Both Destiny cards have '▶ Sim' presets and run standalone from here (sim.destiny stacks the chosen card on the deck and lets the ordinary empty-Future-Pile trigger fire it). Verified live BOTH seats: Player 1's sim revealed Freeze, jumped 0 → End Phase, drew exactly 1 (hand 2→3, History's 4 reshuffled into an empty Future leaving 3) with the button reading 'End Turn'; and, by draining the deck to Freeze and handing the Computer an empty Future Pile, its turn revealed Freeze and the feed read 'Destiny revealed: Freeze → Freeze: turn ends immediately, draws only 1 → Computer's turn → Its turn was frozen — straight to the End Phase → Draws 1 card', with P2 hand 3→4, Future 0→2, History 3→0 and no buy, summon or attack, then the turn passed back to Player 1. Both cards sit face up in the Destiny Abyss, deck empty. No console errors. Shipped in the first Destiny commit (card 2 of 4 in that batch)." },
@@ -809,7 +810,7 @@ document.addEventListener('DOMContentLoaded', () => {
         host.innerHTML =
             tally('Bazaar cards', bazaar) +
             tally('Destiny cards', destiny, nextUp ? `next: ${nextUp.number} ${nextUp.name}` : 'complete') +
-            `<p class="progress-note tech-font">Only implemented Destiny cards enter the live deck, so a playtest never flips a blank. Every implemented card with a <strong>▶ Sim</strong> button can be run on its own from here.</p>`;
+            `<p class="progress-note tech-font">Only implemented Destiny cards enter the live deck, so a playtest never flips a blank${nextUp ? ' — and while the set is incomplete an empty deck reshuffles the Destiny Abyss back in, so the trigger never goes quiet mid-game. That refill stops on its own once all 24 are done' : ''}. Every implemented card with a <strong>▶ Sim</strong> button can be run on its own from here.</p>`;
     }
 
     function renderChecklist() {
@@ -7752,6 +7753,32 @@ document.addEventListener('DOMContentLoaded', () => {
         renderBazaar();
     }
 
+    // Is every Destiny card of the active sets implemented yet?
+    function destinySetComplete() {
+        const all = cardData.filter(c => c.type === 'Destiny' && selectedSets.includes(c.set));
+        return all.length > 0 && all.every(c => implementedCards.includes(c.name));
+    }
+
+    // DEV-ONLY refill. While the set is still being built the live deck holds only the
+    // handful of cards that are wired up, so it dries up after a few reveals — and an
+    // exhausted deck reveals nothing at all, which during a playtest is indistinguishable
+    // from a broken trigger. Until all 24 are implemented, an empty deck shuffles the
+    // Destiny Abyss back in. The moment the set is complete this stops firing on its own
+    // and the deck runs out for real, which is the shipped rule — no flag to remember to
+    // turn off. Returns true if it actually put cards back.
+    function refillDestinyDeckForDev() {
+        if (destinySetComplete()) return false;
+        const abyss = activeBazaar['DA'] || [];
+        const returning = abyss.filter(c => selectedSets.includes(c.set));
+        if (returning.length === 0) return false;
+
+        activeBazaar['DA'] = abyss.filter(c => !selectedSets.includes(c.set));
+        activeBazaar['D'] = (activeBazaar['D'] || []).concat(shuffleArray(returning));
+        renderBazaar();
+        if (vsComputer) aiLog('Destiny deck reshuffled (dev: set incomplete)', 'system');
+        return true;
+    }
+
     // Seats in play order starting with the revealer — the "clockwise, starting with
     // you" that every 'Each Player' Destiny card means.
     function seatsClockwise(from) {
@@ -7898,6 +7925,29 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
+    // A single blind pick: N face-down card backs, resolves with the index chosen.
+    // Used where an effect is printed "random" but plays better as a choice — you still
+    // don't know what you're taking, but you pick it, and the row itself tells the table
+    // how many cards that hand is holding.
+    function destinyPickFaceDown(count, prompt) {
+        const { picker } = destinyEls();
+        return new Promise(resolve => {
+            setDestinyPrompt(prompt);
+            picker.innerHTML = '';
+            for (let i = 0; i < count; i++) {
+                const tile = document.createElement('div');
+                tile.className = 'destiny-pick-card destiny-pick-back';
+                tile.onclick = (ev) => {
+                    ev.stopPropagation();
+                    picker.innerHTML = '';
+                    setDestinyPrompt('');
+                    resolve(i);
+                };
+                picker.appendChild(tile);
+            }
+        });
+    }
+
     // --- Trigger & reveal ---------------------------------------------------
 
     async function maybeTriggerDestiny() {
@@ -7913,7 +7963,11 @@ document.addEventListener('DOMContentLoaded', () => {
         // and the History Pile is irrelevant (it only folds back in during a draw).
         if (future.length !== 0) return;
 
-        const card = takeTopDestiny();
+        let card = takeTopDestiny();
+        // Empty deck: recycle the Abyss while the set is still under construction (see
+        // refillDestinyDeckForDev). Once all 24 are in, this does nothing and the deck
+        // genuinely runs out.
+        if (!card && refillDestinyDeckForDev()) card = takeTopDestiny();
         if (!card) return; // deck exhausted — nothing left to reveal
 
         destinyResolving = true;
@@ -8110,11 +8164,20 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     // 027 Dragon Throne — "Choose an opponent. Take a random Card from their Hand and place
-    // it in yours." The card is RANDOM, so neither player picks it — the only decision is
-    // which opponent, and at 2 players there isn't one. Naming the taken card in the notice
-    // leaks nothing: the victim watched it leave their hand and the thief is holding it.
-    // If the thief's hand is already full the card still arrives (temporary slot) and the
-    // End Phase hand-limit gate settles it, same as Confiscation.
+    // it in yours." Per Simon: a silent dice-roll is anticlimactic, so the theft is played
+    // out — the victim's hand is fanned FACE DOWN and the thief picks one of the backs.
+    // The outcome is still random (you cannot know what you're taking), but the choosing
+    // is a moment, it invites the "no, not that one" from across the table, and the length
+    // of the row is real information: everyone now knows how big that hand is.
+    //
+    // Which real card sits behind each back is SHUFFLED rather than left in hand order.
+    // Without that, anyone who tracked what the opponent drew could aim at a known slot,
+    // and the card is printed "random" — the drama is meant to come from the ritual, not
+    // from an information edge. Flip the shuffle if you'd rather reward hand-tracking.
+    //
+    // Naming the card afterwards leaks nothing: the victim watched it leave and the thief
+    // is holding it. If the thief's hand is full the card still arrives on a temporary
+    // slot and the End Phase limit gate settles it, same as Confiscation.
     async function resolveDragonThrone(card, revealer) {
         const target = await destinyChooseOpponent(revealer, 'Dragon Throne — take a card from which opponent?');
         if (!target) { await destinyNotice('There is no opponent to take from.'); return; }
@@ -8129,11 +8192,20 @@ document.addEventListener('DOMContentLoaded', () => {
             return;
         }
 
-        const taken = takeCardToHand(hand[Math.floor(Math.random() * hand.length)], target, revealer);
+        const fanned = shuffleArray(hand.slice());
+        const thiefIsAI = vsComputer && revealer === AI_PLAYER;
+        const index = thiefIsAI
+            ? Math.floor(Math.random() * fanned.length) // no hand to show it — it just picks
+            : await destinyPickFaceDown(
+                fanned.length,
+                `${targetName}'s hand — ${fanned.length} card${fanned.length === 1 ? '' : 's'}, face down. Choose one to steal.`
+            );
+
+        const taken = takeCardToHand(fanned[index], target, revealer);
         if (!taken) return;
         if (vsComputer) aiLog(`Dragon Throne: ${taken.name} changes hands`, 'play');
-        const thief = (vsComputer && revealer === AI_PLAYER) ? 'The Computer' : `Player ${revealer}`;
-        await destinyNotice(`${thief} takes ${taken.name} at random from ${targetName}'s hand.`);
+        const thief = thiefIsAI ? 'The Computer' : `Player ${revealer}`;
+        await destinyNotice(`${thief} takes ${taken.name} from ${targetName}'s hand.`);
     }
 
     // 047 Chrono Machine — "After your turn ends, you get an additional turn."
