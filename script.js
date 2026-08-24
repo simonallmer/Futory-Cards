@@ -285,7 +285,7 @@ document.addEventListener('DOMContentLoaded', () => {
         };
     }
 
-    const implementedCards = ["Pandorama", "Fountain of Youth", "Laser Catalyst", "Dragura's Wasteland", "Planetarium", "Lethargo's Temple", "Clone Factory", "Aetherlab", "Entrophy", "Meridius", "Meridia", "Time Thief", "Ichor", "Vulcanem", "Cravus", "Rampadon", "Smoke", "Dark Matter", "Reflector", "Talisman", "Reversal", "Faith", "Threat", "Confiscation", "Gravitas", "Time Bender", "Meridia's Cabin", "Repo Station", "Hand of Rhone", "Atlantica", "Hyperscope", "Mines of Pyralos", "Chrona", "Razo", "Looper", "Masiota", "Aromeas", "General Wave", "Namandi", "Sea Lord", "Sleep Potion", "Lotus", "Rush", "Cell Shield", "Alchemy", "Tame Beast", "Tele Control", "Burden of Wealth", "Healing Tree", "Freeze", "Chrono Machine", "Dragon Throne"];
+    const implementedCards = ["Pandorama", "Fountain of Youth", "Laser Catalyst", "Dragura's Wasteland", "Planetarium", "Lethargo's Temple", "Clone Factory", "Aetherlab", "Entrophy", "Meridius", "Meridia", "Time Thief", "Ichor", "Vulcanem", "Cravus", "Rampadon", "Smoke", "Dark Matter", "Reflector", "Talisman", "Reversal", "Faith", "Threat", "Confiscation", "Gravitas", "Time Bender", "Meridia's Cabin", "Repo Station", "Hand of Rhone", "Atlantica", "Hyperscope", "Mines of Pyralos", "Chrona", "Razo", "Looper", "Masiota", "Aromeas", "General Wave", "Namandi", "Sea Lord", "Sleep Potion", "Lotus", "Rush", "Cell Shield", "Alchemy", "Tame Beast", "Tele Control", "Burden of Wealth", "Healing Tree", "Freeze", "Chrono Machine", "Dragon Throne", "Unstoppable Force"];
 
     // --- Intent Classification ---
     // auto: fires on its own when condition is met
@@ -345,6 +345,7 @@ document.addEventListener('DOMContentLoaded', () => {
         'Freeze': 'auto',
         'Chrono Machine': 'auto',
         'Dragon Throne': 'auto',
+        'Unstoppable Force': 'auto',
     };
 
     // --- Simulation Presets ---
@@ -589,6 +590,21 @@ document.addEventListener('DOMContentLoaded', () => {
             p1history: ['FireSteam', 'GoldSteam'],
             p2hand: ['Ichor', 'Cravus', 'Vulcanem', 'LaserSteam'],
         },
+        'Unstoppable Force': {
+            phase: 0,
+            // Cravus attacks instantly (no summoning sickness), so the whole card can be
+            // exercised in the turn it is revealed. The opponent is given BOTH answers it
+            // is supposed to lose: a live blocker (Ichor, Resistance 2) and an Artifact
+            // response (Smoke) — the attack screen should offer neither.
+            desc: "Player 1's Future Pile is empty — the turn start reveals Unstoppable Force. Advance to the Creature Phase and attack with Cravus: the attack screen's Strength should read 3 (2 + 1), BLOCK and PLAY ARTIFACT should both be locked, and the strike should land on Player 2 for 3 despite their Ichor and their Smoke.",
+            destiny: 'Unstoppable Force',
+            hand: ['FireSteam'],
+            p1creatures: [{ name: 'Cravus', damageTaken: 0 }],
+            p1future: [],
+            p1history: ['FireSteam', 'GoldSteam'],
+            p2creatures: [{ name: 'Ichor', damageTaken: 0 }],
+            p2hand: ['Smoke', 'FireSteam'],
+        },
         'Hand of Rhone': {
             phase: 1,
             day: 9,
@@ -689,6 +705,7 @@ document.addEventListener('DOMContentLoaded', () => {
     };
 
     const devLogData = [
+        { date: '2026-08-24', msg: "Destiny 028 Unstoppable Force — implemented (auto), 5/24. 'In this turn, your Creatures have +1 Strength and can't be blocked. Other Players can't use Artifacts in response.' Three clauses, ONE turn-scoped flag (unstoppableForcePlayer = the revealer), and every clause rides a combat chokepoint that already existed rather than a new path: calculateCurrentStrength picks up the +1 (so the attack screen badge, the direct-strike math, resolveCombat's spillover, Hyperscope's Landmark strike and the Computer's own block heuristic all see it for free), initiateDefense's isUnblockable gains one more term next to Rampadon / Entrophy / Meridius, and the same screen's PLAY ARTIFACT button is disabled with a title saying why. JUDGMENT CALLS worth knowing. (1) STRENGTH ONLY, and deliberately NOT on the zone stat badge: that badge is a Creature's single HP value and doubles as its block Resistance, which this card does not touch — a Creature that stays home and blocks this turn still defends with its printed number, so resolveCombat's blocker math is untouched and the buff surfaces only on the Creature Attack screen. That is exactly the call Meridius's +Strength already makes. (2) 'YOUR Creatures' = the ones in the revealer's OWN Creature Zone, read off the attacker slot's board rather than off currentPlayer — so a Creature commandeered with Tele Control attacks out of its owner's zone and gets nothing: you're borrowing their Creature, not fielding yours. (3) 'OTHER Players' is literal: the artifact ban checks defenderNum !== revealer, so aiming a Tele-Controlled Creature back at yourself doesn't bar your own response. (4) Unlike Freeze this changes nothing about the turn's shape — it fires at turn start and the revealer still plays their whole turn, so the buff has to expire on its own: the flag clears in finishTurn beside the rest of the per-turn state (and in resetGameToStart and the Dev Log sim reset, so one preset can't contaminate the next). Two dead buttons with no explanation read as a bug, so the defense screen states the reason — 'Unstoppable Force — no block, no Artifact response.' — except behind a Hyperscope lock, where the lock message is the more useful line. Sim preset gives the opponent BOTH answers they are supposed to lose: a live Ichor blocker AND Smoke in hand, with Cravus attacking (it can act instantly, so the whole card runs in the turn it is revealed). Verified live in BOTH modes. Vs Computer: reveal fired from the empty Future Pile, the attack screen read Strength 3 (2+1) with BLOCK and PLAY ARTIFACT both locked, the feed logged 'Can't block — takes 3 damage' and P2's Day die went 12 → 9 with its Ichor untouched in the zone. EXPIRY verified by NOT attacking: ending the turn, letting the Computer play (its own Ichor attacked back at plain Strength 2 — the buff is the revealer's alone — and P1 could still block normally), then attacking on the next P1 turn read Strength 2 again with PLAY ARTIFACT re-enabled and its title cleared, proving the flag dies with its turn. Hot seat: the same attack showed the explanation line under the buttons and struck for 3 (P2 Day 7 → 4) past a live blocker and an unused Smoke. No console errors. Destiny progress panel now reads 5/24, next 029 Truce." },
         { date: '2026-08-14', msg: "Destiny — Dragon Throne reworked to a blind pick, plus a dev-only deck refill. Both from Simon's playtest read. (1) DECK REFILL. He asked what happens when the deck dries up; the honest answer was nothing — takeTopDestiny() returned null and maybeTriggerDestiny() just returned, silently. With only 4 cards wired up the live deck empties after 4 reveals, and from then on every empty-Future turn start did nothing with no message, which in a playtest is indistinguishable from a broken trigger. Fixed as a DEV-ONLY refill per his call: an empty deck reshuffles the Destiny Abyss back in, gated on destinySetComplete() — so the moment all 24 cards are implemented the refill stops firing on its own and the deck runs out for real, which is the shipped rule. No flag to remember to turn off, and nothing to unpick later. The rulebook says only 'send it to the Destiny Abyss face up' and nothing about recycling, so this is explicitly scaffolding for the short deck, not a rules change. (2) DRAGON THRONE — 'take a RANDOM card' was, in Simon's words, anticlimactic as a silent dice roll. Now the theft is played out: the victim's hand fans FACE DOWN (new destinyPickFaceDown()) and the thief clicks one of the backs. The outcome is still random — you cannot know what you're taking — but the choosing is a moment, it invites the 'no, not that one' from across the table, and the length of the row is real information: everyone now learns how big that hand is, which the old dice roll threw away. JUDGMENT CALL worth knowing: which real card sits behind each back is SHUFFLED rather than left in hand order. Without that, a player who tracked what their opponent drew could aim at a known slot, and the card is printed 'random' — the drama is meant to come from the ritual, not from an information edge. Flip the shuffle if you'd rather reward hand-tracking. The Computer as thief just picks an index (it has no hand fanned at it either way). Verified live: the picker showed 4 identical backs labelled with the hand size, taking one moved it across (opponent 4 → 3, yours 1 → 2), and clicking the SAME tile position across four re-runs took Vulcanem / LaserSteam / Ichor / Cravus — proving the shuffle holds and slot-tracking buys nothing. Refill verified by emptying both seats' Future AND History piles so every turn start triggered: the deck counted down 3 → 2 → 0, then recycled the 8-card Abyss, dealt from it (deck 7, Abyss back to just the card that had resolved) and kept revealing. No console errors." },
         { date: '2026-08-14', msg: "Destiny 027 Dragon Throne — implemented (auto), 4/24. 'Choose an opponent. Take a random Card from their Hand and place it in yours.' The card is RANDOM, so neither player picks it — the only decision is WHICH opponent, and in 2-player V1 there isn't one, so it auto-resolves. REUSE over reinvention: Confiscation (S4) already did the take-a-card-from-their-Hand move, so rather than writing a second copy, that logic was extracted into a shared takeCardToHand(slot, fromPNum, toPNum) — clear the source slot, re-layout both hands, drop it into the receiver's first empty Hand slot (opening a temporary one if the hand is already full, which the End Phase hand-limit gate then trims) and float '+ CardName'. Confiscation now calls the same helper, so the two effects can't drift apart. The opponent picker is deliberately NOT the shared #target-player-overlay that Confiscation and Dark Matter use for 3-4 players: that overlay sits on the same z-index layer as the Destiny screen and would render UNDERNEATH it. New destinyChooseOpponent() asks inside the Destiny overlay itself via the existing destinyButtons() dock, walking seats in clockwise order, and skips the question entirely when there's only one opponent. Naming the taken card in the resolution notice leaks nothing — the victim watched it leave their hand and the thief is holding it. Works in both directions: the Computer as revealer takes from you through the identical path (and logs 'Dragon Throne: <card> changes hands' to its feed). Verified live via the new sim (your hand: 1 FireSteam; the opponent's: Ichor / Cravus / Vulcanem / LaserSteam): the reveal moved exactly one card across — opponent 4 → 3, yours 1 → 2 — and four re-runs took LaserSteam, Cravus, Cravus, Vulcanem, confirming it's actually random rather than always the first or last slot. Regression-checked Confiscation after the extraction: buying it from Bazaar S4 still opened 'Confiscation — P2's Hand' listing Ichor/Cravus/Smoke, and taking Smoke moved it correctly. No console errors. Destiny progress panel now reads 4/24, next 028 Unstoppable Force." },
         { date: '2026-08-14', msg: "Destiny 047 Chrono Machine — implemented (auto), 3/24. 'After your turn ends, you get an additional turn.' The mirror image of Freeze: where Freeze rewrites the CURRENT turn, this one resolves later and leaves the current turn completely alone. resolveChronoMachine just posts a claim on the seat (pendingExtraTurn = revealer); finishTurn consumes it and skips the seat advance, so play stays put instead of passing. THE SUBTLE PART is totalTurns: it is NOT incremented for an extra turn, because despite the name it counts ROUNDS (it only ticks when play cycles back to Player 1) and it's what drives summoning sickness via `summonedOnTurn < totalTurns`. An extra turn is not a full round — nobody else played — so a Creature summoned this round still can't act in the bonus turn, which is the correct reading of 'after a full round in the zone'. Leaving totalTurns alone gets that for free. The extra turn is a real turn start, so it re-runs the Destiny check: a revealer whose Future Pile is still empty flips another card. That's correct and self-limiting (the End Phase draw reshuffles History back into the Future) and a second Chrono Machine simply chains, since the flag is consumed before the new one is set. COMPUTER: this exposed a live deadlock. finishTurn called beginComputerTurn() straight out of a .then, which is microtask-timed — when the Computer chains its own extra turn, the beginComputerTurn() that just ended is still unwinding and aiTurnInProgress doesn't clear until its finally block runs, so the new call would hit the `if (aiTurnInProgress) return` guard and the AI would silently freeze mid-game. Moved to setTimeout(beginComputerTurn, 0): a macrotask runs after every pending microtask has drained, so the guard is always clear by then. Also stopped the feed logging 'Your turn' when the Computer is about to take another one. HOT SEAT: an extra turn is not a hand-off, so the pass screen now reads EXTRA TURN / 'Player N plays again' / TAKE EXTRA TURN instead of PASS DEVICE (h1 given an id; passDevice resets the title so a later mid-combat hand-off can't inherit it). Fixed a Dev Log sim bug found while testing: runSimulation resets the per-turn flags but knew nothing about Destiny state, so an unspent Chrono Machine claim survived a preset reload and handed the extra turn to whoever ran the NEXT sim — it now clears destinyDrawOverride, pendingExtraTurn and destinyResolving alongside the others, and resetGameToStart does the same. Verified live in BOTH modes. Vs Computer: Player 1 revealed Chrono, played a normal full turn (Steam → Construction → Creature → End, unlike Freeze), and End Turn came straight back to PLAYER 1 at the Steam Phase with an empty AI feed — the Computer never played — while the NEXT End Turn passed to it normally, proving the claim is consumed not sticky. Then, by leaving Chrono on the deck and handing the Computer an empty Future Pile, its turn revealed Chrono and it took TWO consecutive turns (feed: Destiny revealed → extra turn follows → COMPUTER'S TURN → buys/summons/draws → COMPUTER'S TURN → buys/builds/draws) with no freeze — the deadlock fix holding. Hot seat: the EXTRA TURN screen appeared with 'Player 1 plays again', and the following turn correctly reverted to PASS DEVICE / To Player 2. No console errors. Shipped in the first Destiny commit (card 3 of 4 in that batch)." },
@@ -1005,6 +1022,7 @@ document.addEventListener('DOMContentLoaded', () => {
             destinyDrawOverride = null;
             pendingExtraTurn = null;
             destinyResolving = false;
+            unstoppableForcePlayer = null;
 
             // Pre-charge Hand of Rhone (its auto +1 then fires via updatePhaseUI below).
             if (sim.rhoneCharge !== undefined) {
@@ -6232,7 +6250,11 @@ document.addEventListener('DOMContentLoaded', () => {
         let selectedBlockerSlot = availableCreatures.length > 0 ? availableCreatures[0] : null;
 
         // A Hyperscope-targeted attack is never blockable — the target is locked in.
-        const isUnblockable = attacker.name.includes("Rampadon") || attacker.unblockable || !!hyperTarget;
+        // Unstoppable Force (Destiny 028) makes the revealer's own Creatures unblockable
+        // for the turn, and bars every OTHER player from answering with an Artifact.
+        const unstoppable = unstoppableAttacker(attackerSlot);
+        const artifactsBarred = unstoppableLocksArtifacts(attackerSlot, defenderNum);
+        const isUnblockable = attacker.name.includes("Rampadon") || attacker.unblockable || !!hyperTarget || unstoppable;
         if (hyperTarget) {
             btnBlock.disabled = true;
             btnBlock.style.opacity = "0.5";
@@ -6268,11 +6290,20 @@ document.addEventListener('DOMContentLoaded', () => {
         }
 
         // Looper strikes 2+ carry no additional effects — Artifact responses included.
-        btnArtifact.disabled = artifactsInHand.length === 0 || !!attacker.looperPlainStrike;
+        btnArtifact.disabled = artifactsInHand.length === 0 || !!attacker.looperPlainStrike || artifactsBarred;
+        btnArtifact.style.opacity = btnArtifact.disabled ? '0.5' : '';
+        if (artifactsBarred) btnArtifact.title = 'Unstoppable Force: Artifacts cannot be used in response this turn.';
+        else btnArtifact.removeAttribute('title');
         btnBlock.classList.remove('in-use');
         btnArtifact.classList.remove('in-use');
         btnContinue.textContent = "CONTINUE";
         if (!isUnblockable) feedbackEl.textContent = "Direct Damage Selected";
+        // Say WHY the options are gone — an unexplained pair of dead buttons reads as a bug.
+        if (unstoppable && !hyperTarget) {
+            feedbackEl.textContent = artifactsBarred
+                ? "Unstoppable Force — no block, no Artifact response."
+                : "Unstoppable Force — this attack can't be blocked.";
+        }
         
         // Ensure options are visible
         btnBlock.classList.remove('hidden');
@@ -6449,6 +6480,8 @@ document.addEventListener('DOMContentLoaded', () => {
             bonus = meridiaArtifactBonus(attackerSlot.closest('.player-zone').querySelector('.history-pile'));
         }
         bonus += cabinBonus(attackerSlot.closest('.player-zone'));
+        // Unstoppable Force (Destiny 028): +1 Strength to the revealer's own Creatures, this turn.
+        bonus += unstoppableBonus(attackerSlot.closest('.player-zone'));
         let base = (parseInt(attacker.baseStrength ?? attacker.baseHealth) || 0) + bonus - (attacker.damageTaken || 0);
         return Math.max(0, base - activeStrDebuff);
     }
@@ -7635,6 +7668,7 @@ document.addEventListener('DOMContentLoaded', () => {
         minesUsedThisPhase = false;
         resetLooper();
         destinyDrawOverride = null; // a Destiny draw rewrite lasts exactly one turn
+        unstoppableForcePlayer = null; // "in this turn" — ends with the turn that revealed it
 
         const hint = document.getElementById('next-player-hint');
         if (hint) hint.textContent = `To Player ${currentPlayer}`;
@@ -7729,6 +7763,41 @@ document.addEventListener('DOMContentLoaded', () => {
     // Seat number owed another turn once this one ends (Chrono Machine). Consumed by
     // finishTurn, so a second Chrono Machine during the extra turn simply chains.
     let pendingExtraTurn = null;
+    // Seat whose Creatures are unstoppable for the current turn (Unstoppable Force).
+    // null = nobody; cleared in finishTurn, so the buff can never outlive its turn.
+    let unstoppableForcePlayer = null;
+
+    // --- Unstoppable Force helpers (Destiny 028) ---------------------------
+    // Declared up here beside the flag because the combat code — which lives earlier in
+    // the file — is what consumes them.
+    //
+    // "Your Creatures" = the ones in the revealer's OWN Creature Zone. A Creature
+    // commandeered with Tele Control attacks out of its owner's zone and is deliberately
+    // not covered: you're borrowing their Creature, not fielding yours.
+    function unstoppableBoard(board) {
+        return unstoppableForcePlayer !== null && !!board && board.id === `player-${unstoppableForcePlayer}`;
+    }
+
+    // +1 Strength only. A Creature that stays home and blocks this turn still defends with
+    // its printed Resistance, so resolveCombat's blocker math is deliberately untouched.
+    function unstoppableBonus(board) {
+        return unstoppableBoard(board) ? 1 : 0;
+    }
+
+    function unstoppableAttacker(attackerSlot) {
+        return unstoppableBoard(attackerSlot && attackerSlot.closest('.player-zone'));
+    }
+
+    // "Other Players can't use Artifacts in response" — the revealer defending against their
+    // own commandeered Creature (Tele Control aimed at yourself) is not an "other player".
+    function unstoppableLocksArtifacts(attackerSlot, defenderNum) {
+        return unstoppableAttacker(attackerSlot) && defenderNum !== unstoppableForcePlayer;
+    }
+
+    // The +1 is attack-only, so it deliberately stays OFF the zone stat badge — that badge
+    // is a Creature's single HP value and doubles as its block Resistance, which this card
+    // does not touch. Same call Meridius's +Strength makes: it shows on the Creature Attack
+    // screen (decorateCombatScreen reads calculateCurrentStrength) and nowhere else.
 
     // A revealed Destiny card shows its FRONT. cardArtUrl deliberately returns null
     // for Destiny so the deck in the Bazaar keeps its back — this is the other half.
@@ -8224,11 +8293,29 @@ document.addEventListener('DOMContentLoaded', () => {
         if (vsComputer) aiLog('Chrono Machine: an extra turn follows this one', 'info');
     }
 
+    // 028 Unstoppable Force — "In this turn, your Creatures have +1 Strength and can't be
+    // blocked. Other Players can't use Artifacts in response." Three clauses, one turn-scoped
+    // flag, and every one of them rides an existing combat chokepoint rather than a new path:
+    // calculateCurrentStrength for the +1, initiateDefense's isUnblockable for the block ban,
+    // and the same screen's PLAY ARTIFACT button for the response ban.
+    //
+    // It fires at turn START, before the Steam Phase, so the revealer still has their whole
+    // turn to use it — unlike Freeze, nothing about the turn's shape changes.
+    async function resolveUnstoppableForce(card, revealer) {
+        unstoppableForcePlayer = revealer;
+        const who = (vsComputer && revealer === AI_PLAYER) ? 'The Computer' : `Player ${revealer}`;
+        await destinyNotice(
+            `${who}'s Creatures have +1 Strength this turn and cannot be blocked. No other player may respond with an Artifact.`
+        );
+        if (vsComputer) aiLog('Unstoppable Force: +1 Strength, unblockable, no Artifact responses', 'info');
+    }
+
     const destinyEffects = {
         'Healing Tree': resolveHealingTree,
         'Freeze': resolveFreeze,
         'Chrono Machine': resolveChronoMachine,
         'Dragon Throne': resolveDragonThrone,
+        'Unstoppable Force': resolveUnstoppableForce,
     };
 
     // ==================== COMPUTER OPPONENT ====================
@@ -8829,6 +8916,7 @@ document.addEventListener('DOMContentLoaded', () => {
         destinyDrawOverride = null;
         pendingExtraTurn = null;
         destinyResolving = false;
+        unstoppableForcePlayer = null;
         disarmCloneFactory();
         deactivateAetherlab();
         resetLooper();
