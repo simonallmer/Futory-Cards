@@ -285,7 +285,7 @@ document.addEventListener('DOMContentLoaded', () => {
         };
     }
 
-    const implementedCards = ["Pandorama", "Fountain of Youth", "Laser Catalyst", "Dragura's Wasteland", "Planetarium", "Lethargo's Temple", "Clone Factory", "Aetherlab", "Entrophy", "Meridius", "Meridia", "Time Thief", "Ichor", "Vulcanem", "Cravus", "Rampadon", "Smoke", "Dark Matter", "Reflector", "Talisman", "Reversal", "Faith", "Threat", "Confiscation", "Gravitas", "Time Bender", "Meridia's Cabin", "Repo Station", "Hand of Rhone", "Atlantica", "Hyperscope", "Mines of Pyralos", "Chrona", "Razo", "Looper", "Masiota", "Aromeas", "General Wave", "Namandi", "Sea Lord", "Sleep Potion", "Lotus", "Rush", "Cell Shield", "Alchemy", "Tame Beast", "Tele Control", "Burden of Wealth", "Healing Tree", "Freeze", "Chrono Machine", "Dragon Throne", "Unstoppable Force"];
+    const implementedCards = ["Pandorama", "Fountain of Youth", "Laser Catalyst", "Dragura's Wasteland", "Planetarium", "Lethargo's Temple", "Clone Factory", "Aetherlab", "Entrophy", "Meridius", "Meridia", "Time Thief", "Ichor", "Vulcanem", "Cravus", "Rampadon", "Smoke", "Dark Matter", "Reflector", "Talisman", "Reversal", "Faith", "Threat", "Confiscation", "Gravitas", "Time Bender", "Meridia's Cabin", "Repo Station", "Hand of Rhone", "Atlantica", "Hyperscope", "Mines of Pyralos", "Chrona", "Razo", "Looper", "Masiota", "Aromeas", "General Wave", "Namandi", "Sea Lord", "Sleep Potion", "Lotus", "Rush", "Cell Shield", "Alchemy", "Tame Beast", "Tele Control", "Burden of Wealth", "Healing Tree", "Freeze", "Chrono Machine", "Dragon Throne", "Unstoppable Force", "Truce"];
 
     // --- Intent Classification ---
     // auto: fires on its own when condition is met
@@ -346,6 +346,7 @@ document.addEventListener('DOMContentLoaded', () => {
         'Chrono Machine': 'auto',
         'Dragon Throne': 'auto',
         'Unstoppable Force': 'auto',
+        'Truce': 'auto',
     };
 
     // --- Simulation Presets ---
@@ -605,6 +606,24 @@ document.addEventListener('DOMContentLoaded', () => {
             p2creatures: [{ name: 'Ichor', damageTaken: 0 }],
             p2hand: ['Smoke', 'FireSteam'],
         },
+        'Truce': {
+            phase: 0,
+            // Cravus attacks instantly, so the ban can be exercised in the very turn it is
+            // revealed. Rush is in hand as the second route into an attack (it must refuse
+            // BEFORE being spent), and the opponent's Ichor is there twice over: to prove
+            // Tele Control still offers THEIR Creature and not yours, and — once the turn
+            // passes — that your barred Cravus can still block normally.
+            desc: "Player 1's Future Pile is empty — the turn start reveals Truce. The Creature block on the phase strip greys out. In the Creature Phase, clicking Cravus should refuse ('Truce — your Creatures can't attack this turn') and playing Rush should refuse too and stay in your hand. End the turn: the Computer attacks and your Cravus can still block.",
+            destiny: 'Truce',
+            hand: ['Rush', 'FireSteam'],
+            p1creatures: [{ name: 'Cravus', damageTaken: 0 }],
+            p1future: [],
+            // Deliberately deep: the End Phase draw reshuffles History into a new Future, and a
+            // History of 2 would leave it empty again — flipping a SECOND Destiny card on the
+            // turn you came back to test that the ban expired. Five keeps the sim about Truce.
+            p1history: ['FireSteam', 'FireSteam', 'GoldSteam', 'GoldSteam', 'LaserSteam'],
+            p2creatures: [{ name: 'Ichor', damageTaken: 0 }],
+        },
         'Hand of Rhone': {
             phase: 1,
             day: 9,
@@ -705,6 +724,7 @@ document.addEventListener('DOMContentLoaded', () => {
     };
 
     const devLogData = [
+        { date: '2026-08-29', msg: "Destiny 029 Truce — implemented (auto), 6/24. 'Your Creatures can't attack this turn.' The exact mirror of Unstoppable Force, and built as one: a single turn-scoped flag (trucePlayer = the revealer) read at ONE chokepoint. beginAttack is that chokepoint — the Creature-zone click, Rush, Tele Control, Clone Factory's second swing, Hyperscope's aimed strike and the Computer's own attack loop all funnel through it, so the rule is written once and every route inherits it rather than each growing its own copy. The guard there is deliberately SILENT: a bare alert() fired from the Computer's loop would be a modal nobody asked for, and every path a player can actually take says why in its own words BEFORE anything is spent. Those are the four: the zone click alerts and returns AHEAD of the summoning-sickness check (a fresh Creature is barred for the ban's reason, not its own, so it must say the right one); triggerRush refuses before the Artifact leaves your hand, because Rush buys nothing but an attack and spending it into a ban would be a dead card; teleControlTargets skips the revealer's whole board, so a barred Creature is never even offered as a puppet; and aiCreaturePhase logs 'Truce — its Creatures can't attack this turn' and returns after the summon step. JUDGMENT CALLS. (1) OWNERSHIP is read exactly as Unstoppable Force reads it — 'your Creatures' = the ones in the revealer's OWN Creature Zone, judged off the attacker slot's board rather than off currentPlayer. So a Creature commandeered FROM an opponent with Tele Control still swings (you're borrowing theirs, not fielding yours) while your own stays barred even while somebody else is pointing it. The two cards now agree on what 'yours' means, which matters because they will meet across a table. (2) ATTACKING ONLY. Blocking is untouched — a barred Creature still defends with its printed Resistance — and so is summoning: the Creature Phase still runs, it just loses its second half. Buying, building and drawing are all normal. (3) Like Unstoppable Force and unlike Freeze, the turn's SHAPE doesn't change: it fires at turn start and the revealer plays all four phases, so the ban has to expire on its own — trucePlayer clears in finishTurn beside the rest of the per-turn state, and in resetGameToStart and the Dev Log sim reset so one preset can't contaminate the next. VISIBILITY was the one thing this needed that Unstoppable Force didn't. A ban you only discover by clicking and being refused is a bad turn, so the Creature block on the phase strip is struck through and desaturated for the whole turn (.truce-locked, overriding the active colouring so it reads even while it's the phase you're standing in) with a title spelling out that you may still summon. That marker had a real bug on the first pass: it lived inside updatePhaseUI, which the reveal only re-runs when a Destiny card MOVED the phase — Truce doesn't, so the strip stayed clean until the next phase click. Pulled out into syncTruceMarker() and called from the reveal itself as well. Sim preset added, with a deliberately DEEP History (5 cards, not 2): the End Phase draw reshuffles History into a new Future, and a shallow one leaves it empty again — flipping a SECOND Destiny card on exactly the turn you came back to check the ban had expired, which is how the first test run ended up staring at a Freeze. Verified live in BOTH modes. Vs Computer: the reveal fired from the empty Future Pile, the strip's CREATURE block greyed out and struck through, clicking Cravus was refused with 'Truce — your Creatures can't attack this turn' and no ATTACK menu, playing Rush was refused too and Rush was still in hand afterwards. Ending the turn, the Computer attacked and the defense screen offered BLOCK WITH CREATURE normally — the barred Cravus blocked, proving the ban is attack-only. EXPIRY: back on Player 1's next turn the marker was gone, the same Cravus click raised no alert and opened the ATTACK menu. THE COMPUTER AS REVEALER was tested too, by handing it the empty Future Pile with Truce on top of the deck: the overlay read 'The Computer's Creatures cannot attack this turn' and its feed ran Destiny revealed: Truce → Truce: no attacks this turn → buys → builds Pandorama → summons Ichor → 'Truce — its Creatures can't attack this turn' → draws 2 → passes, with no FIGHT line — the summon survives, only the swing is gone. Hot seat: same refusal and same marker for Player 1, and on PASS DEVICE / To Player 2 the marker was already clear — the ban is the revealer's alone. No console errors in any run. Destiny progress panel now reads 6/24, next 030 Voider." },
         { date: '2026-08-24', msg: "Destiny 028 Unstoppable Force — implemented (auto), 5/24. 'In this turn, your Creatures have +1 Strength and can't be blocked. Other Players can't use Artifacts in response.' Three clauses, ONE turn-scoped flag (unstoppableForcePlayer = the revealer), and every clause rides a combat chokepoint that already existed rather than a new path: calculateCurrentStrength picks up the +1 (so the attack screen badge, the direct-strike math, resolveCombat's spillover, Hyperscope's Landmark strike and the Computer's own block heuristic all see it for free), initiateDefense's isUnblockable gains one more term next to Rampadon / Entrophy / Meridius, and the same screen's PLAY ARTIFACT button is disabled with a title saying why. JUDGMENT CALLS worth knowing. (1) STRENGTH ONLY, and deliberately NOT on the zone stat badge: that badge is a Creature's single HP value and doubles as its block Resistance, which this card does not touch — a Creature that stays home and blocks this turn still defends with its printed number, so resolveCombat's blocker math is untouched and the buff surfaces only on the Creature Attack screen. That is exactly the call Meridius's +Strength already makes. (2) 'YOUR Creatures' = the ones in the revealer's OWN Creature Zone, read off the attacker slot's board rather than off currentPlayer — so a Creature commandeered with Tele Control attacks out of its owner's zone and gets nothing: you're borrowing their Creature, not fielding yours. (3) 'OTHER Players' is literal: the artifact ban checks defenderNum !== revealer, so aiming a Tele-Controlled Creature back at yourself doesn't bar your own response. (4) Unlike Freeze this changes nothing about the turn's shape — it fires at turn start and the revealer still plays their whole turn, so the buff has to expire on its own: the flag clears in finishTurn beside the rest of the per-turn state (and in resetGameToStart and the Dev Log sim reset, so one preset can't contaminate the next). Two dead buttons with no explanation read as a bug, so the defense screen states the reason — 'Unstoppable Force — no block, no Artifact response.' — except behind a Hyperscope lock, where the lock message is the more useful line. Sim preset gives the opponent BOTH answers they are supposed to lose: a live Ichor blocker AND Smoke in hand, with Cravus attacking (it can act instantly, so the whole card runs in the turn it is revealed). Verified live in BOTH modes. Vs Computer: reveal fired from the empty Future Pile, the attack screen read Strength 3 (2+1) with BLOCK and PLAY ARTIFACT both locked, the feed logged 'Can't block — takes 3 damage' and P2's Day die went 12 → 9 with its Ichor untouched in the zone. EXPIRY verified by NOT attacking: ending the turn, letting the Computer play (its own Ichor attacked back at plain Strength 2 — the buff is the revealer's alone — and P1 could still block normally), then attacking on the next P1 turn read Strength 2 again with PLAY ARTIFACT re-enabled and its title cleared, proving the flag dies with its turn. Hot seat: the same attack showed the explanation line under the buttons and struck for 3 (P2 Day 7 → 4) past a live blocker and an unused Smoke. No console errors. Destiny progress panel now reads 5/24, next 029 Truce." },
         { date: '2026-08-14', msg: "Destiny — Dragon Throne reworked to a blind pick, plus a dev-only deck refill. Both from Simon's playtest read. (1) DECK REFILL. He asked what happens when the deck dries up; the honest answer was nothing — takeTopDestiny() returned null and maybeTriggerDestiny() just returned, silently. With only 4 cards wired up the live deck empties after 4 reveals, and from then on every empty-Future turn start did nothing with no message, which in a playtest is indistinguishable from a broken trigger. Fixed as a DEV-ONLY refill per his call: an empty deck reshuffles the Destiny Abyss back in, gated on destinySetComplete() — so the moment all 24 cards are implemented the refill stops firing on its own and the deck runs out for real, which is the shipped rule. No flag to remember to turn off, and nothing to unpick later. The rulebook says only 'send it to the Destiny Abyss face up' and nothing about recycling, so this is explicitly scaffolding for the short deck, not a rules change. (2) DRAGON THRONE — 'take a RANDOM card' was, in Simon's words, anticlimactic as a silent dice roll. Now the theft is played out: the victim's hand fans FACE DOWN (new destinyPickFaceDown()) and the thief clicks one of the backs. The outcome is still random — you cannot know what you're taking — but the choosing is a moment, it invites the 'no, not that one' from across the table, and the length of the row is real information: everyone now learns how big that hand is, which the old dice roll threw away. JUDGMENT CALL worth knowing: which real card sits behind each back is SHUFFLED rather than left in hand order. Without that, a player who tracked what their opponent drew could aim at a known slot, and the card is printed 'random' — the drama is meant to come from the ritual, not from an information edge. Flip the shuffle if you'd rather reward hand-tracking. The Computer as thief just picks an index (it has no hand fanned at it either way). Verified live: the picker showed 4 identical backs labelled with the hand size, taking one moved it across (opponent 4 → 3, yours 1 → 2), and clicking the SAME tile position across four re-runs took Vulcanem / LaserSteam / Ichor / Cravus — proving the shuffle holds and slot-tracking buys nothing. Refill verified by emptying both seats' Future AND History piles so every turn start triggered: the deck counted down 3 → 2 → 0, then recycled the 8-card Abyss, dealt from it (deck 7, Abyss back to just the card that had resolved) and kept revealing. No console errors." },
         { date: '2026-08-14', msg: "Destiny 027 Dragon Throne — implemented (auto), 4/24. 'Choose an opponent. Take a random Card from their Hand and place it in yours.' The card is RANDOM, so neither player picks it — the only decision is WHICH opponent, and in 2-player V1 there isn't one, so it auto-resolves. REUSE over reinvention: Confiscation (S4) already did the take-a-card-from-their-Hand move, so rather than writing a second copy, that logic was extracted into a shared takeCardToHand(slot, fromPNum, toPNum) — clear the source slot, re-layout both hands, drop it into the receiver's first empty Hand slot (opening a temporary one if the hand is already full, which the End Phase hand-limit gate then trims) and float '+ CardName'. Confiscation now calls the same helper, so the two effects can't drift apart. The opponent picker is deliberately NOT the shared #target-player-overlay that Confiscation and Dark Matter use for 3-4 players: that overlay sits on the same z-index layer as the Destiny screen and would render UNDERNEATH it. New destinyChooseOpponent() asks inside the Destiny overlay itself via the existing destinyButtons() dock, walking seats in clockwise order, and skips the question entirely when there's only one opponent. Naming the taken card in the resolution notice leaks nothing — the victim watched it leave their hand and the thief is holding it. Works in both directions: the Computer as revealer takes from you through the identical path (and logs 'Dragon Throne: <card> changes hands' to its feed). Verified live via the new sim (your hand: 1 FireSteam; the opponent's: Ichor / Cravus / Vulcanem / LaserSteam): the reveal moved exactly one card across — opponent 4 → 3, yours 1 → 2 — and four re-runs took LaserSteam, Cravus, Cravus, Vulcanem, confirming it's actually random rather than always the first or last slot. Regression-checked Confiscation after the extraction: buying it from Bazaar S4 still opened 'Confiscation — P2's Hand' listing Ichor/Cravus/Smoke, and taking Smoke moved it correctly. No console errors. Destiny progress panel now reads 4/24, next 028 Unstoppable Force." },
@@ -1023,6 +1043,7 @@ document.addEventListener('DOMContentLoaded', () => {
             pendingExtraTurn = null;
             destinyResolving = false;
             unstoppableForcePlayer = null;
+            trucePlayer = null;
 
             // Pre-charge Hand of Rhone (its auto +1 then fires via updatePhaseUI below).
             if (sim.rhoneCharge !== undefined) {
@@ -1394,6 +1415,12 @@ document.addEventListener('DOMContentLoaded', () => {
                 }
 
                 if (!devMode && isCreatureZone && isMyBoard && currentPhase === 2) {
+                    // Truce (029) outranks summoning sickness — a fresh Creature is barred for
+                    // the ban's reason, not for its own, so say the right one.
+                    if (truceBlocks(slot)) {
+                        alert("Truce — your Creatures can't attack this turn.");
+                        return;
+                    }
                     // It's the Creature Phase and my creature - Try to attack
                     if (cardData.summonedOnTurn < totalTurns || cardData.name.includes("Cravus") || cardData.name.includes("Rampadon")) {
                          showAttackMenu(cardData, slot);
@@ -2340,6 +2367,12 @@ document.addEventListener('DOMContentLoaded', () => {
             try { const c = JSON.parse(s.dataset.cardData); return c.type === 'Creature' && !c.deactivated; } catch (e) { return false; }
         });
         if (!creatures.length) { alert('Rush — you have no Creature in play to attack.'); return; }
+        // Truce (029): Rush buys nothing but an attack, so refuse before it is spent — the
+        // Artifact stays in hand for a turn where it can actually do something.
+        if (truceBoard(board)) {
+            alert("Truce — your Creatures can't attack this turn. Rush stays in your hand.");
+            return;
+        }
 
         const apply = (slot) => {
             const casterHistory = board.querySelector('.history-pile');
@@ -4083,6 +4116,10 @@ document.addEventListener('DOMContentLoaded', () => {
         for (let p = 1; p <= activePlayerCount; p++) {
             const board = document.getElementById(`player-${p}`);
             if (!board) continue;
+            // Truce (029) bars the revealer's OWN Creatures from attacking, so they can't be
+            // commandeered into one either — not even by their owner. An opponent's Creature is
+            // still fair game: it isn't "yours".
+            if (truceBoard(board)) continue;
             board.querySelectorAll('.creature-zone-main .card:not(.slot-empty)').forEach(slot => {
                 let c; try { c = JSON.parse(slot.dataset.cardData); } catch (e) { return; }
                 if (Array.isArray(c) || c.type !== 'Creature' || c.deactivated) return;
@@ -6003,6 +6040,12 @@ document.addEventListener('DOMContentLoaded', () => {
     // The defender is now chosen. Most creatures go straight to the defense step; Entrophy first
     // rolls its die (the casino wheel), and Meridius scales off the defender's Landmarks.
     function beginAttack(attacker, attackerSlot, defenderNum, hyperTarget = null) {
+        // Truce (029): the one chokepoint every attack passes through — the zone click, Rush,
+        // Tele Control, Clone Factory's second swing, Hyperscope's aimed strike and the
+        // Computer's own loop all arrive here. Silent by design: every path a player can take
+        // says why in its own words BEFORE anything is spent (the click branch, triggerRush,
+        // teleControlTargets, aiCreaturePhase), so this is only the net under them.
+        if (truceBlocks(attackerSlot)) return;
         if (attacker.name.includes('Entrophy')) {
             rollEntrophy(attacker, attackerSlot, defenderNum, hyperTarget);
         } else if (attacker.name.includes('Meridius')) {
@@ -7203,12 +7246,28 @@ document.addEventListener('DOMContentLoaded', () => {
         return occupiedCount <= maxHand;
     }
 
+    // Truce (029): the Creature Phase still runs — you may still summon — but its attack half
+    // is shut. Mark it on the phase strip so the ban is visible for the whole turn instead of
+    // only when a click is refused. Called from updatePhaseUI AND from the reveal itself:
+    // Truce doesn't move the phase, so the reveal's phase-change re-sync never fires for it.
+    function syncTruceMarker() {
+        const creatureBlock = document.querySelector('.phase-block[data-phase="Creature"]');
+        if (!creatureBlock) return;
+        const barred = trucePlayer !== null && trucePlayer === currentPlayer;
+        creatureBlock.classList.toggle('truce-locked', barred);
+        creatureBlock.title = barred
+            ? "Truce — your Creatures can't attack this turn (you may still summon)."
+            : '';
+    }
+
     function updatePhaseUI() {
         if (currentPhase !== 1) rhoneChargedThisPhase = false; // Hand of Rhone charges once per Construction Phase
         const blocks = document.querySelectorAll('.phase-block');
         blocks.forEach((b, i) => {
             b.classList.toggle('active', i === currentPhase);
         });
+
+        syncTruceMarker();
 
         const btn = document.getElementById('next-phase-btn');
         const skipBtn = document.getElementById('skip-turn-btn');
@@ -7669,6 +7728,7 @@ document.addEventListener('DOMContentLoaded', () => {
         resetLooper();
         destinyDrawOverride = null; // a Destiny draw rewrite lasts exactly one turn
         unstoppableForcePlayer = null; // "in this turn" — ends with the turn that revealed it
+        trucePlayer = null;            // ditto: the attack ban dies with its turn
 
         const hint = document.getElementById('next-player-hint');
         if (hint) hint.textContent = `To Player ${currentPlayer}`;
@@ -7792,6 +7852,26 @@ document.addEventListener('DOMContentLoaded', () => {
     // own commandeered Creature (Tele Control aimed at yourself) is not an "other player".
     function unstoppableLocksArtifacts(attackerSlot, defenderNum) {
         return unstoppableAttacker(attackerSlot) && defenderNum !== unstoppableForcePlayer;
+    }
+
+    // Seat whose Creatures are barred from attacking for the current turn (Truce).
+    // null = nobody; cleared in finishTurn, so the ban can never outlive its turn.
+    let trucePlayer = null;
+
+    // --- Truce helpers (Destiny 029) ---------------------------------------
+    // The exact mirror of Unstoppable Force, and it reads ownership the same way:
+    // "your Creatures" = the ones in the revealer's OWN Creature Zone, judged by the slot's
+    // board rather than by whose turn it is. So a Creature commandeered from an opponent with
+    // Tele Control still swings — you are borrowing theirs, not fielding yours — while your
+    // own Creature stays barred even while somebody else is pointing it.
+    function truceBoard(board) {
+        return trucePlayer !== null && !!board && board.id === `player-${trucePlayer}`;
+    }
+
+    // Attacking only. A barred Creature still BLOCKS with its printed Resistance, can still be
+    // summoned into the zone, and everything outside combat is untouched.
+    function truceBlocks(attackerSlot) {
+        return truceBoard(attackerSlot && attackerSlot.closest('.player-zone'));
     }
 
     // The +1 is attack-only, so it deliberately stays OFF the zone stat badge — that badge
@@ -8310,12 +8390,31 @@ document.addEventListener('DOMContentLoaded', () => {
         if (vsComputer) aiLog('Unstoppable Force: +1 Strength, unblockable, no Artifact responses', 'info');
     }
 
+    // 029 Truce — "Your Creatures can't attack this turn." The exact mirror of Unstoppable
+    // Force: one turn-scoped flag on the revealer, read at the single attack chokepoint
+    // (beginAttack) so no attack route needs its own copy of the rule.
+    //
+    // Like Unstoppable Force and unlike Freeze, it changes nothing about the turn's SHAPE —
+    // it fires at turn start and the revealer still plays all four phases. It costs them
+    // exactly one thing: the swing. They still buy, still build, still summon into the
+    // Creature Zone, and their Creatures still block normally when the turn passes on.
+    async function resolveTruce(card, revealer) {
+        trucePlayer = revealer;
+        syncTruceMarker();
+        const who = (vsComputer && revealer === AI_PLAYER) ? 'The Computer' : `Player ${revealer}`;
+        await destinyNotice(
+            `${who}'s Creatures cannot attack this turn. They can still be summoned, and they still block.`
+        );
+        if (vsComputer) aiLog('Truce: no attacks this turn', 'info');
+    }
+
     const destinyEffects = {
         'Healing Tree': resolveHealingTree,
         'Freeze': resolveFreeze,
         'Chrono Machine': resolveChronoMachine,
         'Dragon Throne': resolveDragonThrone,
         'Unstoppable Force': resolveUnstoppableForce,
+        'Truce': resolveTruce,
     };
 
     // ==================== COMPUTER OPPONENT ====================
@@ -8615,7 +8714,12 @@ document.addEventListener('DOMContentLoaded', () => {
             await aiThink();
         }
 
-        // 2) Attack with every Creature that's allowed to act.
+        // 2) Attack with every Creature that's allowed to act — unless Truce closed the
+        // attack half of the phase. It summoned above either way; only the swing is banned.
+        if (truceBoard(board)) {
+            aiLog("Truce — its Creatures can't attack this turn", 'info');
+            return;
+        }
         const zoneSlots = Array.from(board.querySelectorAll('.creature-zone-main .card:not(.slot-empty)'));
         for (const slot of zoneSlots) {
             if (gameWon) return;
@@ -8917,6 +9021,7 @@ document.addEventListener('DOMContentLoaded', () => {
         pendingExtraTurn = null;
         destinyResolving = false;
         unstoppableForcePlayer = null;
+        trucePlayer = null;
         disarmCloneFactory();
         deactivateAetherlab();
         resetLooper();

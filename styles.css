@@ -1111,6 +1111,25 @@ body.dev-mode-on::after {
 .phase-block.active[data-phase="Creature"] { background: rgba(70, 109, 189, 0.3); border-color: #66aaff; box-shadow: 0 0 20px rgba(70, 109, 189, 0.4); }
 .phase-block.active[data-phase="End"] { background: rgba(129, 70, 158, 0.3); border-color: #cc88ff; box-shadow: 0 0 20px rgba(129, 70, 158, 0.4); }
 
+/* Truce (Destiny 029): the Creature Phase still runs — you may still summon — but its
+   attack half is shut. A struck-through, desaturated block says so for the whole turn,
+   and it deliberately overrides the active colouring so the ban reads even while the
+   phase is the one you are standing in. */
+.phase-block.truce-locked,
+.phase-block.active.truce-locked[data-phase="Creature"] {
+  background: rgba(40, 42, 48, 0.85);
+  border-color: rgba(255, 255, 255, 0.12);
+  box-shadow: none;
+}
+
+.phase-block.truce-locked span,
+.phase-block.active.truce-locked span {
+  color: #6a6a72;
+  text-shadow: none;
+  text-decoration: line-through;
+  text-decoration-color: rgba(204, 136, 255, 0.7);
+}
+
 #next-phase-btn {
   background: rgba(0, 255, 255, 0.05);
   border: 1px solid rgba(0, 255, 255, 0.3);
