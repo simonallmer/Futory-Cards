@@ -3847,6 +3847,16 @@ body.mobile-mode .destiny-body { flex-direction: column; text-align: center; gap
 
 /* Face-down pick (Dragon Throne): the victim's hand fanned as backs. Deliberately
    uniform — the only information it carries is how many cards are there. */
+/* Voider (Destiny 030): a picker with a cap ("up to 2"). Once it is reached the unchosen
+   tiles go flat and stop inviting a click, so the limit is visible on the board instead of
+   only being enforced when you press confirm. */
+.destiny-pick-card.at-limit {
+  opacity: 0.35;
+  filter: grayscale(0.8);
+  cursor: default;
+}
+.destiny-pick-card.at-limit:hover { transform: none; border-color: rgba(255, 255, 255, 0.2); }
+
 .destiny-pick-card.destiny-pick-back {
   background-image: url('assets/card_back.png');
   background-size: cover;

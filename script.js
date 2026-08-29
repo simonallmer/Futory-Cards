@@ -285,7 +285,7 @@ document.addEventListener('DOMContentLoaded', () => {
         };
     }
 
-    const implementedCards = ["Pandorama", "Fountain of Youth", "Laser Catalyst", "Dragura's Wasteland", "Planetarium", "Lethargo's Temple", "Clone Factory", "Aetherlab", "Entrophy", "Meridius", "Meridia", "Time Thief", "Ichor", "Vulcanem", "Cravus", "Rampadon", "Smoke", "Dark Matter", "Reflector", "Talisman", "Reversal", "Faith", "Threat", "Confiscation", "Gravitas", "Time Bender", "Meridia's Cabin", "Repo Station", "Hand of Rhone", "Atlantica", "Hyperscope", "Mines of Pyralos", "Chrona", "Razo", "Looper", "Masiota", "Aromeas", "General Wave", "Namandi", "Sea Lord", "Sleep Potion", "Lotus", "Rush", "Cell Shield", "Alchemy", "Tame Beast", "Tele Control", "Burden of Wealth", "Healing Tree", "Freeze", "Chrono Machine", "Dragon Throne", "Unstoppable Force", "Truce"];
+    const implementedCards = ["Pandorama", "Fountain of Youth", "Laser Catalyst", "Dragura's Wasteland", "Planetarium", "Lethargo's Temple", "Clone Factory", "Aetherlab", "Entrophy", "Meridius", "Meridia", "Time Thief", "Ichor", "Vulcanem", "Cravus", "Rampadon", "Smoke", "Dark Matter", "Reflector", "Talisman", "Reversal", "Faith", "Threat", "Confiscation", "Gravitas", "Time Bender", "Meridia's Cabin", "Repo Station", "Hand of Rhone", "Atlantica", "Hyperscope", "Mines of Pyralos", "Chrona", "Razo", "Looper", "Masiota", "Aromeas", "General Wave", "Namandi", "Sea Lord", "Sleep Potion", "Lotus", "Rush", "Cell Shield", "Alchemy", "Tame Beast", "Tele Control", "Burden of Wealth", "Healing Tree", "Freeze", "Chrono Machine", "Dragon Throne", "Unstoppable Force", "Truce", "Voider"];
 
     // --- Intent Classification ---
     // auto: fires on its own when condition is met
@@ -347,12 +347,13 @@ document.addEventListener('DOMContentLoaded', () => {
         'Dragon Throne': 'auto',
         'Unstoppable Force': 'auto',
         'Truce': 'auto',
+        'Voider': 'auto',
     };
 
     // --- Simulation Presets ---
     // Each entry describes the board state to load for quick effect testing.
     // hand/p2hand: card names; landmarks/p2landmarks: card names; p1creatures/p2creatures: {name, damageTaken}
-    // p1history: card names to put in Player 1's History Pile
+    // p1history/p2history: card names to put in that player's History Pile
     const simulationMap = {
         'Pandorama': {
             phase: 0,
@@ -624,6 +625,20 @@ document.addEventListener('DOMContentLoaded', () => {
             p1history: ['FireSteam', 'FireSteam', 'GoldSteam', 'GoldSteam', 'LaserSteam'],
             p2creatures: [{ name: 'Ichor', damageTaken: 0 }],
         },
+        'Voider': {
+            phase: 0,
+            // Both seats get a History Pile worth a real decision: a mix of dead FireSteam
+            // and cards actually worth keeping, so declining, voiding 1 and voiding 2 are all
+            // sensible plays rather than one obvious answer. Deep enough (6) that the End
+            // Phase reshuffle doesn't leave Player 1's Future empty and flip a second event.
+            desc: "Player 1's Future Pile is empty — the turn start reveals Voider. Each player may send up to 2 cards from their History Pile into the Abyss, for good. Pick a third card and the unchosen tiles should be dimmed and unclickable. Voided cards leave the History Pile and show up in the shared Abyss (click it to list them).",
+            destiny: 'Voider',
+            hand: ['FireSteam', 'GoldSteam'],
+            p1future: [],
+            p1history: ['FireSteam', 'FireSteam', 'FireSteam', 'GoldSteam', 'Ichor', 'Smoke'],
+            p2hand: ['FireSteam'],
+            p2history: ['FireSteam', 'FireSteam', 'GoldSteam', 'Cravus'],
+        },
         'Hand of Rhone': {
             phase: 1,
             day: 9,
@@ -724,6 +739,7 @@ document.addEventListener('DOMContentLoaded', () => {
     };
 
     const devLogData = [
+        { date: '2026-08-29', msg: "Destiny 030 Voider — implemented (auto), 7/24. 'Each Player may send up to 2 Cards from their History Pile into the Abyss.' The first Destiny card that is pure DECK-BUILDING rather than combat or tempo: the History Pile folds back into the Future when it runs dry, so a card sent to the Abyss leaves that player's deck for good and every remaining draw gets better. Clockwise from the revealer via forEachPlayerClockwise, and the 'may' is real — a seat can void 2, 1 or nothing. Written as runVoider(max) because 031 Space Voider is literally this card with 4 instead of 2; when it comes up it should be one table row and one line, not a second copy of the whole thing. TWO EXTRACTIONS rather than two new copies of existing code, following the takeCardToHand precedent. (1) destinyPickCards only knew how to select over DOM SLOTS (Healing Tree picks Hand cards), and Voider selects over plain card records INSIDE a pile. Rather than a second picker, the core became destinyPickTiles(items, opts) taking { card, value } pairs and resolving with the chosen values; destinyPickCards is now a four-line slot wrapper over it, so Healing Tree's call site is untouched and the two selections can't drift. It also gained `max`, which is what 'up to 2' actually needs: at the cap the UNCHOSEN tiles dim and stop responding (.at-limit), so the limit shows on the board instead of only being enforced when you press confirm — a picker that silently swallows your third click reads as broken. (2) Reversal already owned, inline, the fiddly 'pull a card out of a pile and repaint the slot' move — the pile's top card IS its face, so removing anything has to redraw it or empty the slot. That is now removeFromStackPile(pileEl, indices, emptyLabel), splicing high index first so the earlier ones stay valid and handing the cards back in pile order; Reversal calls it for one card and Voider for up to N. (A third copy of the same logic still lives in the grab/drop path around the stack-slot click handler; left alone deliberately — it pops the top rather than an arbitrary index, and rewiring the drag core is not this card's job.) JUDGMENT CALLS. (1) HISTORY ONLY, exactly as printed — not the Hand, not the Future, and not Atlantica-parked cards, which are a resource rather than a pile. (2) Naming the voided cards in the resolution leaks nothing: the Abyss is a public view-only zone any player can click and list, so those cards are about to be on show anyway. (3) The cap is per player, not a pool — 'each Player may send up to 2' is 2 each. COMPUTER: voiding is thinning, so the only question is 'which card do I least want to draw again', and the answer is always Steam — it never voids a Creature, Landmark, Artifact or Spark, because those ARE the payoff a thinner deck exists to reach. It also keeps a floor of 4 Steam across ALL its zones (new aiSteamPoolCounts, counting Hand + parked + History + Future), since a deck thinned past its economy can't buy the things that were supposed to justify it. Easy doesn't plan a deck and declines; Normal drops FireSteam, the free starter currency; Hard also drops GoldSteam ONCE it owns a LaserSteam — at that point the Gold is the weak card in that particular deck, which is exactly the judgment the card asks for. A REAL BUG worth recording, because the codebase has been bitten by it before (the duplicate gainTimePoints caught during the first Destiny commit): the pool counter was first written as aiSteamCounts(pNum) — and a function of that name ALREADY existed down in the Computer section, counting the HAND only and keying its result F/G/L. Two same-named function declarations in this one big scope don't collide loudly; the later one silently wins for the whole file. So the new code read {F,G,L}, summed three undefineds to NaN, and slice(0, NaN) returned an empty array — the Computer declined every Voider and looked merely cautious rather than broken. Renamed to aiSteamPoolCounts with a comment on both halves of the distinction. Verified live in BOTH modes. Vs Computer: the reveal fired, the picker listed Player 1's six History cards, selecting two dimmed the other four and a THIRD click was correctly ignored (still 2 selected), VOID 2 moved exactly the chosen indices out (History 6 → 4, the untouched cards intact and in order) and both landed in the shared Abyss, whose badge read '4 IN ABYSS' and whose list modal showed them. The Computer then voided its two FireSteam and kept its GoldSteam and Cravus. EDGE CASES: voiding a two-card pile down to nothing empties the slot properly (slot-empty, 'History' label restored, dataset cleared, no ghost art); an empty History Pile gives a CONTINUE notice instead of opening an empty picker. DIFFICULTY verified all three ways — Easy declined; Normal with a Laser owned and a Gold-only History still voided NOTHING (the Gold clause is Hard-only); Hard in the same spot voided both Golds. REGRESSION: Reversal after the extraction still lists its History, takes the chosen card to Hand and repaints the pile correctly. Hot seat: each seat saw only its OWN History, the device passed between them (PASS DEVICE / MY CHOICE) and handed back to the revealer (RESUME TURN) before the turn resumed at the Steam Phase. No console errors in any run. Destiny progress panel now reads 7/24, next 031 Space Voider." },
         { date: '2026-08-29', msg: "Destiny 029 Truce — implemented (auto), 6/24. 'Your Creatures can't attack this turn.' The exact mirror of Unstoppable Force, and built as one: a single turn-scoped flag (trucePlayer = the revealer) read at ONE chokepoint. beginAttack is that chokepoint — the Creature-zone click, Rush, Tele Control, Clone Factory's second swing, Hyperscope's aimed strike and the Computer's own attack loop all funnel through it, so the rule is written once and every route inherits it rather than each growing its own copy. The guard there is deliberately SILENT: a bare alert() fired from the Computer's loop would be a modal nobody asked for, and every path a player can actually take says why in its own words BEFORE anything is spent. Those are the four: the zone click alerts and returns AHEAD of the summoning-sickness check (a fresh Creature is barred for the ban's reason, not its own, so it must say the right one); triggerRush refuses before the Artifact leaves your hand, because Rush buys nothing but an attack and spending it into a ban would be a dead card; teleControlTargets skips the revealer's whole board, so a barred Creature is never even offered as a puppet; and aiCreaturePhase logs 'Truce — its Creatures can't attack this turn' and returns after the summon step. JUDGMENT CALLS. (1) OWNERSHIP is read exactly as Unstoppable Force reads it — 'your Creatures' = the ones in the revealer's OWN Creature Zone, judged off the attacker slot's board rather than off currentPlayer. So a Creature commandeered FROM an opponent with Tele Control still swings (you're borrowing theirs, not fielding yours) while your own stays barred even while somebody else is pointing it. The two cards now agree on what 'yours' means, which matters because they will meet across a table. (2) ATTACKING ONLY. Blocking is untouched — a barred Creature still defends with its printed Resistance — and so is summoning: the Creature Phase still runs, it just loses its second half. Buying, building and drawing are all normal. (3) Like Unstoppable Force and unlike Freeze, the turn's SHAPE doesn't change: it fires at turn start and the revealer plays all four phases, so the ban has to expire on its own — trucePlayer clears in finishTurn beside the rest of the per-turn state, and in resetGameToStart and the Dev Log sim reset so one preset can't contaminate the next. VISIBILITY was the one thing this needed that Unstoppable Force didn't. A ban you only discover by clicking and being refused is a bad turn, so the Creature block on the phase strip is struck through and desaturated for the whole turn (.truce-locked, overriding the active colouring so it reads even while it's the phase you're standing in) with a title spelling out that you may still summon. That marker had a real bug on the first pass: it lived inside updatePhaseUI, which the reveal only re-runs when a Destiny card MOVED the phase — Truce doesn't, so the strip stayed clean until the next phase click. Pulled out into syncTruceMarker() and called from the reveal itself as well. Sim preset added, with a deliberately DEEP History (5 cards, not 2): the End Phase draw reshuffles History into a new Future, and a shallow one leaves it empty again — flipping a SECOND Destiny card on exactly the turn you came back to check the ban had expired, which is how the first test run ended up staring at a Freeze. Verified live in BOTH modes. Vs Computer: the reveal fired from the empty Future Pile, the strip's CREATURE block greyed out and struck through, clicking Cravus was refused with 'Truce — your Creatures can't attack this turn' and no ATTACK menu, playing Rush was refused too and Rush was still in hand afterwards. Ending the turn, the Computer attacked and the defense screen offered BLOCK WITH CREATURE normally — the barred Cravus blocked, proving the ban is attack-only. EXPIRY: back on Player 1's next turn the marker was gone, the same Cravus click raised no alert and opened the ATTACK menu. THE COMPUTER AS REVEALER was tested too, by handing it the empty Future Pile with Truce on top of the deck: the overlay read 'The Computer's Creatures cannot attack this turn' and its feed ran Destiny revealed: Truce → Truce: no attacks this turn → buys → builds Pandorama → summons Ichor → 'Truce — its Creatures can't attack this turn' → draws 2 → passes, with no FIGHT line — the summon survives, only the swing is gone. Hot seat: same refusal and same marker for Player 1, and on PASS DEVICE / To Player 2 the marker was already clear — the ban is the revealer's alone. No console errors in any run. Destiny progress panel now reads 6/24, next 030 Voider." },
         { date: '2026-08-24', msg: "Destiny 028 Unstoppable Force — implemented (auto), 5/24. 'In this turn, your Creatures have +1 Strength and can't be blocked. Other Players can't use Artifacts in response.' Three clauses, ONE turn-scoped flag (unstoppableForcePlayer = the revealer), and every clause rides a combat chokepoint that already existed rather than a new path: calculateCurrentStrength picks up the +1 (so the attack screen badge, the direct-strike math, resolveCombat's spillover, Hyperscope's Landmark strike and the Computer's own block heuristic all see it for free), initiateDefense's isUnblockable gains one more term next to Rampadon / Entrophy / Meridius, and the same screen's PLAY ARTIFACT button is disabled with a title saying why. JUDGMENT CALLS worth knowing. (1) STRENGTH ONLY, and deliberately NOT on the zone stat badge: that badge is a Creature's single HP value and doubles as its block Resistance, which this card does not touch — a Creature that stays home and blocks this turn still defends with its printed number, so resolveCombat's blocker math is untouched and the buff surfaces only on the Creature Attack screen. That is exactly the call Meridius's +Strength already makes. (2) 'YOUR Creatures' = the ones in the revealer's OWN Creature Zone, read off the attacker slot's board rather than off currentPlayer — so a Creature commandeered with Tele Control attacks out of its owner's zone and gets nothing: you're borrowing their Creature, not fielding yours. (3) 'OTHER Players' is literal: the artifact ban checks defenderNum !== revealer, so aiming a Tele-Controlled Creature back at yourself doesn't bar your own response. (4) Unlike Freeze this changes nothing about the turn's shape — it fires at turn start and the revealer still plays their whole turn, so the buff has to expire on its own: the flag clears in finishTurn beside the rest of the per-turn state (and in resetGameToStart and the Dev Log sim reset, so one preset can't contaminate the next). Two dead buttons with no explanation read as a bug, so the defense screen states the reason — 'Unstoppable Force — no block, no Artifact response.' — except behind a Hyperscope lock, where the lock message is the more useful line. Sim preset gives the opponent BOTH answers they are supposed to lose: a live Ichor blocker AND Smoke in hand, with Cravus attacking (it can act instantly, so the whole card runs in the turn it is revealed). Verified live in BOTH modes. Vs Computer: reveal fired from the empty Future Pile, the attack screen read Strength 3 (2+1) with BLOCK and PLAY ARTIFACT both locked, the feed logged 'Can't block — takes 3 damage' and P2's Day die went 12 → 9 with its Ichor untouched in the zone. EXPIRY verified by NOT attacking: ending the turn, letting the Computer play (its own Ichor attacked back at plain Strength 2 — the buff is the revealer's alone — and P1 could still block normally), then attacking on the next P1 turn read Strength 2 again with PLAY ARTIFACT re-enabled and its title cleared, proving the flag dies with its turn. Hot seat: the same attack showed the explanation line under the buttons and struck for 3 (P2 Day 7 → 4) past a live blocker and an unused Smoke. No console errors. Destiny progress panel now reads 5/24, next 029 Truce." },
         { date: '2026-08-14', msg: "Destiny — Dragon Throne reworked to a blind pick, plus a dev-only deck refill. Both from Simon's playtest read. (1) DECK REFILL. He asked what happens when the deck dries up; the honest answer was nothing — takeTopDestiny() returned null and maybeTriggerDestiny() just returned, silently. With only 4 cards wired up the live deck empties after 4 reveals, and from then on every empty-Future turn start did nothing with no message, which in a playtest is indistinguishable from a broken trigger. Fixed as a DEV-ONLY refill per his call: an empty deck reshuffles the Destiny Abyss back in, gated on destinySetComplete() — so the moment all 24 cards are implemented the refill stops firing on its own and the deck runs out for real, which is the shipped rule. No flag to remember to turn off, and nothing to unpick later. The rulebook says only 'send it to the Destiny Abyss face up' and nothing about recycling, so this is explicitly scaffolding for the short deck, not a rules change. (2) DRAGON THRONE — 'take a RANDOM card' was, in Simon's words, anticlimactic as a silent dice roll. Now the theft is played out: the victim's hand fans FACE DOWN (new destinyPickFaceDown()) and the thief clicks one of the backs. The outcome is still random — you cannot know what you're taking — but the choosing is a moment, it invites the 'no, not that one' from across the table, and the length of the row is real information: everyone now learns how big that hand is, which the old dice roll threw away. JUDGMENT CALL worth knowing: which real card sits behind each back is SHUFFLED rather than left in hand order. Without that, a player who tracked what their opponent drew could aim at a known slot, and the card is printed 'random' — the drama is meant to come from the ritual, not from an information edge. Flip the shuffle if you'd rather reward hand-tracking. The Computer as thief just picks an index (it has no hand fanned at it either way). Verified live: the picker showed 4 identical backs labelled with the hand size, taking one moved it across (opponent 4 → 3, yours 1 → 2), and clicking the SAME tile position across four re-runs took Vulcanem / LaserSteam / Ichor / Cravus — proving the shuffle holds and slot-tracking buys nothing. Refill verified by emptying both seats' Future AND History piles so every turn start triggered: the deck counted down 3 → 2 → 0, then recycled the 8-card Abyss, dealt from it (deck 7, Abyss back to just the card that had resolved) and kept revealing. No console errors." },
@@ -1020,7 +1036,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 future: sim.p1future,
             });
 
-            if (sim.p2landmarks || sim.p2hand || sim.p2creatures || sim.p2future ||
+            if (sim.p2landmarks || sim.p2hand || sim.p2creatures || sim.p2future || sim.p2history ||
                 sim.p2day !== undefined || sim.p2night !== undefined) {
                 setupBoard(2, {
                     // Destiny events read and compare both seats' Time Points, so a preset
@@ -1030,6 +1046,9 @@ document.addEventListener('DOMContentLoaded', () => {
                     landmarks: sim.p2landmarks,
                     hand: sim.p2hand,
                     creatures: sim.p2creatures,
+                    // Destiny's "Each Player…" cards act on both seats' piles, so a preset has
+                    // to be able to stock the opponent's History as well as their Hand.
+                    history: sim.p2history,
                     future: sim.p2future,
                 });
             }
@@ -3811,6 +3830,42 @@ document.addEventListener('DOMContentLoaded', () => {
     // Reversal: Take a Card from your History Pile and place it in your Hand.
     // If History is empty the Spark simply has nothing to take — it still resolves (and is
     // still sent to the Abyss), it just does nothing.
+    // Pull cards out of a stack pile (History/Future) by index and repaint the slot — the
+    // pile's top card IS its face, so removing anything has to redraw it, or empty the slot
+    // when the last card goes. Returns the removed cards in the order they sat in the pile.
+    // Shared by Reversal (one card, to Hand) and Voider (up to N, to the Abyss) so the
+    // repaint rules can't drift between them.
+    function removeFromStackPile(pileEl, indices, emptyLabel = 'History') {
+        if (!pileEl) return [];
+        let cards = [];
+        try { cards = JSON.parse(pileEl.dataset.cardData || '[]'); } catch (e) { return []; }
+
+        // Splice highest index first so the earlier ones stay valid, then unshift to hand
+        // them back in pile order rather than the order they were removed.
+        const wanted = [...new Set(indices)].filter(i => i >= 0 && i < cards.length).sort((a, b) => b - a);
+        const removed = [];
+        wanted.forEach(i => removed.unshift(cards.splice(i, 1)[0]));
+        if (!removed.length) return [];
+
+        if (cards.length === 0) {
+            clearStackSlot(pileEl, emptyLabel);
+        } else {
+            pileEl.dataset.cardData = JSON.stringify(cards);
+            const newTop = cards[cards.length - 1];
+            const art = cardArtUrl(newTop);
+            if (art) {
+                pileEl.style.backgroundImage = `url('${art}')`;
+            } else {
+                pileEl.style.backgroundImage = '';
+                pileEl.style.backgroundColor = 'rgba(255,255,255,0.1)';
+                pileEl.textContent = newTop.name;
+            }
+            bindHoverToElement(pileEl, newTop);
+            updateStackIndicator(pileEl);
+        }
+        return removed;
+    }
+
     function resolveReversal(pNum) {
         const board = document.getElementById(`player-${pNum}`);
         if (!board) return;
@@ -3822,23 +3877,8 @@ document.addEventListener('DOMContentLoaded', () => {
         if (history.length === 0) return;
 
         const takeCardAt = (idx) => {
-            const [taken] = history.splice(idx, 1);
-            if (history.length === 0) {
-                clearStackSlot(historyPile, 'History');
-            } else {
-                historyPile.dataset.cardData = JSON.stringify(history);
-                const newTop = history[history.length - 1];
-                const art = cardArtUrl(newTop);
-                if (art) {
-                    historyPile.style.backgroundImage = `url('${art}')`;
-                } else {
-                    historyPile.style.backgroundImage = '';
-                    historyPile.style.backgroundColor = 'rgba(255,255,255,0.1)';
-                    historyPile.textContent = newTop.name;
-                }
-                bindHoverToElement(historyPile, newTop);
-                updateStackIndicator(historyPile);
-            }
+            const [taken] = removeFromStackPile(historyPile, [idx], 'History');
+            if (!taken) return;
 
             const handSlots = Array.from(board.querySelectorAll('.hand-slot'));
             let targetSlot = handSlots.find(s => s.classList.contains('slot-empty'));
@@ -8015,22 +8055,31 @@ document.addEventListener('DOMContentLoaded', () => {
         setDestinyPrompt('');
     }
 
-    // Multi-select over a set of card slots, rendered as mini cards in the overlay.
-    // Resolves with the chosen slots ([] when the player declines).
-    function destinyPickCards(slots, { title, confirmLabel, declineLabel, live }) {
+    // Multi-select over a set of cards, rendered as mini cards in the overlay. `items` are
+    // { card, value } pairs and it resolves with the chosen VALUES ([] when the player
+    // declines), in the order they were given. One picker therefore serves both a selection
+    // over Hand SLOTS (Healing Tree) and one over the plain card records inside a pile
+    // (Voider), instead of two copies of it drifting apart.
+    //
+    // `max` caps the selection — Voider's "up to 2". Once the cap is reached the unchosen
+    // tiles dim and stop responding, so the limit shows on the board rather than only being
+    // enforced when you press confirm. Omit it for an uncapped pick.
+    function destinyPickTiles(items, { title, confirmLabel, declineLabel, live, max }) {
         const { picker } = destinyEls();
         return new Promise(resolve => {
             picker.innerHTML = '';
             const selected = new Set();
+            const tiles = [];
 
             const refresh = () => {
                 setDestinyPrompt(live ? live(selected.size) : title);
                 confirmBtn.textContent = confirmLabel(selected.size);
+                const full = max !== undefined && selected.size >= max;
+                tiles.forEach(t => t.tile.classList.toggle('at-limit', full && !selected.has(t.value)));
             };
 
-            slots.forEach(slot => {
-                let card = {};
-                try { card = JSON.parse(slot.dataset.cardData); } catch (e) { /* blank */ }
+            items.forEach(item => {
+                const card = item.card || {};
                 const tile = document.createElement('div');
                 tile.className = 'destiny-pick-card';
                 const art = cardArtUrl(card);
@@ -8039,10 +8088,14 @@ document.addEventListener('DOMContentLoaded', () => {
                 tile.title = card.name || '';
                 tile.onclick = (ev) => {
                     ev.stopPropagation();
-                    if (selected.has(slot)) { selected.delete(slot); tile.classList.remove('selected'); }
-                    else { selected.add(slot); tile.classList.add('selected'); }
+                    if (selected.has(item.value)) { selected.delete(item.value); tile.classList.remove('selected'); }
+                    else {
+                        if (max !== undefined && selected.size >= max) return; // at the cap — say nothing, the tile is already dimmed
+                        selected.add(item.value); tile.classList.add('selected');
+                    }
                     refresh();
                 };
+                tiles.push({ value: item.value, tile });
                 picker.appendChild(tile);
             });
 
@@ -8052,7 +8105,7 @@ document.addEventListener('DOMContentLoaded', () => {
             confirmBtn.className = 'menu-btn tech-font';
             confirmBtn.onclick = (ev) => {
                 ev.stopPropagation();
-                const out = slots.filter(s => selected.has(s));
+                const out = items.filter(i => selected.has(i.value)).map(i => i.value);
                 picker.innerHTML = '';
                 controls.innerHTML = '';
                 setDestinyPrompt('');
@@ -8072,6 +8125,15 @@ document.addEventListener('DOMContentLoaded', () => {
             controls.appendChild(declineBtn);
             refresh();
         });
+    }
+
+    // Slot flavour of the picker: select over Hand slots, resolving with the slots themselves.
+    function destinyPickCards(slots, opts) {
+        return destinyPickTiles(slots.map(slot => {
+            let card = {};
+            try { card = JSON.parse(slot.dataset.cardData); } catch (e) { /* blank */ }
+            return { card, value: slot };
+        }), opts);
     }
 
     // A single blind pick: N face-down card backs, resolves with the index chosen.
@@ -8408,6 +8470,123 @@ document.addEventListener('DOMContentLoaded', () => {
         if (vsComputer) aiLog('Truce: no attacks this turn', 'info');
     }
 
+    // 030 Voider — "Each Player may send up to 2 Cards from their History Pile into the Abyss."
+    // The first Destiny card that is pure DECK-BUILDING rather than combat or tempo: the
+    // History Pile folds back into the Future when it runs dry, so a card sent to the Abyss
+    // leaves that player's deck for good and every remaining draw gets better. Clockwise from
+    // the revealer, and the "may" is real — a seat can void 2, 1 or nothing.
+    //
+    // Written as runVoider(max) because 031 Space Voider is this card with 4 instead of 2;
+    // when it comes up it should be one table row and one line, not a second copy.
+    //
+    // JUDGMENT CALLS. (1) HISTORY ONLY, exactly as printed — not the Hand, not the Future, and
+    // not Atlantica-parked cards, which are a resource rather than a pile. (2) Naming the
+    // voided cards in the resolution leaks nothing: the Abyss is a public, view-only zone that
+    // any player can click and list, so those cards are about to be on show anyway. (3) The
+    // cap is per player, not a pool — "each Player may send up to 2" is 2 each.
+    async function runVoider(revealer, max) {
+        await forEachPlayerClockwise(revealer, async (pNum) => {
+            const board = document.getElementById(`player-${pNum}`);
+            if (!board) return;
+            const isAI = vsComputer && pNum === AI_PLAYER;
+            const seatName = isAI ? 'The Computer' : `Player ${pNum}`;
+            const historyPile = board.querySelector('.history-pile');
+
+            let history = [];
+            try { history = JSON.parse((historyPile && historyPile.dataset.cardData) || '[]'); } catch (e) { history = []; }
+            if (history.length === 0) {
+                await destinyNotice(`${seatName}'s History Pile is empty — there is nothing to void.`);
+                return;
+            }
+
+            const cap = Math.min(max, history.length);
+            const picked = isAI
+                ? aiVoiderPick(history, cap)
+                : await destinyPickTiles(history.map((c, i) => ({ card: c, value: i })), {
+                    max: cap,
+                    live: (n) => n === 0
+                        ? `Player ${pNum}: choose up to ${cap} card${cap === 1 ? '' : 's'} to remove from your deck for good — or decline.`
+                        : `Voiding ${n} of ${cap} — these never come back, and every later draw improves.`,
+                    confirmLabel: (n) => n === 0 ? 'VOID NOTHING' : `VOID ${n}`,
+                    declineLabel: 'DECLINE',
+                });
+
+            if (picked.length === 0) {
+                if (isAI) aiLog('Voider: keeps its History Pile intact', 'info');
+                await destinyNotice(`${seatName} voids nothing.`);
+                return;
+            }
+
+            const removed = removeFromStackPile(historyPile, picked, 'History');
+            const abyssEl = document.querySelector('.card--abyss');
+            removed.forEach(c => finishSingleCardPlacement(abyssEl, c));
+            if (abyssEl) floatValue(abyssEl, `${removed.length} Voided`, 'damage');
+            floatValue(historyPile, `-${removed.length}`, 'damage');
+
+            const names = removed.map(c => c.name).join(', ');
+            if (isAI) aiLog(`Voider: sends ${names} into the Abyss`, 'play');
+            await destinyNotice(`${seatName} sends ${names} into the Abyss — out of the game for good.`);
+        });
+    }
+
+    async function resolveVoider(card, revealer) {
+        await runVoider(revealer, 2);
+    }
+
+    // The Computer's Voider call. Voiding is deck-thinning, so the question is only ever
+    // "which card do I least want to draw again" — and the answer is always Steam. Creatures,
+    // Landmarks, Artifacts and Sparks ARE the payoff a thinner deck exists to reach, so it
+    // never voids one, however cheap. It also keeps a floor of Steam across all its zones:
+    // a deck thinned past its economy can't buy the things that were supposed to justify it.
+    //
+    // Easy doesn't plan a deck at all and declines. Normal drops FireSteam, the free starter
+    // currency. Hard also drops GoldSteam ONCE it owns a LaserSteam — at that point the Gold
+    // is the weak card in that particular deck, which is the whole judgment the card asks for.
+    const AI_STEAM_FLOOR = 4;
+    function aiVoiderPick(history, cap) {
+        if (aiLevel === 'easy') return [];
+
+        const owned = aiSteamPoolCounts(AI_PLAYER);
+        const total = owned.STM1 + owned.STM2 + owned.STM3;
+        const trashable = (c) => c.number === 'STM1' ||
+            (aiLevel === 'hard' && owned.STM3 > 0 && c.number === 'STM2');
+
+        const spare = Math.max(0, total - AI_STEAM_FLOOR);
+        if (spare === 0) return [];
+
+        // Cheapest first, so a Hard player drops its Fires before its Golds.
+        return history
+            .map((c, i) => ({ i, c }))
+            .filter(e => trashable(e.c))
+            .sort((a, b) => cardCostValue(a.c) - cardCostValue(b.c))
+            .slice(0, Math.min(cap, spare))
+            .map(e => e.i)
+            .sort((a, b) => a - b);
+    }
+
+    // Every Steam card a player owns, wherever it currently sits — Hand (parked cards
+    // included, they spend like Hand cards), History and Future. That whole POOL is what a
+    // thinning decision has to be measured against, not just the pile being thinned.
+    //
+    // Deliberately NOT named aiSteamCounts: that one already exists down in the Computer
+    // section, counts the HAND only, and keys its result F/G/L. Two same-named function
+    // declarations in this one scope don't collide loudly — the later one silently wins for
+    // the whole file — so the two have to stay tellably different by name.
+    function aiSteamPoolCounts(pNum) {
+        const board = document.getElementById(`player-${pNum}`);
+        const out = { STM1: 0, STM2: 0, STM3: 0 };
+        if (!board) return out;
+        const tally = (c) => { if (c && out[c.number] !== undefined) out[c.number]++; };
+        board.querySelectorAll('.hand-slot:not(.slot-empty), .atlantica-slot:not(.slot-empty)')
+            .forEach(sl => { try { tally(JSON.parse(sl.dataset.cardData)); } catch (e) { /* blank */ } });
+        board.querySelectorAll('.history-pile, .future-pile').forEach(pile => {
+            let cards = [];
+            try { cards = JSON.parse(pile.dataset.cardData || '[]'); } catch (e) { cards = []; }
+            if (Array.isArray(cards)) cards.forEach(tally);
+        });
+        return out;
+    }
+
     const destinyEffects = {
         'Healing Tree': resolveHealingTree,
         'Freeze': resolveFreeze,
@@ -8415,6 +8594,7 @@ document.addEventListener('DOMContentLoaded', () => {
         'Dragon Throne': resolveDragonThrone,
         'Unstoppable Force': resolveUnstoppableForce,
         'Truce': resolveTruce,
+        'Voider': resolveVoider,
     };
 
     // ==================== COMPUTER OPPONENT ====================
