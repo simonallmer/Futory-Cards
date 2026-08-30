@@ -285,7 +285,7 @@ document.addEventListener('DOMContentLoaded', () => {
         };
     }
 
-    const implementedCards = ["Pandorama", "Fountain of Youth", "Laser Catalyst", "Dragura's Wasteland", "Planetarium", "Lethargo's Temple", "Clone Factory", "Aetherlab", "Entrophy", "Meridius", "Meridia", "Time Thief", "Ichor", "Vulcanem", "Cravus", "Rampadon", "Smoke", "Dark Matter", "Reflector", "Talisman", "Reversal", "Faith", "Threat", "Confiscation", "Gravitas", "Time Bender", "Meridia's Cabin", "Repo Station", "Hand of Rhone", "Atlantica", "Hyperscope", "Mines of Pyralos", "Chrona", "Razo", "Looper", "Masiota", "Aromeas", "General Wave", "Namandi", "Sea Lord", "Sleep Potion", "Lotus", "Rush", "Cell Shield", "Alchemy", "Tame Beast", "Tele Control", "Burden of Wealth", "Healing Tree", "Freeze", "Chrono Machine", "Dragon Throne", "Unstoppable Force"];
+    const implementedCards = ["Pandorama", "Fountain of Youth", "Laser Catalyst", "Dragura's Wasteland", "Planetarium", "Lethargo's Temple", "Clone Factory", "Aetherlab", "Entrophy", "Meridius", "Meridia", "Time Thief", "Ichor", "Vulcanem", "Cravus", "Rampadon", "Smoke", "Dark Matter", "Reflector", "Talisman", "Reversal", "Faith", "Threat", "Confiscation", "Gravitas", "Time Bender", "Meridia's Cabin", "Repo Station", "Hand of Rhone", "Atlantica", "Hyperscope", "Mines of Pyralos", "Chrona", "Razo", "Looper", "Masiota", "Aromeas", "General Wave", "Namandi", "Sea Lord", "Sleep Potion", "Lotus", "Rush", "Cell Shield", "Alchemy", "Tame Beast", "Tele Control", "Burden of Wealth", "Healing Tree", "Freeze", "Chrono Machine", "Dragon Throne", "Unstoppable Force", "Truce"];
 
     // --- Intent Classification ---
     // auto: fires on its own when condition is met
@@ -346,6 +346,7 @@ document.addEventListener('DOMContentLoaded', () => {
         'Chrono Machine': 'auto',
         'Dragon Throne': 'auto',
         'Unstoppable Force': 'auto',
+        'Truce': 'auto',
     };
 
     // --- Simulation Presets ---
@@ -605,6 +606,25 @@ document.addEventListener('DOMContentLoaded', () => {
             p2creatures: [{ name: 'Ichor', damageTaken: 0 }],
             p2hand: ['Smoke', 'FireSteam'],
         },
+        'Truce': {
+            phase: 1,
+            // Every way to point a Creature at someone, on one board. Cravus attacks
+            // instantly and Ichor is seeded past its summoning sickness, so both are live
+            // the moment the card lands; Rush is the Artifact that exists to force an
+            // attack; Tele Control is the Spark that borrows one. The Spark sits in hand
+            // rather than being bought — dropping a Spark on the Abyss IS the play gesture
+            // (placeCard fires resolveSparkEffect), so the real path still runs, and with
+            // both sets active the S3 pile shows Unity's Threat on top anyway. Vulcanem
+            // proves summoning still works. Starts in Construction so the Spark is legal.
+            desc: "Player 1's Future Pile is empty — the turn start reveals Truce. CONSTRUCTION: play Tele Control (click it, then click the Abyss) — even with two of your own Creatures in the zone it should go straight to 'Attack Which Player?' with no chooser, because only the Computer's Ichor is offered; aim it at Player 2 and the borrowed Creature still strikes. NEXT PHASE to CREATURE: clicking Cravus or Ichor should say \"Truce — your Creatures can't attack this turn.\", playing Rush should refuse and STAY in your hand, and summoning Vulcanem should still work. End the turn: the Computer attacks you normally and you can still block, and on your next turn your Creatures attack again.",
+            destiny: 'Truce',
+            hand: ['Tele Control', 'Rush', 'Vulcanem'],
+            p1creatures: [{ name: 'Cravus', damageTaken: 0 }, { name: 'Ichor', damageTaken: 0 }],
+            p1future: [],
+            p1history: ['FireSteam', 'GoldSteam'],
+            p2creatures: [{ name: 'Ichor', damageTaken: 0 }],
+            p2hand: ['FireSteam', 'GoldSteam'],
+        },
         'Hand of Rhone': {
             phase: 1,
             day: 9,
@@ -705,6 +725,7 @@ document.addEventListener('DOMContentLoaded', () => {
     };
 
     const devLogData = [
+        { date: '2026-08-30', msg: "Destiny 029 Truce \u2014 implemented (auto), 6/24. 'Your Creatures can't attack this turn.' The exact inverse of Unstoppable Force and deliberately built out of the same two pieces: one turn-scoped seat flag (trucePlayer = the revealer) and the same reading of 'your Creatures' \u2014 the ones sitting in that seat's OWN Creature Zone, tested off the slot's board rather than off currentPlayer. THE ONE DECISION THAT MATTERED was where to put the gate. Not in the zone-click dispatcher (Rush would walk straight past it) and not in beginAttack (that would also stop a Creature you borrowed from someone else): it sits in showAttackMenu, the single door every player-initiated attack goes through \u2014 the click on your own Creature, and Rush's instant attack, which calls it too. Three more places needed a word. triggerRush refuses BEFORE the Artifact is spent, so a Truce'd turn can't waste your Rush on a refusal. teleControlTargets drops the Truce'd seat's own Creatures from the target list, because commandeering your OWN Creature is not a way round 'your Creatures can't attack' \u2014 an opponent's Creature stays fair game, which is the same borrowing rule Unstoppable Force already set. And the Computer stands down at the top of its own attack loop with a feed line rather than a silent skip, so watching it obey reads as a rule and not as a hang. WHAT IT DOESN'T TOUCH, on purpose: blocking (the card forbids attacking, not defending \u2014 resolveCombat and initiateDefense are untouched), summoning, and building. The revealer still plays a whole normal turn; only the strike is gone. Like Unstoppable Force and unlike Freeze, nothing about the turn's shape changes, so the ban has to expire on its own: trucePlayer clears in finishTurn beside the other per-turn state, and in resetGameToStart and the Dev Log sim reset so one preset can't contaminate the next. Sim preset puts every route to an attack on one board \u2014 Cravus (instant) and Ichor (past its sickness) in the zone, Rush and Tele Control in hand, Vulcanem to prove summoning still works. The Spark is seeded into the hand rather than bought: dropping a Spark on the Abyss IS the play gesture (placeCard fires resolveSparkEffect), and with both sets active the S3 pile shows Unity's Threat on top anyway. VERIFIED LIVE, vs Computer, all six paths. Clicking Cravus and clicking Ichor each said \"Truce \u2014 your Creatures can't attack this turn.\" and left the attack menu shut. Rush refused with its own message and was still in hand afterwards. Tele Control, with two of my own Creatures standing in the zone, skipped the chooser entirely and went straight to 'Attack Which Player?' \u2014 only the Computer's Ichor was ever a target \u2014 and aiming it at Player 2 struck P2 with their own Creature, so a borrowed Creature really does still attack. Summoning Vulcanem into the middle slot worked untouched. Ending the turn, the Computer attacked me normally with BLOCK and PLAY ARTIFACT both live (the ban is the revealer's alone), and on my next turn clicking Cravus opened the attack menu with no alert \u2014 the flag dies with its turn. Then the mirror case, by handing the Computer the empty Future Pile instead: it revealed Truce, the overlay read 'The Computer's Creatures cannot attack this turn.', the feed logged 'Truce: its Creatures can't attack this turn', and its Ichor never swung \u2014 no defense screen came up for me at all. No console errors. Destiny progress panel now reads 6/24, next 030 Voider." },
         { date: '2026-08-24', msg: "Destiny 028 Unstoppable Force — implemented (auto), 5/24. 'In this turn, your Creatures have +1 Strength and can't be blocked. Other Players can't use Artifacts in response.' Three clauses, ONE turn-scoped flag (unstoppableForcePlayer = the revealer), and every clause rides a combat chokepoint that already existed rather than a new path: calculateCurrentStrength picks up the +1 (so the attack screen badge, the direct-strike math, resolveCombat's spillover, Hyperscope's Landmark strike and the Computer's own block heuristic all see it for free), initiateDefense's isUnblockable gains one more term next to Rampadon / Entrophy / Meridius, and the same screen's PLAY ARTIFACT button is disabled with a title saying why. JUDGMENT CALLS worth knowing. (1) STRENGTH ONLY, and deliberately NOT on the zone stat badge: that badge is a Creature's single HP value and doubles as its block Resistance, which this card does not touch — a Creature that stays home and blocks this turn still defends with its printed number, so resolveCombat's blocker math is untouched and the buff surfaces only on the Creature Attack screen. That is exactly the call Meridius's +Strength already makes. (2) 'YOUR Creatures' = the ones in the revealer's OWN Creature Zone, read off the attacker slot's board rather than off currentPlayer — so a Creature commandeered with Tele Control attacks out of its owner's zone and gets nothing: you're borrowing their Creature, not fielding yours. (3) 'OTHER Players' is literal: the artifact ban checks defenderNum !== revealer, so aiming a Tele-Controlled Creature back at yourself doesn't bar your own response. (4) Unlike Freeze this changes nothing about the turn's shape — it fires at turn start and the revealer still plays their whole turn, so the buff has to expire on its own: the flag clears in finishTurn beside the rest of the per-turn state (and in resetGameToStart and the Dev Log sim reset, so one preset can't contaminate the next). Two dead buttons with no explanation read as a bug, so the defense screen states the reason — 'Unstoppable Force — no block, no Artifact response.' — except behind a Hyperscope lock, where the lock message is the more useful line. Sim preset gives the opponent BOTH answers they are supposed to lose: a live Ichor blocker AND Smoke in hand, with Cravus attacking (it can act instantly, so the whole card runs in the turn it is revealed). Verified live in BOTH modes. Vs Computer: reveal fired from the empty Future Pile, the attack screen read Strength 3 (2+1) with BLOCK and PLAY ARTIFACT both locked, the feed logged 'Can't block — takes 3 damage' and P2's Day die went 12 → 9 with its Ichor untouched in the zone. EXPIRY verified by NOT attacking: ending the turn, letting the Computer play (its own Ichor attacked back at plain Strength 2 — the buff is the revealer's alone — and P1 could still block normally), then attacking on the next P1 turn read Strength 2 again with PLAY ARTIFACT re-enabled and its title cleared, proving the flag dies with its turn. Hot seat: the same attack showed the explanation line under the buttons and struck for 3 (P2 Day 7 → 4) past a live blocker and an unused Smoke. No console errors. Destiny progress panel now reads 5/24, next 029 Truce." },
         { date: '2026-08-14', msg: "Destiny — Dragon Throne reworked to a blind pick, plus a dev-only deck refill. Both from Simon's playtest read. (1) DECK REFILL. He asked what happens when the deck dries up; the honest answer was nothing — takeTopDestiny() returned null and maybeTriggerDestiny() just returned, silently. With only 4 cards wired up the live deck empties after 4 reveals, and from then on every empty-Future turn start did nothing with no message, which in a playtest is indistinguishable from a broken trigger. Fixed as a DEV-ONLY refill per his call: an empty deck reshuffles the Destiny Abyss back in, gated on destinySetComplete() — so the moment all 24 cards are implemented the refill stops firing on its own and the deck runs out for real, which is the shipped rule. No flag to remember to turn off, and nothing to unpick later. The rulebook says only 'send it to the Destiny Abyss face up' and nothing about recycling, so this is explicitly scaffolding for the short deck, not a rules change. (2) DRAGON THRONE — 'take a RANDOM card' was, in Simon's words, anticlimactic as a silent dice roll. Now the theft is played out: the victim's hand fans FACE DOWN (new destinyPickFaceDown()) and the thief clicks one of the backs. The outcome is still random — you cannot know what you're taking — but the choosing is a moment, it invites the 'no, not that one' from across the table, and the length of the row is real information: everyone now learns how big that hand is, which the old dice roll threw away. JUDGMENT CALL worth knowing: which real card sits behind each back is SHUFFLED rather than left in hand order. Without that, a player who tracked what their opponent drew could aim at a known slot, and the card is printed 'random' — the drama is meant to come from the ritual, not from an information edge. Flip the shuffle if you'd rather reward hand-tracking. The Computer as thief just picks an index (it has no hand fanned at it either way). Verified live: the picker showed 4 identical backs labelled with the hand size, taking one moved it across (opponent 4 → 3, yours 1 → 2), and clicking the SAME tile position across four re-runs took Vulcanem / LaserSteam / Ichor / Cravus — proving the shuffle holds and slot-tracking buys nothing. Refill verified by emptying both seats' Future AND History piles so every turn start triggered: the deck counted down 3 → 2 → 0, then recycled the 8-card Abyss, dealt from it (deck 7, Abyss back to just the card that had resolved) and kept revealing. No console errors." },
         { date: '2026-08-14', msg: "Destiny 027 Dragon Throne — implemented (auto), 4/24. 'Choose an opponent. Take a random Card from their Hand and place it in yours.' The card is RANDOM, so neither player picks it — the only decision is WHICH opponent, and in 2-player V1 there isn't one, so it auto-resolves. REUSE over reinvention: Confiscation (S4) already did the take-a-card-from-their-Hand move, so rather than writing a second copy, that logic was extracted into a shared takeCardToHand(slot, fromPNum, toPNum) — clear the source slot, re-layout both hands, drop it into the receiver's first empty Hand slot (opening a temporary one if the hand is already full, which the End Phase hand-limit gate then trims) and float '+ CardName'. Confiscation now calls the same helper, so the two effects can't drift apart. The opponent picker is deliberately NOT the shared #target-player-overlay that Confiscation and Dark Matter use for 3-4 players: that overlay sits on the same z-index layer as the Destiny screen and would render UNDERNEATH it. New destinyChooseOpponent() asks inside the Destiny overlay itself via the existing destinyButtons() dock, walking seats in clockwise order, and skips the question entirely when there's only one opponent. Naming the taken card in the resolution notice leaks nothing — the victim watched it leave their hand and the thief is holding it. Works in both directions: the Computer as revealer takes from you through the identical path (and logs 'Dragon Throne: <card> changes hands' to its feed). Verified live via the new sim (your hand: 1 FireSteam; the opponent's: Ichor / Cravus / Vulcanem / LaserSteam): the reveal moved exactly one card across — opponent 4 → 3, yours 1 → 2 — and four re-runs took LaserSteam, Cravus, Cravus, Vulcanem, confirming it's actually random rather than always the first or last slot. Regression-checked Confiscation after the extraction: buying it from Bazaar S4 still opened 'Confiscation — P2's Hand' listing Ichor/Cravus/Smoke, and taking Smoke moved it correctly. No console errors. Destiny progress panel now reads 4/24, next 028 Unstoppable Force." },
@@ -1023,6 +1044,7 @@ document.addEventListener('DOMContentLoaded', () => {
             pendingExtraTurn = null;
             destinyResolving = false;
             unstoppableForcePlayer = null;
+            trucePlayer = null;
 
             // Pre-charge Hand of Rhone (its auto +1 then fires via updatePhaseUI below).
             if (sim.rhoneCharge !== undefined) {
@@ -2340,6 +2362,9 @@ document.addEventListener('DOMContentLoaded', () => {
             try { const c = JSON.parse(s.dataset.cardData); return c.type === 'Creature' && !c.deactivated; } catch (e) { return false; }
         });
         if (!creatures.length) { alert('Rush — you have no Creature in play to attack.'); return; }
+        // Truce (029) locks every Creature on this board, so Rush has nothing legal to do —
+        // say so BEFORE the Artifact is spent rather than after showAttackMenu refuses.
+        if (truceBoard(board)) { alert("Truce — your Creatures can't attack this turn. Rush stays in your hand."); return; }
 
         const apply = (slot) => {
             const casterHistory = board.querySelector('.history-pile');
@@ -4088,6 +4113,9 @@ document.addEventListener('DOMContentLoaded', () => {
                 if (Array.isArray(c) || c.type !== 'Creature' || c.deactivated) return;
                 const canAct = (c.summonedOnTurn < totalTurns) || c.name.includes('Cravus') || c.name.includes('Rampadon');
                 if (!canAct) return;
+                // Truce (029): commandeering your OWN Creature is not a way around "your
+                // Creatures can't attack this turn". An opponent's Creature stays fair game.
+                if (truceBoard(document.getElementById(`player-${p}`))) return;
                 found.push({ slot, owner: p });
             });
         }
@@ -5303,6 +5331,13 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function showAttackMenu(attackerCard, attackerSlot) {
+        // Truce (Destiny 029): the revealer's own Creatures can't attack this turn. Gated
+        // here rather than in the zone-click dispatcher because this is the one door every
+        // player-initiated attack goes through — the click, and Rush's instant attack.
+        if (truceBlocks(attackerSlot)) {
+            alert("Truce — your Creatures can't attack this turn.");
+            return;
+        }
         currentAttackerCard = attackerCard;
         currentAttackerSlot = attackerSlot;
         document.getElementById('attack-action-menu').classList.remove('hidden');
@@ -7669,6 +7704,7 @@ document.addEventListener('DOMContentLoaded', () => {
         resetLooper();
         destinyDrawOverride = null; // a Destiny draw rewrite lasts exactly one turn
         unstoppableForcePlayer = null; // "in this turn" — ends with the turn that revealed it
+        trucePlayer = null;            // same: the ban dies with the turn that revealed it
 
         const hint = document.getElementById('next-player-hint');
         if (hint) hint.textContent = `To Player ${currentPlayer}`;
@@ -7766,6 +7802,9 @@ document.addEventListener('DOMContentLoaded', () => {
     // Seat whose Creatures are unstoppable for the current turn (Unstoppable Force).
     // null = nobody; cleared in finishTurn, so the buff can never outlive its turn.
     let unstoppableForcePlayer = null;
+    // Seat whose Creatures are forbidden to attack this turn (Truce). Same lifetime and
+    // the same "your Creatures = the ones in your own zone" reading as the flag above.
+    let trucePlayer = null;
 
     // --- Unstoppable Force helpers (Destiny 028) ---------------------------
     // Declared up here beside the flag because the combat code — which lives earlier in
@@ -7798,6 +7837,22 @@ document.addEventListener('DOMContentLoaded', () => {
     // is a Creature's single HP value and doubles as its block Resistance, which this card
     // does not touch. Same call Meridius's +Strength makes: it shows on the Creature Attack
     // screen (decorateCombatScreen reads calculateCurrentStrength) and nowhere else.
+
+    // --- Truce helpers (Destiny 029) ---------------------------------------
+    // "Your Creatures can't attack this turn." Same board test as Unstoppable Force, so
+    // "your Creatures" means the same thing in both cards: the ones sitting in the
+    // revealer's OWN Creature Zone. A Creature commandeered out of an opponent's zone with
+    // Tele Control is still theirs, so the Truce doesn't reach it — but commandeering one
+    // of your OWN is not a loophole either, which is why teleControlTargets filters too.
+    //
+    // Blocking is untouched: the card forbids attacking, not defending.
+    function truceBoard(board) {
+        return trucePlayer !== null && !!board && board.id === `player-${trucePlayer}`;
+    }
+
+    function truceBlocks(creatureSlot) {
+        return truceBoard(creatureSlot && creatureSlot.closest('.player-zone'));
+    }
 
     // A revealed Destiny card shows its FRONT. cardArtUrl deliberately returns null
     // for Destiny so the deck in the Bazaar keeps its back — this is the other half.
@@ -8310,12 +8365,29 @@ document.addEventListener('DOMContentLoaded', () => {
         if (vsComputer) aiLog('Unstoppable Force: +1 Strength, unblockable, no Artifact responses', 'info');
     }
 
+    // 029 Truce — "Your Creatures can't attack this turn." The exact inverse of Unstoppable
+    // Force and deliberately built on the same two pieces: one turn-scoped seat flag, and the
+    // same "your Creatures = the ones in your own Creature Zone" reading.
+    //
+    // It bans ATTACKING only. The revealer still gets their whole turn — Steam, Construction,
+    // and a Creature Phase they can still summon into — and their Creatures still block
+    // normally when the turn passes, so a Truce'd board is quiet, not defenceless.
+    async function resolveTruce(card, revealer) {
+        trucePlayer = revealer;
+        const who = (vsComputer && revealer === AI_PLAYER) ? 'The Computer' : `Player ${revealer}`;
+        await destinyNotice(
+            `${who}'s Creatures cannot attack this turn. Summoning, building and blocking are unaffected.`
+        );
+        if (vsComputer) aiLog('Truce: no attacks this turn', 'info');
+    }
+
     const destinyEffects = {
         'Healing Tree': resolveHealingTree,
         'Freeze': resolveFreeze,
         'Chrono Machine': resolveChronoMachine,
         'Dragon Throne': resolveDragonThrone,
         'Unstoppable Force': resolveUnstoppableForce,
+        'Truce': resolveTruce,
     };
 
     // ==================== COMPUTER OPPONENT ====================
@@ -8616,6 +8688,12 @@ document.addEventListener('DOMContentLoaded', () => {
         }
 
         // 2) Attack with every Creature that's allowed to act.
+        // Truce (Destiny 029): it revealed the card, it obeys it — one line in the feed
+        // rather than a silent skip, so watching the Computer stand down reads as a rule.
+        if (truceBoard(board)) {
+            aiLog("Truce: its Creatures can't attack this turn", 'info');
+            return;
+        }
         const zoneSlots = Array.from(board.querySelectorAll('.creature-zone-main .card:not(.slot-empty)'));
         for (const slot of zoneSlots) {
             if (gameWon) return;
@@ -8917,6 +8995,7 @@ document.addEventListener('DOMContentLoaded', () => {
         pendingExtraTurn = null;
         destinyResolving = false;
         unstoppableForcePlayer = null;
+        trucePlayer = null;
         disarmCloneFactory();
         deactivateAetherlab();
         resetLooper();
