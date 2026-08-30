@@ -285,7 +285,7 @@ document.addEventListener('DOMContentLoaded', () => {
         };
     }
 
-    const implementedCards = ["Pandorama", "Fountain of Youth", "Laser Catalyst", "Dragura's Wasteland", "Planetarium", "Lethargo's Temple", "Clone Factory", "Aetherlab", "Entrophy", "Meridius", "Meridia", "Time Thief", "Ichor", "Vulcanem", "Cravus", "Rampadon", "Smoke", "Dark Matter", "Reflector", "Talisman", "Reversal", "Faith", "Threat", "Confiscation", "Gravitas", "Time Bender", "Meridia's Cabin", "Repo Station", "Hand of Rhone", "Atlantica", "Hyperscope", "Mines of Pyralos", "Chrona", "Razo", "Looper", "Masiota", "Aromeas", "General Wave", "Namandi", "Sea Lord", "Sleep Potion", "Lotus", "Rush", "Cell Shield", "Alchemy", "Tame Beast", "Tele Control", "Burden of Wealth", "Healing Tree", "Freeze", "Chrono Machine", "Dragon Throne", "Unstoppable Force", "Truce", "Voider", "Space Voider", "Eternal Hour", "Great Flood", "Laser Bomb", "Daredevil's Reward"];
+    const implementedCards = ["Pandorama", "Fountain of Youth", "Laser Catalyst", "Dragura's Wasteland", "Planetarium", "Lethargo's Temple", "Clone Factory", "Aetherlab", "Entrophy", "Meridius", "Meridia", "Time Thief", "Ichor", "Vulcanem", "Cravus", "Rampadon", "Smoke", "Dark Matter", "Reflector", "Talisman", "Reversal", "Faith", "Threat", "Confiscation", "Gravitas", "Time Bender", "Meridia's Cabin", "Repo Station", "Hand of Rhone", "Atlantica", "Hyperscope", "Mines of Pyralos", "Chrona", "Razo", "Looper", "Masiota", "Aromeas", "General Wave", "Namandi", "Sea Lord", "Sleep Potion", "Lotus", "Rush", "Cell Shield", "Alchemy", "Tame Beast", "Tele Control", "Burden of Wealth", "Healing Tree", "Freeze", "Chrono Machine", "Dragon Throne", "Unstoppable Force", "Truce", "Voider", "Space Voider", "Eternal Hour", "Great Flood", "Laser Bomb", "Daredevil's Reward", "Lethargo's Approach", "Sacrifice"];
 
     // --- Intent Classification ---
     // auto: fires on its own when condition is met
@@ -353,6 +353,8 @@ document.addEventListener('DOMContentLoaded', () => {
         'Great Flood': 'auto',
         'Laser Bomb': 'auto',
         "Daredevil's Reward": 'auto',
+        "Lethargo's Approach": 'auto',
+        'Sacrifice': 'auto',
     };
 
     // --- Simulation Presets ---
@@ -726,6 +728,34 @@ document.addEventListener('DOMContentLoaded', () => {
             p1future: [],
             p1history: ['FireSteam', 'GoldSteam'],
         },
+        "Lethargo's Approach": {
+            phase: 0,
+            // Two different dice states, so one reveal shows both routes the loss can take:
+            // yours is a full clock (Day die eats it), the Computer's Day die is already gone
+            // (Night die eats it instead).
+            day: 12,
+            night: 12,
+            p2day: 0,
+            p2night: 5,
+            desc: "Player 1's Future Pile is empty — the turn start reveals Lethargo's Approach. Both players lose exactly 1 Time Point at once: your Day die goes 12 → 11, while the Computer — whose Day die is already gone — takes it on the Night die, 5 → 4. Nobody chooses anything.",
+            destiny: "Lethargo's Approach",
+            hand: ['FireSteam', 'GoldSteam'],
+            p1future: [],
+            p1history: ['FireSteam', 'GoldSteam'],
+        },
+        'Sacrifice': {
+            phase: 0,
+            // Day at 3 so any roll of 4+ spills onto the Night die — the one thing about this
+            // card that isn't just subtraction. The Computer's clock is left alone to prove
+            // "You" means the revealer and nobody else.
+            day: 3,
+            night: 12,
+            desc: "Player 1's Future Pile is empty — the turn start reveals Sacrifice. A Futory Die rolls in the overlay and YOU lose that many Time Points — the Computer's clock must not move at all. Your Day die is on 3, so a roll of 4 or more empties it and the rest comes off the Night die. Re-run it a few times: the roll is real, and a roll big enough to reach 0 ends the game there and then.",
+            destiny: 'Sacrifice',
+            hand: ['FireSteam', 'GoldSteam'],
+            p1future: [],
+            p1history: ['FireSteam', 'GoldSteam'],
+        },
         'Hand of Rhone': {
             phase: 1,
             day: 9,
@@ -826,6 +856,8 @@ document.addEventListener('DOMContentLoaded', () => {
     };
 
     const devLogData = [
+        { date: '2026-08-30', msg: "Destiny 037 Sacrifice \u2014 implemented (auto), 14/24. 'Roll a Futory Die. You lose Time Points equal to the result.' The whole card is the roll, so the roll had to be worth watching \u2014 and it had to happen INSIDE the Destiny overlay, since the board is behind the backdrop and Looper's own die overlay would have fought this one for the screen. destinyRollDie() renders the die in the picker row using the same buildPips face and the same fast-then-easing tick as the Looper and Entrophy rolls, resolves with the face, and LEAVES THE DIE ON SCREEN under the notice that explains what it cost \u2014 so the number you are reading about is still sitting there. 'You' is literal: the revealer alone, everyone else just watches. The loss rides destinyLoseTimePoints, so a roll bigger than the active die spills onto the other one, an emptied die is permanently lost, and a roll that reaches 0 ends the game. When the clock can't pay the full roll the notice says so ('has only 2 Time Points left to give') rather than reporting a number the dice never actually took. FOUND AND FIXED WHILE TESTING, a real dev-tool trap: runSimulation resets destinyResolving as part of clearing per-turn state, which meant loading a preset while a reveal was still awaiting a choice started a SECOND reveal alongside the first, and both resolved onto the same board \u2014 two Sacrifice rolls landed on one clock and the numbers stopped adding up. runSimulation now refuses outright while a reveal is open. Anyone testing 'Each Player' cards would have hit this eventually. VERIFIED LIVE vs Computer, every branch, with the Computer's clock untouched in all of them. Roll 3 against a Day die of 3 emptied it exactly (Day lost, Night 12, 12 TP left). Roll 6 against the same Day die took all 3 and spilled the other 3 onto the Night die (12 \u2192 9). Roll 4 against a player holding 2 Time Points on a lone Day die reported 'loses 2 TP', vanished both dice, and ended the game \u2014 with the Destiny overlay closing itself behind the victory screen, the destinyNotice fix from Eternal Hour doing its job a second time. No console errors. Destiny progress panel now reads 14/24, next 038 Break of Dawn \u2014 this card's mirror." },
+        { date: '2026-08-30', msg: "Destiny 036 Lethargo's Approach \u2014 implemented (auto), 13/24. 'Each Player loses 1 Time Point.' The smallest card in the set: no choices, no snapshot, no targeting \u2014 1 TP off every seat at the same moment. It exists in the code purely as a call to destinyLoseTimePoints, the helper Eternal Hour left behind, so it inherits the whole TP contract for free: Day die first, a seat whose Day die is already gone takes it on the Night die, an emptied die stays lost, and a seat on exactly 1 TP is knocked out with the game-over check firing. The notice reads out both clocks afterwards, since a card that changes everyone by the same tiny amount is otherwise easy to miss. Sim preset puts the two seats in different dice states on purpose, so one reveal shows both routes. VERIFIED LIVE vs Computer: Player 1's Day die went 12 \u2192 11 while the Computer \u2014 Day die already gone \u2014 took it on the Night die, 5 \u2192 4, and the notice read 'Player 1 23 \u00b7 The Computer 4 TP remaining'. No console errors." },
         { date: '2026-08-30', msg: "Destiny 035 Daredevil's Reward \u2014 implemented (auto), 12/24. 'All Players tied for least Time Points may show a Card from their Hand to take the same Card from the Bazaar.' The catch-up card, and the first one whose wording genuinely forked \u2014 SIMON RULED ON THREE THINGS and all three are load-bearing. (1) The taken card goes to its type's NORMAL destination, exactly where a Construction Phase buy would put it: Landmark straight into the Landmark Zone, Artifact to History, Spark played, Creature to Hand. It is a free BUY, not a free card in hand. (2) Emptying a Bazaar pile this way does NOT cost every player 1 Time Point \u2014 that rule is written for buying, and this is a take. (3) STEAM CANNOT BE SHOWN, because 'the Bazaar' is defined as the Non-Steam, Non-Destiny cards; a Steam card in hand simply has no Bazaar counterpart. That definition is now in the code as bazaarStockByName, which skips ST1-3, D, DA and AB \u2014 every future card that says 'from the Bazaar' should go through it. Two pieces of plumbing came out of it. grantCardToPlayer(pNum, card) places a card at its type destination and reports where it went \u2014 the routine the engine never had, because the Computer only ever buys Creatures and Landmarks and the human path goes through drag-and-drop. And a follow-up QUEUE on the Destiny overlay: a Spark plays the instant it lands in the Abyss, and its own targeting UI must not open behind the Destiny screen or interleave with another seat's choice, so the Spark's effect is deferred and revealDestiny flushes the queue after the overlay closes. forEachPlayerClockwise also gained an optional seat filter, so the walk visits only the tied-for-least seats and skips everyone else outright rather than showing them an empty prompt. Eligibility is checked against what the board can actually do: no Steam, the Bazaar must have that card in stock in an active set, and a Landmark you already own (or have no room for) is not offered \u2014 caught live when a second run correctly dropped Pandorama from the tiles because the first run had just built it. The shown card is SHOWN, not spent: it stays in hand. COMPUTER: it is behind on time, so it takes the biggest freebie it can use \u2014 most expensive first, Creatures and Landmarks only, since V1 it plays neither Artifacts nor Sparks. VERIFIED LIVE vs Computer, every branch. At 8 TP against 24, only Player 1 was offered and the Computer's half of the walk was skipped entirely. FireSteam did not appear among the tiles. Showing Pandorama built the Bazaar's copy straight into the Landmark Zone with L1 going 3 \u2192 2, the Pandorama in hand untouched, and NOBODY losing a Time Point. Showing Faith sent it to the Abyss with the notice 'it plays as soon as this reveal closes' and nothing else happening \u2014 then, once the overlay was gone, the Spark resolved on its own: Day die 4 \u2192 7 and a GoldSteam drawn. A tie run (both on 24) offered BOTH seats: Player 1, holding only Steam, got 'holds nothing the Bazaar can match', and the Computer chose Vulcanem over Cravus and ignored the Smoke, with C8 going 3 \u2192 2 and its own Vulcanem still in hand. No console errors. Destiny progress panel now reads 12/24 \u2014 halfway \u2014 next 036 Lethargo's Approach." },
         { date: '2026-08-30', msg: "Destiny 034 Laser Bomb \u2014 implemented (auto), 11/24. 'Send all Creatures from the Creature Zone into the Abyss.' The board wipe: no choices, no exceptions, both sides at once, and \u2014 the part that actually matters \u2014 to the ABYSS. Every other way a Creature leaves the zone routes it to its owner's History, where it cycles back into their deck; these are gone from the game, which makes this the hardest reset in the set. TWO EDGES. A deactivated, face-down Creature is still a Creature and still goes \u2014 being asleep is not cover. And a Lotus pad is NOT a Creature: it is an Artifact lying in the Creature Zone, and the card names Creatures only, so a bare pad is left alone and a Creature RIDING a pad is taken while the pad is re-seated behind it, empty and reusable \u2014 the same move finishAttacker makes for a Creature that merely attacked. QUESTION FOR SIMON, flagged in the code: the other reading is that a Laser Bomb 'defeats' the Creature, in which case the Lotus should discharge with it to History. One line to switch if that's the intent. Sim presets gained an onLotus flag on a creature spec (seats it on a Lotus pad exactly the way summonCreatureToZone does, marker and all), which is what made that interaction testable at all \u2014 and will be reusable for every later card that has to say something about pads. VERIFIED LIVE vs Computer. Four Creatures across both boards \u2014 Cravus, a damaged Vulcanem, an Ichor on a \ud83e\udeb7 pad, and the Computer's Meridius \u2014 all four vanished in one reveal and the Bazaar Abyss went 0 \u2192 4 IN ABYSS, with both Creature Zones empty and neither History Pile touched. The pad the Ichor was sitting on was still there afterwards, empty with the marker stripped, and so was the bare Lotus laid in the outer slot. Re-run with an empty field: 'No Creature is in play \u2014 the bomb falls on an empty field', a lone Lotus pad still standing and nothing added to the Abyss. No console errors. Destiny progress panel now reads 11/24, next 035 Daredevil's Reward." },
         { date: '2026-08-30', msg: "Destiny 033 Great Flood \u2014 implemented (auto), 10/24. 'Each Player must send one of their Landmarks into the Abyss.' The first MANDATORY Destiny card \u2014 no 'may', no decline \u2014 which needed a picker the overlay didn't have: destinyPickOneTile is a face-up row with no confirm step and no decline button, where clicking a tile IS the answer. Every earlier picker was built around a 'may'. THREE RULINGS. (1) 'One of their Landmarks' = any card in the Landmark Zone, a deactivated face-down one included \u2014 otherwise a Sandstorm'd board walks away untouched, and the choice belongs to its owner anyway so nothing is hidden from the person making it. (2) Into the ABYSS as printed, which is deliberately NOT the Hyperscope/Alchemy route: a destroyed or discarded Landmark goes to its owner's History and rebuilds itself on a later draw, while this one is gone for good, same as Threat's printed wording. (3) A seat with exactly one Landmark is not asked \u2014 there is no choice to make \u2014 and a seat with none is simply passed by, the only escape the card allows. Removal goes through clearSlot, the shared teardown chokepoint, so an Atlantica parked card and a Hand of Rhone charge clean up with it. COMPUTER: gives up its cheapest Landmark by Steam price. It doesn't buy the Landmarks whose worth is in their effect rather than their cost, so price is a fair proxy for least missed. Sim preset stacks three Landmarks on your side (Atlantica among them, so the parked-card teardown rides along if you pick it) against exactly one for the Computer, so a single reveal shows both the picker and the auto-resolve. VERIFIED LIVE vs Computer. The row fanned Pandorama / Atlantica / Aetherlab with NO buttons under it \u2014 one click on Atlantica was the whole answer: it left the Landmark Zone, landed in the Abyss (1 IN ABYSS), and the zone kept Pandorama and Aetherlab. The Computer's single Fountain of Youth resolved without a question and the Abyss went to 2. Re-run with the Landmarks swapped: an empty zone gave 'Player 1 owns no Landmarks \u2014 the Flood passes them by', and the Computer, offered Laser Catalyst / Pandorama / Aetherlab, gave up Pandorama \u2014 the cheapest \u2014 and kept the other two. No console errors. Destiny progress panel now reads 10/24, next 034 Laser Bomb." },
@@ -1010,6 +1042,14 @@ document.addEventListener('DOMContentLoaded', () => {
     function runSimulation(cardName) {
         const sim = simulationMap[cardName];
         if (!sim) return;
+        // A Destiny reveal is a live, awaited walk. Loading a preset underneath one clears
+        // destinyResolving while that walk is still in flight, so the new preset's reveal
+        // starts alongside it and BOTH resolve onto the same board — caught while testing
+        // Sacrifice, where two rolls landed on one clock and the numbers stopped adding up.
+        if (destinyResolving) {
+            alert('Finish the Destiny reveal on screen before running another simulation.');
+            return;
+        }
 
         devlogScreen.classList.add('hidden');
 
@@ -8222,6 +8262,33 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
+    // Roll a Futory Die inside the overlay and resolve with the face. Reuses buildPips and
+    // the Looper/Entrophy ease-out so a die rolled by Destiny looks like every other die in
+    // the game — and it stays on screen under the notice that explains what it cost you.
+    function destinyRollDie(prompt) {
+        const { picker } = destinyEls();
+        const result = 1 + Math.floor(Math.random() * 6);
+        return new Promise(resolve => {
+            setDestinyPrompt(prompt);
+            picker.innerHTML = '';
+            const wrap = document.createElement('div');
+            wrap.className = 'destiny-die';
+            picker.appendChild(wrap);
+
+            const show = (n) => { wrap.innerHTML = ''; wrap.appendChild(buildPips(n)); };
+            const minSteps = 18;
+            let step = 0, face = 1;
+            (function tick() {
+                show(face);
+                if (step >= minSteps && face === result) { resolve(result); return; }
+                face = (face % 6) + 1;
+                step++;
+                const progress = Math.min(1, step / (minSteps + 6));
+                setTimeout(tick, 45 + Math.pow(progress, 3) * 300);
+            })();
+        });
+    }
+
     // A single blind pick: N face-down card backs, resolves with the index chosen.
     // Used where an effect is printed "random" but plays better as a choice — you still
     // don't know what you're taking, but you pick it, and the row itself tells the table
@@ -8959,6 +9026,45 @@ document.addEventListener('DOMContentLoaded', () => {
         return usable.slice().sort((a, b) => cardCostValue(b.card) - cardCostValue(a.card))[0].value;
     }
 
+    // 036 Lethargo's Approach — "Each Player loses 1 Time Point." The smallest card in the
+    // set and the only one that touches everybody equally, so there is nothing to decide and
+    // nothing to snapshot: 1 TP off every seat, at the same moment.
+    //
+    // It rides destinyLoseTimePoints, which is resolveDamageDirectly underneath — so the
+    // Day-die-first rule holds, a seat whose Day die is already gone takes it on the Night
+    // die, and a seat on exactly 1 TP is knocked out with the game-over check firing.
+    async function resolveLethargosApproach(card, revealer) {
+        const seats = seatsClockwise(revealer);
+        seats.forEach(p => destinyLoseTimePoints(p, 1));
+
+        if (vsComputer) aiLog("Lethargo's Approach: everyone loses 1 TP", 'combat');
+        const readout = seats.map(p => {
+            const name = (vsComputer && p === AI_PLAYER) ? 'The Computer' : `Player ${p}`;
+            return `${name} ${totalTimePoints(p)}`;
+        }).join(' · ');
+        await destinyNotice(`Every player loses 1 Time Point. ${readout} TP remaining.`);
+    }
+
+    // 037 Sacrifice — "Roll a Futory Die. You lose Time Points equal to the result."
+    // The revealer alone, 1 to 6 off the clock, and nothing to decide — the whole card is
+    // the roll. "You" is literal: everyone else watches.
+    //
+    // The loss goes through destinyLoseTimePoints (resolveDamageDirectly underneath), so a 6
+    // against a half-spent Day die spills onto the Night die correctly, and a roll that
+    // reaches 0 ends the game — destinyNotice steps aside for the victory screen when it does.
+    async function resolveSacrifice(card, revealer) {
+        const who = (vsComputer && revealer === AI_PLAYER) ? 'The Computer' : `Player ${revealer}`;
+        const roll = await destinyRollDie(`${who} rolls the Futory Die…`);
+        const lost = destinyLoseTimePoints(revealer, roll);
+
+        if (vsComputer) aiLog(`Sacrifice: rolls ${roll}, ${who} loses ${lost} TP`, 'combat');
+        // A clock that can't pay the full roll simply runs out — say so rather than quietly
+        // reporting a number the dice never took.
+        await destinyNotice(lost < roll
+            ? `${who} rolls ${roll} and has only ${lost} Time Point${lost === 1 ? '' : 's'} left to give.`
+            : `${who} rolls ${roll} and loses ${roll} Time Points — ${totalTimePoints(revealer)} remaining.`);
+    }
+
     const destinyEffects = {
         'Healing Tree': resolveHealingTree,
         'Freeze': resolveFreeze,
@@ -8972,6 +9078,8 @@ document.addEventListener('DOMContentLoaded', () => {
         'Great Flood': resolveGreatFlood,
         'Laser Bomb': resolveLaserBomb,
         "Daredevil's Reward": resolveDaredevilsReward,
+        "Lethargo's Approach": resolveLethargosApproach,
+        'Sacrifice': resolveSacrifice,
     };
 
     // ==================== COMPUTER OPPONENT ====================

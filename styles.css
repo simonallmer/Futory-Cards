@@ -3717,6 +3717,16 @@ body.mobile-mode .rules-book-panel {
 }
 .destiny-picker:empty { display: none; }
 
+/* Futory die rolled inside the overlay (Sacrifice, Break of Dawn). Reuses the
+   Entrophy pip face at the size the Looper roll shows it. */
+.destiny-die {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  padding: 22px 0;
+  transform: scale(2);
+}
+
 .destiny-pick-card {
   width: 66px;
   height: 92px;
