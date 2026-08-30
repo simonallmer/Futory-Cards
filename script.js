@@ -285,7 +285,7 @@ document.addEventListener('DOMContentLoaded', () => {
         };
     }
 
-    const implementedCards = ["Pandorama", "Fountain of Youth", "Laser Catalyst", "Dragura's Wasteland", "Planetarium", "Lethargo's Temple", "Clone Factory", "Aetherlab", "Entrophy", "Meridius", "Meridia", "Time Thief", "Ichor", "Vulcanem", "Cravus", "Rampadon", "Smoke", "Dark Matter", "Reflector", "Talisman", "Reversal", "Faith", "Threat", "Confiscation", "Gravitas", "Time Bender", "Meridia's Cabin", "Repo Station", "Hand of Rhone", "Atlantica", "Hyperscope", "Mines of Pyralos", "Chrona", "Razo", "Looper", "Masiota", "Aromeas", "General Wave", "Namandi", "Sea Lord", "Sleep Potion", "Lotus", "Rush", "Cell Shield", "Alchemy", "Tame Beast", "Tele Control", "Burden of Wealth", "Healing Tree", "Freeze", "Chrono Machine", "Dragon Throne", "Unstoppable Force", "Truce", "Voider", "Space Voider", "Eternal Hour", "Great Flood", "Laser Bomb", "Daredevil's Reward", "Lethargo's Approach", "Sacrifice", "Break of Dawn"];
+    const implementedCards = ["Pandorama", "Fountain of Youth", "Laser Catalyst", "Dragura's Wasteland", "Planetarium", "Lethargo's Temple", "Clone Factory", "Aetherlab", "Entrophy", "Meridius", "Meridia", "Time Thief", "Ichor", "Vulcanem", "Cravus", "Rampadon", "Smoke", "Dark Matter", "Reflector", "Talisman", "Reversal", "Faith", "Threat", "Confiscation", "Gravitas", "Time Bender", "Meridia's Cabin", "Repo Station", "Hand of Rhone", "Atlantica", "Hyperscope", "Mines of Pyralos", "Chrona", "Razo", "Looper", "Masiota", "Aromeas", "General Wave", "Namandi", "Sea Lord", "Sleep Potion", "Lotus", "Rush", "Cell Shield", "Alchemy", "Tame Beast", "Tele Control", "Burden of Wealth", "Healing Tree", "Freeze", "Chrono Machine", "Dragon Throne", "Unstoppable Force", "Truce", "Voider", "Space Voider", "Eternal Hour", "Great Flood", "Laser Bomb", "Daredevil's Reward", "Lethargo's Approach", "Sacrifice", "Break of Dawn", "Sandstorm"];
 
     // --- Intent Classification ---
     // auto: fires on its own when condition is met
@@ -356,6 +356,7 @@ document.addEventListener('DOMContentLoaded', () => {
         "Lethargo's Approach": 'auto',
         'Sacrifice': 'auto',
         'Break of Dawn': 'auto',
+        'Sandstorm': 'auto',
     };
 
     // --- Simulation Presets ---
@@ -770,6 +771,20 @@ document.addEventListener('DOMContentLoaded', () => {
             p1future: [],
             p1history: ['FireSteam', 'GoldSteam'],
         },
+        'Sandstorm': {
+            phase: 0,
+            // Atlantica is in your row on purpose: it must be the one Landmark left standing.
+            // Both boards are stocked so the sweep is visibly table-wide, and a card parked
+            // behind Pandorama would be discarded with it — the ordinary consequence of any
+            // Landmark going to sleep.
+            desc: "Player 1's Future Pile is empty — the turn start reveals Sandstorm. Every Landmark on BOTH boards flips face down — except Atlantica, which cannot be deactivated. Then dig out under the general rule: in your CONSTRUCTION Phase, click one buried Landmark to unveil it, and a second one should be refused ('one per turn'). Clicking one in the Steam or Creature Phase should be refused too. Next turn you may flip up one more.",
+            destiny: 'Sandstorm',
+            hand: ['FireSteam', 'GoldSteam'],
+            landmarks: ['Pandorama', 'Atlantica', 'Aetherlab'],
+            p2landmarks: ['Fountain of Youth', 'Clone Factory'],
+            p1future: [],
+            p1history: ['FireSteam', 'GoldSteam'],
+        },
         'Hand of Rhone': {
             phase: 1,
             day: 9,
@@ -870,6 +885,7 @@ document.addEventListener('DOMContentLoaded', () => {
     };
 
     const devLogData = [
+        { date: '2026-08-30', msg: "Destiny 039 Sandstorm \u2014 implemented (auto), 16/24, and it changed a GENERAL RULE. 'All Landmarks on the Playing Field are deactivated. Once per Construction Phase a Player may reactivate 1 Landmark.' SIMON'S RULING on the second sentence: it is not a Sandstorm rule at all \u2014 it is the general reactivation rule, printed here because this is the card that makes you feel it. Reactivating is limited to ONE CARD PER TURN, in the right phase: a Landmark in your Construction Phase, a Creature in your Construction or Creature Phase. His reason is the one that matters \u2014 without it Sleep Potion (and every other way of putting a card face down) is barely an inconvenience, because you would simply flip the card straight back up. Until now the engine let you unveil your own face-down cards freely, any phase, any number, which quietly undercut the whole Duality deactivation subsystem. That is now reactivationBlockedReason() + a per-turn flag cleared in finishTurn beside the rest, and the confirm dialog says what it is spending ('your one reactivation this turn'). Sandstorm itself, therefore, sticks around for NOTHING: it flips every Landmark on the table face down, goes to the Destiny Abyss, and the players dig out under the general rule. No lingering flag, no timer, no 'while Sandstorm is in play' bookkeeping \u2014 per Simon, 'it's not a card that sticks around with longer effect'. Atlantica is exempt as always (canBeDeactivated), a Landmark already face down is left alone rather than double-deactivated (that is Sleep Potion's discard rule, not this one's), and every deactivation goes through the same refreshBoardAfterDeactivation chokepoint, so an Atlantica-parked card behind a Landmark that DOES go down is discarded exactly as for any other sleep. COMPUTER: this rule would have buried it permanently \u2014 it has no click, so it had no path to an unveil at all. aiReactivateOne() now takes its one reactivation at the top of its Construction Phase (the phase that suits both card types, so it never has to choose between digging out a Landmark and a Creature on timing), flipping up its most expensive sleeper, and it respects the Masiota same-turn lockout. VERIFIED LIVE, both modes. Vs Computer: the reveal buried 4 Landmarks across BOTH boards \u2014 Pandorama, Aetherlab, Fountain of Youth, Clone Factory \u2014 and left Atlantica standing with the notice saying why. Clicking a buried Landmark in the STEAM phase was refused ('only in your Construction Phase'); in Construction the first click unveiled Pandorama and the second was refused ('one per turn'), with Aetherlab staying down. The Computer then dug itself out on its own turn, unveiling exactly one Landmark (feed: 'Unveils Fountain of Youth') and leaving Clone Factory buried. Hot seat: Player 1 unveiled one and was refused a second, then the turn passed and PLAYER 2 got a fresh reactivation \u2014 one card, then refused \u2014 proving the per-turn reset. No console errors. Destiny progress panel now reads 16/24, next 040 Wormhole." },
         { date: '2026-08-30', msg: "Destiny 038 Break of Dawn \u2014 implemented (auto), 15/24. 'Roll a Futory Die. You gain Time Points equal to the result.' Sacrifice's mirror, same shape: the revealer alone, the whole card is the roll, the die stays on screen under the result. destinyRollDie was already there from 037, so the card itself is six lines. THE ONE THING THAT ISN'T SYMMETRICAL is the ceiling, and it is the only reason this card needed any thought. A loss always lands in full until you are dead; a gain runs into the 12-per-die cap and can never revive a die already lost at 0, so a 6 rolled on a nearly full clock quietly becomes a 2. destinyGainTimePoints \u2014 the mirror of destinyLoseTimePoints \u2014 measures what actually landed rather than assuming the roll, floats that number on the die, and the notice reports it: 'rolls 5 but the dice can only hold 3'. Promising six and delivering three with no explanation is exactly the kind of thing that reads as a bug. Sim preset leaves precisely 3 Time Points of headroom (Day 10, Night 11) so both halves of the ceiling show up in one roll: the Day die fills to 12, the remainder spills onto the Night die, and then it runs out of room. VERIFIED LIVE vs Computer, both branches, with the Computer's clock untouched in each. Roll 2 landed in full \u2014 Day 10 \u2192 12, 23 Time Points, notice 'gains 2'. Roll 5 filled the Day die (+2), spilled onto the Night die (+1) and stopped at 24 with the notice reading 'rolls 5 but the dice can only hold 3'. No console errors. Destiny progress panel now reads 15/24, next 039 Sandstorm." },
         { date: '2026-08-30', msg: "Destiny 037 Sacrifice \u2014 implemented (auto), 14/24. 'Roll a Futory Die. You lose Time Points equal to the result.' The whole card is the roll, so the roll had to be worth watching \u2014 and it had to happen INSIDE the Destiny overlay, since the board is behind the backdrop and Looper's own die overlay would have fought this one for the screen. destinyRollDie() renders the die in the picker row using the same buildPips face and the same fast-then-easing tick as the Looper and Entrophy rolls, resolves with the face, and LEAVES THE DIE ON SCREEN under the notice that explains what it cost \u2014 so the number you are reading about is still sitting there. 'You' is literal: the revealer alone, everyone else just watches. The loss rides destinyLoseTimePoints, so a roll bigger than the active die spills onto the other one, an emptied die is permanently lost, and a roll that reaches 0 ends the game. When the clock can't pay the full roll the notice says so ('has only 2 Time Points left to give') rather than reporting a number the dice never actually took. FOUND AND FIXED WHILE TESTING, a real dev-tool trap: runSimulation resets destinyResolving as part of clearing per-turn state, which meant loading a preset while a reveal was still awaiting a choice started a SECOND reveal alongside the first, and both resolved onto the same board \u2014 two Sacrifice rolls landed on one clock and the numbers stopped adding up. runSimulation now refuses outright while a reveal is open. Anyone testing 'Each Player' cards would have hit this eventually. VERIFIED LIVE vs Computer, every branch, with the Computer's clock untouched in all of them. Roll 3 against a Day die of 3 emptied it exactly (Day lost, Night 12, 12 TP left). Roll 6 against the same Day die took all 3 and spilled the other 3 onto the Night die (12 \u2192 9). Roll 4 against a player holding 2 Time Points on a lone Day die reported 'loses 2 TP', vanished both dice, and ended the game \u2014 with the Destiny overlay closing itself behind the victory screen, the destinyNotice fix from Eternal Hour doing its job a second time. No console errors. Destiny progress panel now reads 14/24, next 038 Break of Dawn \u2014 this card's mirror." },
         { date: '2026-08-30', msg: "Destiny 036 Lethargo's Approach \u2014 implemented (auto), 13/24. 'Each Player loses 1 Time Point.' The smallest card in the set: no choices, no snapshot, no targeting \u2014 1 TP off every seat at the same moment. It exists in the code purely as a call to destinyLoseTimePoints, the helper Eternal Hour left behind, so it inherits the whole TP contract for free: Day die first, a seat whose Day die is already gone takes it on the Night die, an emptied die stays lost, and a seat on exactly 1 TP is knocked out with the game-over check firing. The notice reads out both clocks afterwards, since a card that changes everyone by the same tiny amount is otherwise easy to miss. Sim preset puts the two seats in different dice states on purpose, so one reveal shows both routes. VERIFIED LIVE vs Computer: Player 1's Day die went 12 \u2192 11 while the Computer \u2014 Day die already gone \u2014 took it on the Night die, 5 \u2192 4, and the notice read 'Player 1 23 \u00b7 The Computer 4 TP remaining'. No console errors." },
@@ -1208,6 +1224,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
             // Per-phase/turn flags don't survive a preset reload (the sim skips finishTurn).
             minesUsedThisPhase = false;
+            reactivationUsedThisTurn = false;
             resetLooper();
             // Destiny state too, or one preset contaminates the next: an unspent Chrono
             // Machine claim would hand the extra turn to whoever runs the NEXT sim.
@@ -1571,8 +1588,14 @@ document.addEventListener('DOMContentLoaded', () => {
                         alert('Masiota can be reactivated next turn.');
                         return;
                     }
-                    if (isMyBoard && confirm(`Unveil ${cardData.name}? It flips face up and reactivates.`)) {
-                        reactivateCard(slot);
+                    if (isMyBoard) {
+                        const isLandmarkZone = slot.parentNode && slot.parentNode.classList.contains('landmark-zone-main');
+                        const blocked = reactivationBlockedReason(cardData, isLandmarkZone);
+                        if (blocked) { alert(blocked); return; }
+                        if (confirm(`Unveil ${cardData.name}? It flips face up and reactivates — your one reactivation this turn.`)) {
+                            reactivationUsedThisTurn = true;
+                            reactivateCard(slot);
+                        }
                     }
                     return;
                 }
@@ -2303,6 +2326,26 @@ document.addEventListener('DOMContentLoaded', () => {
     // Atlantica and Razo can never be deactivated (printed rule).
     function canBeDeactivated(card) {
         return card && card.name !== 'Atlantica' && card.name !== 'Razo';
+    }
+
+    // --- Reactivation: the general rule (Simon, 2026-08-30) ---------------------
+    // Flipping one of your own face-down cards back up is NOT free. A player may reactivate
+    // ONE card per turn, and only in the right phase: a Landmark in the Construction Phase,
+    // a Creature in the Construction or Creature Phase. Without this, Sleep Potion (and every
+    // other way of putting a card down) is barely an inconvenience — you would simply flip it
+    // straight back. Sandstorm's printed "Once per Construction Phase a Player may reactivate
+    // 1 Landmark" is this same rule stated on a card, not a rule of its own.
+    let reactivationUsedThisTurn = false;
+
+    // Why this card can't be flipped up right now — or null when it can.
+    function reactivationBlockedReason(card, isLandmarkZone) {
+        if (reactivationUsedThisTurn) return 'You have already reactivated a card this turn — one per turn.';
+        if (isLandmarkZone) {
+            if (currentPhase !== 1) return 'A Landmark can only be reactivated in your Construction Phase.';
+        } else if (currentPhase !== 1 && currentPhase !== 2) {
+            return 'A Creature can only be reactivated in your Construction or Creature Phase.';
+        }
+        return null;
     }
 
     function syncFaceDownVisual(slot) {
@@ -7880,6 +7923,7 @@ document.addEventListener('DOMContentLoaded', () => {
         resetHyperscopeTurnDamage();
         minesUsedThisPhase = false;
         resetLooper();
+        reactivationUsedThisTurn = false; // one card back up per turn
         destinyDrawOverride = null; // a Destiny draw rewrite lasts exactly one turn
         unstoppableForcePlayer = null; // "in this turn" — ends with the turn that revealed it
         trucePlayer = null;            // same: the ban dies with the turn that revealed it
@@ -9112,6 +9156,63 @@ document.addEventListener('DOMContentLoaded', () => {
             : `${who} rolls ${roll} and gains ${roll} Time Points — ${totalTimePoints(revealer)} in total.`);
     }
 
+    // 039 Sandstorm — "All Landmarks on the Playing Field are deactivated. Once per
+    // Construction Phase a Player may reactivate 1 Landmark."
+    //
+    // SIMON'S RULING: the second sentence is not a Sandstorm rule at all — it is the GENERAL
+    // reactivation rule, printed here because this is the card that makes you feel it. So
+    // Sandstorm itself sticks around for nothing: it flips every Landmark on the table face
+    // down, goes to the Destiny Abyss, and the players dig out at one card per turn under
+    // reactivationBlockedReason like any other sleeping card. No lingering flag, no timer.
+    // (That general rule is why Sleep Potion matters at all — without it you would simply
+    // flip a slept card straight back up.)
+    //
+    // Atlantica is exempt, as always — canBeDeactivated says it cannot be put down — and a
+    // Landmark already face down is left alone rather than double-deactivated (that is Sleep
+    // Potion's discard rule, not this card's). Every deactivation goes through the same
+    // refreshBoardAfterDeactivation chokepoint, so parked Atlantica cards behind the
+    // Landmarks that DO go down are discarded exactly as they are for any other sleep.
+    async function resolveSandstorm(card, revealer) {
+        const downed = [];
+        const spared = [];
+        let alreadyAsleep = 0;
+
+        seatsClockwise(revealer).forEach(pNum => {
+            const board = document.getElementById(`player-${pNum}`);
+            if (!board) return;
+            board.querySelectorAll('.landmark-zone-main .card:not(.slot-empty)').forEach(slot => {
+                let c;
+                try { c = JSON.parse(slot.dataset.cardData); } catch (e) { return; }
+                if (!c) return;
+                // A Landmark already face down is left alone — double-deactivation is Sleep
+                // Potion's discard rule, not this card's.
+                if (c.deactivated) { alreadyAsleep++; return; }
+                if (!canBeDeactivated(c)) { spared.push(c.name); return; }
+                c.deactivated = true; // Landmarks were already seen — no faceDownSecret
+                slot.dataset.cardData = JSON.stringify(c);
+                syncFaceDownVisual(slot);
+                refreshBoardAfterDeactivation(slot);
+                floatValue(slot, 'Deactivated', 'damage');
+                downed.push(c.name);
+            });
+        });
+
+        if (downed.length === 0) {
+            let why = 'No Landmark stands on the Playing Field — the storm has nothing to bury.';
+            if (spared.length) why = `${spared.join(', ')} cannot be deactivated — the storm passes over.`;
+            else if (alreadyAsleep) why = 'Every Landmark on the field is already buried.';
+            await destinyNotice(why);
+            return;
+        }
+
+        if (vsComputer) aiLog(`Sandstorm: ${downed.length} Landmark${downed.length === 1 ? '' : 's'} buried`, 'combat');
+        const sparedNote = spared.length ? ` ${spared.join(', ')} stands — it cannot be deactivated.` : '';
+        await destinyNotice(
+            `${downed.join(', ')} ${downed.length === 1 ? 'is' : 'are'} buried face down.${sparedNote} ` +
+            'Each player may flip one card back up per turn — a Landmark in their Construction Phase.'
+        );
+    }
+
     const destinyEffects = {
         'Healing Tree': resolveHealingTree,
         'Freeze': resolveFreeze,
@@ -9128,6 +9229,7 @@ document.addEventListener('DOMContentLoaded', () => {
         "Lethargo's Approach": resolveLethargosApproach,
         'Sacrifice': resolveSacrifice,
         'Break of Dawn': resolveBreakOfDawn,
+        'Sandstorm': resolveSandstorm,
     };
 
     // ==================== COMPUTER OPPONENT ====================
@@ -9409,6 +9511,29 @@ document.addEventListener('DOMContentLoaded', () => {
         place();
     }
 
+    // The Computer's one reactivation per turn, taken in its Construction Phase — the phase
+    // that suits both card types, so it never has to choose between digging out a Landmark
+    // and a Creature on timing. It flips up the most expensive sleeper it owns, on the same
+    // "price is the best proxy for value" basis its other choices use.
+    function aiReactivateOne() {
+        if (reactivationUsedThisTurn) return;
+        const board = aiBoard();
+        const sleepers = Array.from(board.querySelectorAll('.landmark-zone-main .card:not(.slot-empty), .creature-zone-main .card:not(.slot-empty)'))
+            .map(slot => {
+                let c; try { c = JSON.parse(slot.dataset.cardData); } catch (e) { return null; }
+                return (c && c.deactivated) ? { slot, card: c } : null;
+            })
+            .filter(Boolean)
+            // Masiota can't be woken in the turn her own rescue put her down.
+            .filter(x => !(x.card.name === 'Masiota' && x.card.masiotaRescueStamp === `${totalTurns}-${AI_PLAYER}`));
+        if (!sleepers.length) return;
+
+        const pick = sleepers.sort((a, b) => cardCostValue(b.card) - cardCostValue(a.card))[0];
+        reactivationUsedThisTurn = true;
+        reactivateCard(pick.slot);
+        aiLog(`Unveils ${pick.card.name}`, 'play');
+    }
+
     async function aiCreaturePhase() {
         const board = aiBoard();
 
@@ -9494,7 +9619,11 @@ document.addEventListener('DOMContentLoaded', () => {
             await aiThink();
             aiAdvancePhase(); // → Construction
 
-            // Construction Phase — buy per difficulty profile.
+            // Construction Phase — dig out first, then buy per difficulty profile.
+            // Without this the Computer would sit under a Sandstorm (or a Sleep Potion)
+            // forever: it has no other path to the unveil that a human gets by clicking.
+            if (!gameWon) aiReactivateOne();
+
             const prof = aiProfile();
             let buys = 0;
             while (buys < prof.maxBuys && !gameWon) {
@@ -9731,6 +9860,7 @@ document.addEventListener('DOMContentLoaded', () => {
         aetherlabUsedThisPhase = false;
         minesUsedThisPhase = false;
         rhoneChargedThisPhase = false;
+        reactivationUsedThisTurn = false;
         destinyDrawOverride = null;
         pendingExtraTurn = null;
         destinyResolving = false;
