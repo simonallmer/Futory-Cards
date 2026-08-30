@@ -285,7 +285,7 @@ document.addEventListener('DOMContentLoaded', () => {
         };
     }
 
-    const implementedCards = ["Pandorama", "Fountain of Youth", "Laser Catalyst", "Dragura's Wasteland", "Planetarium", "Lethargo's Temple", "Clone Factory", "Aetherlab", "Entrophy", "Meridius", "Meridia", "Time Thief", "Ichor", "Vulcanem", "Cravus", "Rampadon", "Smoke", "Dark Matter", "Reflector", "Talisman", "Reversal", "Faith", "Threat", "Confiscation", "Gravitas", "Time Bender", "Meridia's Cabin", "Repo Station", "Hand of Rhone", "Atlantica", "Hyperscope", "Mines of Pyralos", "Chrona", "Razo", "Looper", "Masiota", "Aromeas", "General Wave", "Namandi", "Sea Lord", "Sleep Potion", "Lotus", "Rush", "Cell Shield", "Alchemy", "Tame Beast", "Tele Control", "Burden of Wealth", "Healing Tree", "Freeze", "Chrono Machine", "Dragon Throne", "Unstoppable Force", "Truce", "Voider", "Space Voider", "Eternal Hour"];
+    const implementedCards = ["Pandorama", "Fountain of Youth", "Laser Catalyst", "Dragura's Wasteland", "Planetarium", "Lethargo's Temple", "Clone Factory", "Aetherlab", "Entrophy", "Meridius", "Meridia", "Time Thief", "Ichor", "Vulcanem", "Cravus", "Rampadon", "Smoke", "Dark Matter", "Reflector", "Talisman", "Reversal", "Faith", "Threat", "Confiscation", "Gravitas", "Time Bender", "Meridia's Cabin", "Repo Station", "Hand of Rhone", "Atlantica", "Hyperscope", "Mines of Pyralos", "Chrona", "Razo", "Looper", "Masiota", "Aromeas", "General Wave", "Namandi", "Sea Lord", "Sleep Potion", "Lotus", "Rush", "Cell Shield", "Alchemy", "Tame Beast", "Tele Control", "Burden of Wealth", "Healing Tree", "Freeze", "Chrono Machine", "Dragon Throne", "Unstoppable Force", "Truce", "Voider", "Space Voider", "Eternal Hour", "Great Flood"];
 
     // --- Intent Classification ---
     // auto: fires on its own when condition is met
@@ -350,6 +350,7 @@ document.addEventListener('DOMContentLoaded', () => {
         'Voider': 'auto',
         'Space Voider': 'auto',
         'Eternal Hour': 'auto',
+        'Great Flood': 'auto',
     };
 
     // --- Simulation Presets ---
@@ -672,6 +673,20 @@ document.addEventListener('DOMContentLoaded', () => {
             p1future: [],
             p1history: ['FireSteam', 'GoldSteam'],
         },
+        'Great Flood': {
+            phase: 0,
+            // Three Landmarks for you (a real choice, and Atlantica is in there so the
+            // parked-card cleanup rides along if you pick it) against exactly one for the
+            // Computer, so the same reveal shows both halves: the picker, and the
+            // single-Landmark case that auto-resolves rather than asking a pointless question.
+            desc: "Player 1's Future Pile is empty — the turn start reveals Great Flood. Your three Landmarks fan out and you MUST pick one — there is no decline, and clicking a tile is the answer. It goes to the Abyss (out of the game, not to History like a Hyperscope kill), the Bazaar's Abyss count goes up, and the Landmark Zone slot empties. The Computer owns exactly one Landmark, so its half resolves without asking. A seat with no Landmarks is simply passed by.",
+            destiny: 'Great Flood',
+            hand: ['FireSteam', 'GoldSteam'],
+            landmarks: ['Pandorama', 'Atlantica', 'Aetherlab'],
+            p2landmarks: ['Fountain of Youth'],
+            p1future: [],
+            p1history: ['FireSteam', 'GoldSteam'],
+        },
         'Hand of Rhone': {
             phase: 1,
             day: 9,
@@ -772,6 +787,7 @@ document.addEventListener('DOMContentLoaded', () => {
     };
 
     const devLogData = [
+        { date: '2026-08-30', msg: "Destiny 033 Great Flood \u2014 implemented (auto), 10/24. 'Each Player must send one of their Landmarks into the Abyss.' The first MANDATORY Destiny card \u2014 no 'may', no decline \u2014 which needed a picker the overlay didn't have: destinyPickOneTile is a face-up row with no confirm step and no decline button, where clicking a tile IS the answer. Every earlier picker was built around a 'may'. THREE RULINGS. (1) 'One of their Landmarks' = any card in the Landmark Zone, a deactivated face-down one included \u2014 otherwise a Sandstorm'd board walks away untouched, and the choice belongs to its owner anyway so nothing is hidden from the person making it. (2) Into the ABYSS as printed, which is deliberately NOT the Hyperscope/Alchemy route: a destroyed or discarded Landmark goes to its owner's History and rebuilds itself on a later draw, while this one is gone for good, same as Threat's printed wording. (3) A seat with exactly one Landmark is not asked \u2014 there is no choice to make \u2014 and a seat with none is simply passed by, the only escape the card allows. Removal goes through clearSlot, the shared teardown chokepoint, so an Atlantica parked card and a Hand of Rhone charge clean up with it. COMPUTER: gives up its cheapest Landmark by Steam price. It doesn't buy the Landmarks whose worth is in their effect rather than their cost, so price is a fair proxy for least missed. Sim preset stacks three Landmarks on your side (Atlantica among them, so the parked-card teardown rides along if you pick it) against exactly one for the Computer, so a single reveal shows both the picker and the auto-resolve. VERIFIED LIVE vs Computer. The row fanned Pandorama / Atlantica / Aetherlab with NO buttons under it \u2014 one click on Atlantica was the whole answer: it left the Landmark Zone, landed in the Abyss (1 IN ABYSS), and the zone kept Pandorama and Aetherlab. The Computer's single Fountain of Youth resolved without a question and the Abyss went to 2. Re-run with the Landmarks swapped: an empty zone gave 'Player 1 owns no Landmarks \u2014 the Flood passes them by', and the Computer, offered Laser Catalyst / Pandorama / Aetherlab, gave up Pandorama \u2014 the cheapest \u2014 and kept the other two. No console errors. Destiny progress panel now reads 10/24, next 034 Laser Bomb." },
         { date: '2026-08-30', msg: "Destiny 032 Eternal Hour \u2014 implemented (auto), 9/24. 'All Players tied for most Time Points lose 4.' A leader tax, and the first Destiny card that just happens TO you \u2014 nobody is asked anything. TWO READINGS TO GET RIGHT. (1) 'Tied for most' is the plain reading: whoever is on the highest total takes 4, and if several share that total they all take it. One player alone at the top is still the most, so at 2 players a clear leader is hit by themselves \u2014 the card is not conditional on there being a tie. (2) It resolves SIMULTANEOUSLY: the set of victims is snapshotted before any damage lands, so the 4 coming off the first seat can't drop them out of the tie and quietly spare the second. Iterating and re-reading totals would have produced exactly that bug. The loss runs through resolveDamageDirectly \u2014 the same path combat damage uses \u2014 so Day-die-first, a die permanently lost at 0, and the game-over check all come along for free. Two small shared helpers came out of it, both for the TP cards still to come (036 Lethargo's Approach, 037 Sacrifice): destinyLoseTimePoints, which reads the active-die selector BEFORE the hit so a die emptied by this very loss doesn't send its float to the other one, and reports what actually landed; and seatList, which names a group of seats readably ('Player 1 and The Computer'). THIS CARD CAN END A GAME, which turned up a real flaw in the Destiny plumbing: the victory screen draws OVER the Destiny overlay, so a notice waiting for a CONTINUE nobody can see left a live modal parked behind the win. destinyNotice now shows its line but returns immediately when gameWon, so the reveal walks straight out and hands the board to the victory screen. That fix is general \u2014 every lethal Destiny card gets it. Sim preset deliberately is NOT a tie: a fresh game is already 24/24, so the tie case can be seen for free by revealing this on turn one. What a default board can't show is the discriminating half \u2014 that a clear leader is hit alone \u2014 so Player 1 starts four ahead. VERIFIED LIVE vs Computer, all three branches. Leader-only: Player 1 on 24 vs the Computer's 20 \u2014 Player 1's Day die went 12 \u2192 8 and the Computer was untouched, both ending on 20. Tie (both seats at 24): both Day dice went 12 \u2192 8 and the notice read 'Player 1 and The Computer are tied on 24 Time Points \u2014 each loses 4', proving Player 1 dropping to 20 first did not spare the Computer. Lethal (Player 1 on 3 with the Day die already gone, the Computer on 2): the 4 came off the Night die, Player 1 hit 0, and COMPUTER WON appeared with the Destiny overlay closing itself behind it \u2014 no orphaned CONTINUE. Also moved the feed line ahead of the notice so the log lands with the damage rather than whenever CONTINUE is clicked. No console errors. Destiny progress panel now reads 9/24, next 033 Great Flood." },
         { date: '2026-08-30', msg: "Destiny 031 Space Voider \u2014 implemented (auto), 8/24. 'Each Player may send up to 4 Cards from their History Pile into the Abyss.' This one is the payoff for how 030 Voider was built rather than a card in its own right: the entire effect is resolveSpaceVoider calling voidFromHistory(revealer, 4, 'Space Voider'), because the limit was already a parameter and the picker's `max` cap was already reading it. Nothing else in the engine changed. The one real edit was to the Computer, which had a fixed 'Normal takes 1' \u2014 fine for a 2-card card, timid for a 4-card one. The cap now scales with the card: Hard takes the lot, Normal takes half (Math.ceil(limit / 2), so 1 of 2 and 2 of 4, leaving Voider's behaviour exactly as it was), Easy still declines. Its two real constraints are unchanged and are what keep this from being a blunder: it voids STEAM only, cheapest first, and it stops before Future + History would fall below 6 cards. Sim preset gives BOTH seats a six-card History, so 4 is a ceiling you bump into rather than 'select everything', with a LaserSteam and a Creature in each pile worth keeping. VERIFIED LIVE vs Computer. The picker fanned all six; selecting four lit them and the FIFTH click did not take (VOID 4, '4 cards out of the game for good.'); confirming left History as LaserSteam / Ichor and the Bazaar Abyss climbing to 6 IN ABYSS. Normal voided exactly 2 of its cheapest FireSteam and kept its GoldSteam, LaserSteam and Cravus; Hard voided 4 (three FireSteam plus the GoldSteam) and left LaserSteam / Cravus. The deck floor was then checked directly by trimming the Computer's Future Pile to a single card mid-reveal, while the overlay was still waiting on my choice: Hard's allowance of 4 clamped to 1, leaving its deck at exactly 6. Player 1's DECLINE left a six-card pile untouched in the same reveal. No console errors. Destiny progress panel now reads 8/24, next 032 Eternal Hour." },
         { date: '2026-08-30', msg: "Destiny 030 Voider \u2014 implemented (auto), 7/24. 'Each Player may send up to 2 Cards from their History Pile into the Abyss.' The first Destiny card that is pure deck-thinning: the Abyss is out of the game for good, so voiding a dead FireSteam permanently sharpens what you draw. Both words in 'may send up to 2' are real \u2014 0, 1 and 2 are all legal answers, DECLINE is always offered, and the walk is clockwise from the revealer like every other 'Each Player' event. THE NEW PROBLEM was that a History Pile is ONE slot holding an array, not a slot per card, so the existing destinyPickCards (which reads dataset.cardData off each DOM element and hands the elements back) had nothing to iterate. Rather than write a second near-identical picker, it split in two: destinyPickTiles is now the picker itself, over anything describable as {card, value} \u2014 card for the face it draws, value for what the caller gets back \u2014 and destinyPickCards is a four-line wrapper that maps slots into that shape, so Healing Tree's behaviour is byte-for-byte what it was. The pile passes its entries directly with the array index as the value. The picker also gained `max`: at the cap a further tile simply doesn't take, and deselecting frees the slot again, which reads better than an error and makes 'up to 2' visible in the UI instead of only in the text. Cards leave from the MIDDLE of a stack here, not off the top, so the pile's face has to be rewritten afterwards. Reversal already did that inline; that block is now writeStackPile(slot, cards, label) \u2014 the counterpart to finishSingleCardPlacement, which only ever appends \u2014 and both cards share it so the two can't drift. Removal splices from the back so earlier indices stay valid, then reports the cards in the pile's own order. The voided cards go to the Abyss through the same finishSingleCardPlacement path Mines of Pyralos uses, so the Bazaar's 'N IN ABYSS' counter and the click-to-list modal pick them up for free. COMPUTER: thinning is one of the strongest things a deck-builder can do, but only while there is still a deck left to draw from \u2014 so aiVoiderPick voids its cheapest STEAM cards only (never a Creature, Landmark or Artifact it paid for) and stops before Future + History would fall below 6. Easy declines, Normal voids 1, Hard voids 2. Also added p2history to the Dev Log sim presets \u2014 setupBoard already took a history list but only Player 1 was wired to pass one, and an 'Each Player' event that reaches into the History Pile needs both seats stocked, the same reason p2day/p2night were added for the TP events. VERIFIED LIVE vs Computer, every branch. The picker fanned all four History cards; selecting two lit them and the THIRD click did not take (prompt held at '2 cards out of the game for good.', button at VOID 2); deselecting one immediately allowed a different third card, proving the cap is a cap and not a freeze. Confirming VOID 2 moved both FireSteam out \u2014 History went FireSteam/FireSteam/GoldSteam/Ichor \u2192 GoldSteam/Ichor, its face became the Ichor art, and the Bazaar Abyss read '3 IN ABYSS'. The Computer then took the same choice in the same reveal: on Normal it voided exactly 1 FireSteam and kept its GoldSteam and Cravus; on Hard, 2. DECLINE left Player 1's pile untouched at four cards while the Computer still made its own choice, and an empty History Pile said so instead of opening an empty picker. Re-ran the Reversal sim afterwards to check the shared writeStackPile: it still pulled Ichor out of the middle of a two-card pile and left the face showing Smoke. No console errors. Destiny progress panel now reads 7/24, next 031 Space Voider \u2014 which is this card with 4 instead of 2, and voidFromHistory already takes the limit." },
@@ -8126,6 +8142,33 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
+    // A single MANDATORY pick from a face-up row: no confirm step and no decline, because
+    // the card says "must". Clicking a tile is the answer. Resolves with that entry's value.
+    function destinyPickOneTile(entries, prompt) {
+        const { picker, controls } = destinyEls();
+        return new Promise(resolve => {
+            setDestinyPrompt(prompt);
+            controls.innerHTML = '';
+            picker.innerHTML = '';
+            entries.forEach(entry => {
+                const card = entry.card || {};
+                const tile = document.createElement('div');
+                tile.className = 'destiny-pick-card';
+                const art = cardArtUrl(card);
+                if (art) tile.style.backgroundImage = `url('${art}')`;
+                else tile.textContent = card.name || '';
+                tile.title = card.name || '';
+                tile.onclick = (ev) => {
+                    ev.stopPropagation();
+                    picker.innerHTML = '';
+                    setDestinyPrompt('');
+                    resolve(entry.value);
+                };
+                picker.appendChild(tile);
+            });
+        });
+    }
+
     // A single blind pick: N face-down card backs, resolves with the index chosen.
     // Used where an effect is printed "random" but plays better as a choice — you still
     // don't know what you're taking, but you pick it, and the row itself tells the table
@@ -8607,6 +8650,65 @@ document.addEventListener('DOMContentLoaded', () => {
             : `${who} leads on ${most} Time Points and loses 4.`);
     }
 
+    // 033 Great Flood — "Each Player must send one of their Landmarks into the Abyss."
+    // The first MANDATORY Destiny card: no decline, no "may". A seat that owns Landmarks
+    // gives one up, full stop; a seat that owns none simply has nothing to give, which is
+    // the only way out of it.
+    //
+    // "One of their Landmarks" is read as any card in their Landmark Zone — a deactivated,
+    // face-down Landmark included. Excluding those would let a Sandstorm'd board walk away
+    // untouched, and the choice is the owner's own, so nothing is hidden from them.
+    //
+    // Into the ABYSS, as printed — out of the game. That is deliberately NOT the Hyperscope /
+    // Alchemy route (destroyed or discarded Landmarks go to the owner's History and rebuild
+    // themselves on a later draw); this one is permanent, the same as Threat. Removal goes
+    // through clearSlot, so Atlantica's parked card and a Hand of Rhone charge clean up with it.
+    async function resolveGreatFlood(card, revealer) {
+        await forEachPlayerClockwise(revealer, async (pNum) => {
+            const board = document.getElementById(`player-${pNum}`);
+            if (!board) return;
+            const isAI = vsComputer && pNum === AI_PLAYER;
+            const seatName = isAI ? 'The Computer' : `Player ${pNum}`;
+
+            const slots = Array.from(board.querySelectorAll('.landmark-zone-main .card:not(.slot-empty)'));
+            if (slots.length === 0) {
+                await destinyNotice(`${seatName} owns no Landmarks — the Flood passes them by.`);
+                return;
+            }
+
+            const entries = slots.map(slot => {
+                let c = {};
+                try { c = JSON.parse(slot.dataset.cardData); } catch (e) { /* blank */ }
+                return { card: c, value: slot };
+            });
+
+            // One Landmark is no choice at all — don't make them click it.
+            const chosen = entries.length === 1 ? entries[0].value
+                : isAI ? aiGreatFloodPick(entries)
+                : await destinyPickOneTile(entries, `Player ${pNum}: the Flood takes one of your Landmarks. Choose which.`);
+
+            let data = {};
+            try { data = JSON.parse(chosen.dataset.cardData); } catch (e) { /* blank */ }
+            const abyssEl = document.querySelector('.card--abyss');
+            clearSlot(chosen);
+            if (abyssEl) {
+                finishSingleCardPlacement(abyssEl, data);
+                renderBazaar();
+                floatValue(abyssEl, `${data.name} Lost`, 'damage');
+            }
+
+            if (isAI) aiLog(`Great Flood: loses ${data.name}`, 'combat');
+            await destinyNotice(`${seatName} sends ${data.name} into the Abyss — out of the game.`);
+        });
+    }
+
+    // The Computer gives up its cheapest Landmark. Price is the closest thing the board has
+    // to "how much did this cost you", and the Computer doesn't buy the Landmarks whose value
+    // is in their effect rather than their cost, so this is a fair proxy for least missed.
+    function aiGreatFloodPick(entries) {
+        return entries.slice().sort((a, b) => cardCostValue(a.card) - cardCostValue(b.card))[0].value;
+    }
+
     const destinyEffects = {
         'Healing Tree': resolveHealingTree,
         'Freeze': resolveFreeze,
@@ -8617,6 +8719,7 @@ document.addEventListener('DOMContentLoaded', () => {
         'Voider': resolveVoider,
         'Space Voider': resolveSpaceVoider,
         'Eternal Hour': resolveEternalHour,
+        'Great Flood': resolveGreatFlood,
     };
 
     // ==================== COMPUTER OPPONENT ====================
