@@ -285,7 +285,7 @@ document.addEventListener('DOMContentLoaded', () => {
         };
     }
 
-    const implementedCards = ["Pandorama", "Fountain of Youth", "Laser Catalyst", "Dragura's Wasteland", "Planetarium", "Lethargo's Temple", "Clone Factory", "Aetherlab", "Entrophy", "Meridius", "Meridia", "Time Thief", "Ichor", "Vulcanem", "Cravus", "Rampadon", "Smoke", "Dark Matter", "Reflector", "Talisman", "Reversal", "Faith", "Threat", "Confiscation", "Gravitas", "Time Bender", "Meridia's Cabin", "Repo Station", "Hand of Rhone", "Atlantica", "Hyperscope", "Mines of Pyralos", "Chrona", "Razo", "Looper", "Masiota", "Aromeas", "General Wave", "Namandi", "Sea Lord", "Sleep Potion", "Lotus", "Rush", "Cell Shield", "Alchemy", "Tame Beast", "Tele Control", "Burden of Wealth", "Healing Tree", "Freeze", "Chrono Machine", "Dragon Throne", "Unstoppable Force", "Truce", "Voider", "Space Voider", "Eternal Hour", "Great Flood", "Laser Bomb", "Daredevil's Reward", "Lethargo's Approach", "Sacrifice", "Break of Dawn", "Sandstorm", "Wormhole"];
+    const implementedCards = ["Pandorama", "Fountain of Youth", "Laser Catalyst", "Dragura's Wasteland", "Planetarium", "Lethargo's Temple", "Clone Factory", "Aetherlab", "Entrophy", "Meridius", "Meridia", "Time Thief", "Ichor", "Vulcanem", "Cravus", "Rampadon", "Smoke", "Dark Matter", "Reflector", "Talisman", "Reversal", "Faith", "Threat", "Confiscation", "Gravitas", "Time Bender", "Meridia's Cabin", "Repo Station", "Hand of Rhone", "Atlantica", "Hyperscope", "Mines of Pyralos", "Chrona", "Razo", "Looper", "Masiota", "Aromeas", "General Wave", "Namandi", "Sea Lord", "Sleep Potion", "Lotus", "Rush", "Cell Shield", "Alchemy", "Tame Beast", "Tele Control", "Burden of Wealth", "Healing Tree", "Freeze", "Chrono Machine", "Dragon Throne", "Unstoppable Force", "Truce", "Voider", "Space Voider", "Eternal Hour", "Great Flood", "Laser Bomb", "Daredevil's Reward", "Lethargo's Approach", "Sacrifice", "Break of Dawn", "Sandstorm", "Wormhole", "Dragura's Command", "Rula's Support"];
 
     // --- Intent Classification ---
     // auto: fires on its own when condition is met
@@ -358,12 +358,15 @@ document.addEventListener('DOMContentLoaded', () => {
         'Break of Dawn': 'auto',
         'Sandstorm': 'auto',
         'Wormhole': 'auto',
+        "Dragura's Command": 'auto',
+        "Rula's Support": 'auto',
     };
 
     // --- Simulation Presets ---
     // Each entry describes the board state to load for quick effect testing.
     // hand/p2hand: card names; landmarks/p2landmarks: card names; p1creatures/p2creatures: {name, damageTaken}
     // p1history/p2history: card names to put in that player's History Pile
+    // p1parked: card names to park in the Atlantica row (needs Atlantica among landmarks)
     const simulationMap = {
         'Pandorama': {
             phase: 0,
@@ -808,6 +811,35 @@ document.addEventListener('DOMContentLoaded', () => {
             p2future: ['FireSteam', 'GoldSteam'],
             p2history: ['FireSteam'],
         },
+        "Dragura's Command": {
+            phase: 0,
+            // A mixed hand for you (a real choice) against a single card for the Computer,
+            // so one reveal shows both the picker and the case that resolves without asking.
+            // Atlantica is in play with a card parked behind it: that card must NOT be
+            // offered — this takes from the hand only.
+            desc: "Player 1's Future Pile is empty — the turn start reveals Dragura's Command. Your four hand cards fan out and you MUST give one up — no decline, one click is the answer — and it goes to your own History Pile, not the Abyss. An Ichor is already parked behind Atlantica and must NOT appear among the tiles \u2014 this takes from the hand only. The Computer holds a single card, so its half resolves without a question.",
+            destiny: "Dragura's Command",
+            hand: ['FireSteam', 'GoldSteam', 'LaserSteam', 'Vulcanem'],
+            landmarks: ['Atlantica'],
+            p1parked: ['Ichor'],
+            p1future: [],
+            p1history: ['FireSteam'],
+            p2hand: ['Cravus'],
+        },
+        "Rula's Support": {
+            phase: 0,
+            // Your own Future Pile is empty (that is what summoned Destiny), so YOUR draw has
+            // to fold the History Pile back into a new deck first — and the Meridia sitting in
+            // there must be exiled to the Abyss on the way, not dealt to you. The Computer's
+            // Future Pile is stocked, so its draw is the plain case, from the top.
+            desc: "Player 1's Future Pile is empty — the turn start reveals Rula's Support. Once the overlay closes, each player draws exactly 1 card ON THE VISIBLE BOARD. Your empty Future Pile forces a reshuffle of your History first: watch the Meridia in there go to the Abyss instead of into your deck. The Computer simply takes the top card of its own Future Pile.",
+            destiny: "Rula's Support",
+            hand: ['FireSteam'],
+            p1future: [],
+            p1history: ['GoldSteam', 'Meridia', 'LaserSteam'],
+            p2hand: ['FireSteam'],
+            p2future: ['Cravus', 'GoldSteam'],
+        },
         'Hand of Rhone': {
             phase: 1,
             day: 9,
@@ -908,6 +940,8 @@ document.addEventListener('DOMContentLoaded', () => {
     };
 
     const devLogData = [
+        { date: '2026-08-30', msg: "Destiny 042 Rula's Support \u2014 implemented (auto), 19/24. 'Each Player draws 1 Card.' Dragura's Command inverted and the gentlest card in the set: no choices, no targets, one card each. Deferred to the follow-up queue like Wormhole's draws, for the same reason \u2014 the deal animation belongs on the visible board, not behind the Destiny backdrop \u2014 and drawCards does everything else on its own. The sim preset is built so the two seats take DIFFERENT routes to the same draw: your Future Pile is empty (that is what summoned Destiny in the first place), so your draw has to fold your History back into a new deck first, while the Computer's pile is stocked and it simply takes the top card. VERIFIED LIVE vs Computer: on CONTINUE the overlay closed and both draws played out on the board \u2014 Player 1's History (GoldSteam / Meridia / LaserSteam) reshuffled with MERIDIA EXILED TO THE ABYSS rather than dealt, leaving a 2-card deck and LaserSteam in hand, while the Computer took GoldSteam off its own pile. That reshuffle also confirmed the exileToAbyss fix from Wormhole working through the ordinary draw path: Meridia now actually appears in the Abyss list. No console errors." },
+        { date: '2026-08-30', msg: "Destiny 041 Dragura's Command \u2014 implemented (auto), 18/24. 'Each Player discards 1 Card from their Hand.' Mandatory and universal, clockwise from the revealer, no decline \u2014 destinyPickOneTile again, the no-confirm/no-decline picker Great Flood introduced. A seat holding a single card is not asked (there is no choice to make), and an empty hand is simply passed over. The discard goes to that player's OWN History Pile, which is where this engine discards to, so the card cycles back into their deck rather than leaving the game. HAND ONLY: Atlantica-parked cards are deliberately not offered, the same line Healing Tree and Dark Matter already draw \u2014 parked cards are a resource, not hand count. To be able to actually TEST that line rather than assert it, sim presets gained a p1parked key: it seeds cards into the Atlantica row after the Landmarks are placed (so each has a live Landmark in front of it and syncAtlanticaZone doesn't discard them on sight). Every future card that has to respect the hand/parked distinction can now be checked instead of reasoned about. COMPUTER: gives up its cheapest card, the same price-as-proxy basis it uses for Healing Tree and Great Flood. VERIFIED LIVE vs Computer: with Atlantica in play and an Ichor parked behind it, the picker fanned exactly the four HAND cards and not the Ichor; choosing Vulcanem moved it to Player 1's History (hand 4 \u2192 3, parked row untouched), and the Computer's single Cravus resolved with no question asked. No console errors." },
         { date: '2026-08-30', msg: "Destiny 040 Wormhole \u2014 implemented (auto), 17/24. 'Each Player shuffles Creature Zone, Landmark Zone, Hand, History Pile and Future Pile to a new Future Pile. Then each Player draws 3 Cards.' The great levelling: every board on the table is swept flat and everyone starts again from three cards. The biggest single board operation in the set, and almost all of it is about ORDER and CLEANLINESS. ORDER: hand and Atlantica-parked cards are collected FIRST, because clearing Atlantica discards whatever is still parked behind a Landmark into a History Pile that is about to be wiped \u2014 sweep the Landmark Zone first and those cards are lost instead of shuffled. (Parked cards going in at all is Simon's 'extension of the hand' ruling doing its work.) A Creature riding a Lotus pad contributes BOTH cards from one slot. Meridia is exiled to the Abyss rather than shuffled back \u2014 the rule the End-Phase fold and Sea Lord already apply; she never survives becoming deck again. CLEANLINESS: everything is passed through a new stripInPlayState() on the way in, so damage, summoning stamps, a face-down flip, a Chrona split, a Masiota rescue history and Hyperscope turn damage all come off. A card that goes into a deck has to come back out as printed \u2014 otherwise a Vulcanem that was on 4 HP returns to your hand still wounded, and a Landmark buried by Sandstorm gets drawn face down, which the engine has no concept of. The DRAWS are deferred to the follow-up queue (the one Daredevil's Reward introduced): the deal animation belongs on the visible board, not behind the Destiny backdrop, so the overlay announces the sweep and the three cards land in front of the players once it closes. Gravitas deliberately does NOT fire on this shuffle \u2014 it is swept into the pile by the same effect, so findLandmark can't see it, which falls out of the existing code for free and is the right reading. BUG FOUND AND FIXED ALONG THE WAY, and it was already in the game: both existing Meridia-exile sites wrote her into activeBazaar['AB'], but the Abyss is NOT a Bazaar sale pile \u2014 renderBazaar reads its cards from the slot element's own dataset. So an exiled Meridia was being removed from the deck correctly and then vanishing silently instead of appearing in the public 'Abyss \u2014 Out of Game' list. All three sites (the End-Phase fold, Sea Lord, and this card) now go through one exileToAbyss() helper that places her the same way Threat and Mines of Pyralos place theirs. Caught only because the Wormhole sim showed an empty Abyss next to a notice that said she had been exiled. VERIFIED LIVE vs Computer. Both boards \u2014 3 hand cards, 2 Landmarks including Atlantica, a damaged Vulcanem, an Ichor on a Lotus pad, and a 3-card History against the Computer's hand, Landmark, Creature, Future and History \u2014 went completely bare, and the new decks came out at exactly 10 and 7 cards (P1: 3 hand + 2 Landmarks + 3 from the two Creature slots + 2 of 3 History). Meridia was not among them and now reads '1 IN ABYSS' in the Bazaar. The drawn Vulcanem carried none of its in-play fields. On CONTINUE both players drew 3 from their own new decks (10 \u2192 7 and 7 \u2192 4) and Player 1's Pandorama came off the top and REBUILT ITSELF straight into the empty Landmark Zone \u2014 the Hyperscope rebuild rule reassembling a board that Wormhole had just flattened. No console errors. Destiny progress panel now reads 17/24, next 041 Dragura's Command." },
         { date: '2026-08-30', msg: "Destiny 039 Sandstorm \u2014 implemented (auto), 16/24, and it changed a GENERAL RULE. 'All Landmarks on the Playing Field are deactivated. Once per Construction Phase a Player may reactivate 1 Landmark.' SIMON'S RULING on the second sentence: it is not a Sandstorm rule at all \u2014 it is the general reactivation rule, printed here because this is the card that makes you feel it. Reactivating is limited to ONE CARD PER TURN, in the right phase: a Landmark in your Construction Phase, a Creature in your Construction or Creature Phase. His reason is the one that matters \u2014 without it Sleep Potion (and every other way of putting a card face down) is barely an inconvenience, because you would simply flip the card straight back up. Until now the engine let you unveil your own face-down cards freely, any phase, any number, which quietly undercut the whole Duality deactivation subsystem. That is now reactivationBlockedReason() + a per-turn flag cleared in finishTurn beside the rest, and the confirm dialog says what it is spending ('your one reactivation this turn'). Sandstorm itself, therefore, sticks around for NOTHING: it flips every Landmark on the table face down, goes to the Destiny Abyss, and the players dig out under the general rule. No lingering flag, no timer, no 'while Sandstorm is in play' bookkeeping \u2014 per Simon, 'it's not a card that sticks around with longer effect'. Atlantica is exempt as always (canBeDeactivated), a Landmark already face down is left alone rather than double-deactivated (that is Sleep Potion's discard rule, not this one's), and every deactivation goes through the same refreshBoardAfterDeactivation chokepoint, so an Atlantica-parked card behind a Landmark that DOES go down is discarded exactly as for any other sleep. COMPUTER: this rule would have buried it permanently \u2014 it has no click, so it had no path to an unveil at all. aiReactivateOne() now takes its one reactivation at the top of its Construction Phase (the phase that suits both card types, so it never has to choose between digging out a Landmark and a Creature on timing), flipping up its most expensive sleeper, and it respects the Masiota same-turn lockout. VERIFIED LIVE, both modes. Vs Computer: the reveal buried 4 Landmarks across BOTH boards \u2014 Pandorama, Aetherlab, Fountain of Youth, Clone Factory \u2014 and left Atlantica standing with the notice saying why. Clicking a buried Landmark in the STEAM phase was refused ('only in your Construction Phase'); in Construction the first click unveiled Pandorama and the second was refused ('one per turn'), with Aetherlab staying down. The Computer then dug itself out on its own turn, unveiling exactly one Landmark (feed: 'Unveils Fountain of Youth') and leaving Clone Factory buried. Hot seat: Player 1 unveiled one and was refused a second, then the turn passed and PLAYER 2 got a fresh reactivation \u2014 one card, then refused \u2014 proving the per-turn reset. No console errors. Destiny progress panel now reads 16/24, next 040 Wormhole." },
         { date: '2026-08-30', msg: "Destiny 038 Break of Dawn \u2014 implemented (auto), 15/24. 'Roll a Futory Die. You gain Time Points equal to the result.' Sacrifice's mirror, same shape: the revealer alone, the whole card is the roll, the die stays on screen under the result. destinyRollDie was already there from 037, so the card itself is six lines. THE ONE THING THAT ISN'T SYMMETRICAL is the ceiling, and it is the only reason this card needed any thought. A loss always lands in full until you are dead; a gain runs into the 12-per-die cap and can never revive a die already lost at 0, so a 6 rolled on a nearly full clock quietly becomes a 2. destinyGainTimePoints \u2014 the mirror of destinyLoseTimePoints \u2014 measures what actually landed rather than assuming the roll, floats that number on the die, and the notice reports it: 'rolls 5 but the dice can only hold 3'. Promising six and delivering three with no explanation is exactly the kind of thing that reads as a bug. Sim preset leaves precisely 3 Time Points of headroom (Day 10, Night 11) so both halves of the ceiling show up in one roll: the Day die fills to 12, the remainder spills onto the Night die, and then it runs out of room. VERIFIED LIVE vs Computer, both branches, with the Computer's clock untouched in each. Roll 2 landed in full \u2014 Day 10 \u2192 12, 23 Time Points, notice 'gains 2'. Roll 5 filled the Day die (+2), spilled onto the Night die (+1) and stopped at 24 with the notice reading 'rolls 5 but the dice can only hold 3'. No console errors. Destiny progress panel now reads 15/24, next 039 Sandstorm." },
@@ -1204,6 +1238,21 @@ document.addEventListener('DOMContentLoaded', () => {
                     });
                 }
 
+                // Atlantica-parked cards (the row behind the Landmarks). Seeded after the
+                // Landmarks so the zone exists and each slot has a live Landmark in front of
+                // it — otherwise syncAtlanticaZone would discard the card straight away.
+                // Lets a preset exercise the hand-vs-parked distinction, which several cards
+                // deliberately draw a line on.
+                if (cfg.parked) {
+                    syncAtlanticaZone(pNum);
+                    const aSlots = Array.from(board.querySelectorAll('.atlantica-slot'));
+                    aSlots.forEach(sl => { if (!sl.classList.contains('slot-empty')) clearSlot(sl); });
+                    cfg.parked.forEach((name, i) => {
+                        const found = cardData.find(c => c.name === name);
+                        if (found && aSlots[i]) finishSingleCardPlacement(aSlots[i], { ...found });
+                    });
+                }
+
                 // Future Pile (deck to draw from — e.g. for Planetarium)
                 if (cfg.future) {
                     const futSlot = board.querySelector('.future-pile');
@@ -1228,6 +1277,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 creatures: sim.p1creatures,
                 history: sim.p1history,
                 future: sim.p1future,
+                parked: sim.p1parked,
             });
 
             if (sim.p2landmarks || sim.p2hand || sim.p2creatures || sim.p2future || sim.p2history ||
@@ -9356,6 +9406,74 @@ document.addEventListener('DOMContentLoaded', () => {
         );
     }
 
+    // 041 Dragura's Command — "Each Player discards 1 Card from their Hand." Mandatory and
+    // universal: everyone gives one up, clockwise from the revealer, no decline.
+    //
+    // HAND ONLY. Atlantica-parked cards are deliberately not offered — the same call Healing
+    // Tree and Dark Matter already make: parked cards are a resource, not hand count. A
+    // discarded card goes to its owner's own History Pile, which is where this engine
+    // discards to, so it cycles back into their deck rather than leaving the game.
+    async function resolveDraguraSCommand(card, revealer) {
+        await forEachPlayerClockwise(revealer, async (pNum) => {
+            const board = document.getElementById(`player-${pNum}`);
+            if (!board) return;
+            const isAI = vsComputer && pNum === AI_PLAYER;
+            const seatName = isAI ? 'The Computer' : `Player ${pNum}`;
+
+            const slots = Array.from(board.querySelectorAll('.hand-slot:not(.slot-empty)'));
+            if (slots.length === 0) {
+                await destinyNotice(`${seatName} has no cards in hand — nothing to give.`);
+                return;
+            }
+
+            const entries = slots.map(slot => {
+                let c = {};
+                try { c = JSON.parse(slot.dataset.cardData); } catch (e) { /* blank */ }
+                return { card: c, value: slot };
+            });
+
+            // One card in hand is no choice — don't make them click it.
+            const chosen = entries.length === 1 ? entries[0].value
+                : isAI ? aiDraguraPick(entries)
+                : await destinyPickOneTile(entries, `Player ${pNum}: Dragura takes one card from your hand. Choose which.`);
+
+            let data = {};
+            try { data = JSON.parse(chosen.dataset.cardData); } catch (e) { /* blank */ }
+            clearSlot(chosen);
+            finishSingleCardPlacement(board.querySelector('.history-pile'), data);
+            updateHandLayout(pNum);
+
+            if (isAI) aiLog(`Dragura's Command: discards ${data.name}`, 'info');
+            await destinyNotice(`${seatName} discards ${data.name} to their History Pile.`);
+        });
+    }
+
+    // The Computer gives up its cheapest card — the same "price is the best proxy for value"
+    // basis it uses for Healing Tree and Great Flood.
+    function aiDraguraPick(entries) {
+        return entries.slice().sort((a, b) => cardCostValue(a.card) - cardCostValue(b.card))[0].value;
+    }
+
+    // 042 Rula's Support — "Each Player draws 1 Card." Dragura's Command inverted, and the
+    // gentlest card in the set: no choices, no targets, one card each.
+    //
+    // Deferred to the follow-up queue like Wormhole's draws, for the same reason — the deal
+    // animation belongs on the visible board, not behind the Destiny backdrop. drawCards
+    // handles everything else on its own: an empty Future Pile reshuffles the History back in
+    // (exiling Meridia), Gravitas fires on that reshuffle if it is in play, and a full hand
+    // takes the card onto a temporary slot for the End Phase limit to settle.
+    async function resolveRulasSupport(card, revealer) {
+        const seats = seatsClockwise(revealer);
+        destinyFollowUps.push(async () => {
+            for (const pNum of seats) {
+                if (gameWon) return;
+                await drawCards(pNum, 1);
+            }
+        });
+        if (vsComputer) aiLog("Rula's Support: everyone draws 1", 'draw');
+        await destinyNotice('Every player draws 1 card once this closes.');
+    }
+
     const destinyEffects = {
         'Healing Tree': resolveHealingTree,
         'Freeze': resolveFreeze,
@@ -9374,6 +9492,8 @@ document.addEventListener('DOMContentLoaded', () => {
         'Break of Dawn': resolveBreakOfDawn,
         'Sandstorm': resolveSandstorm,
         'Wormhole': resolveWormhole,
+        "Dragura's Command": resolveDraguraSCommand,
+        "Rula's Support": resolveRulasSupport,
     };
 
     // ==================== COMPUTER OPPONENT ====================
