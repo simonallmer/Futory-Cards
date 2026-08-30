@@ -285,7 +285,7 @@ document.addEventListener('DOMContentLoaded', () => {
         };
     }
 
-    const implementedCards = ["Pandorama", "Fountain of Youth", "Laser Catalyst", "Dragura's Wasteland", "Planetarium", "Lethargo's Temple", "Clone Factory", "Aetherlab", "Entrophy", "Meridius", "Meridia", "Time Thief", "Ichor", "Vulcanem", "Cravus", "Rampadon", "Smoke", "Dark Matter", "Reflector", "Talisman", "Reversal", "Faith", "Threat", "Confiscation", "Gravitas", "Time Bender", "Meridia's Cabin", "Repo Station", "Hand of Rhone", "Atlantica", "Hyperscope", "Mines of Pyralos", "Chrona", "Razo", "Looper", "Masiota", "Aromeas", "General Wave", "Namandi", "Sea Lord", "Sleep Potion", "Lotus", "Rush", "Cell Shield", "Alchemy", "Tame Beast", "Tele Control", "Burden of Wealth", "Healing Tree", "Freeze", "Chrono Machine", "Dragon Throne", "Unstoppable Force", "Truce", "Voider", "Space Voider", "Eternal Hour", "Great Flood", "Laser Bomb", "Daredevil's Reward", "Lethargo's Approach", "Sacrifice"];
+    const implementedCards = ["Pandorama", "Fountain of Youth", "Laser Catalyst", "Dragura's Wasteland", "Planetarium", "Lethargo's Temple", "Clone Factory", "Aetherlab", "Entrophy", "Meridius", "Meridia", "Time Thief", "Ichor", "Vulcanem", "Cravus", "Rampadon", "Smoke", "Dark Matter", "Reflector", "Talisman", "Reversal", "Faith", "Threat", "Confiscation", "Gravitas", "Time Bender", "Meridia's Cabin", "Repo Station", "Hand of Rhone", "Atlantica", "Hyperscope", "Mines of Pyralos", "Chrona", "Razo", "Looper", "Masiota", "Aromeas", "General Wave", "Namandi", "Sea Lord", "Sleep Potion", "Lotus", "Rush", "Cell Shield", "Alchemy", "Tame Beast", "Tele Control", "Burden of Wealth", "Healing Tree", "Freeze", "Chrono Machine", "Dragon Throne", "Unstoppable Force", "Truce", "Voider", "Space Voider", "Eternal Hour", "Great Flood", "Laser Bomb", "Daredevil's Reward", "Lethargo's Approach", "Sacrifice", "Break of Dawn"];
 
     // --- Intent Classification ---
     // auto: fires on its own when condition is met
@@ -355,6 +355,7 @@ document.addEventListener('DOMContentLoaded', () => {
         "Daredevil's Reward": 'auto',
         "Lethargo's Approach": 'auto',
         'Sacrifice': 'auto',
+        'Break of Dawn': 'auto',
     };
 
     // --- Simulation Presets ---
@@ -756,6 +757,19 @@ document.addEventListener('DOMContentLoaded', () => {
             p1future: [],
             p1history: ['FireSteam', 'GoldSteam'],
         },
+        'Break of Dawn': {
+            phase: 0,
+            // Day 10 / Night 11 = 3 Time Points of headroom in total, so a roll of 1-3 lands
+            // in full while a 4, 5 or 6 fills the Day die, spills onto the Night die and then
+            // runs out of room — both halves of the ceiling in one preset.
+            day: 10,
+            night: 11,
+            desc: "Player 1's Future Pile is empty — the turn start reveals Break of Dawn. A Futory Die rolls in the overlay and YOU gain that many Time Points — the Computer's clock must not move. Your dice hold only 3 more (Day 10, Night 11), so a low roll lands in full, a 4+ fills the Day die to 12, spills onto the Night die and then stops: the notice should report what the dice actually took, not what you rolled.",
+            destiny: 'Break of Dawn',
+            hand: ['FireSteam', 'GoldSteam'],
+            p1future: [],
+            p1history: ['FireSteam', 'GoldSteam'],
+        },
         'Hand of Rhone': {
             phase: 1,
             day: 9,
@@ -856,6 +870,7 @@ document.addEventListener('DOMContentLoaded', () => {
     };
 
     const devLogData = [
+        { date: '2026-08-30', msg: "Destiny 038 Break of Dawn \u2014 implemented (auto), 15/24. 'Roll a Futory Die. You gain Time Points equal to the result.' Sacrifice's mirror, same shape: the revealer alone, the whole card is the roll, the die stays on screen under the result. destinyRollDie was already there from 037, so the card itself is six lines. THE ONE THING THAT ISN'T SYMMETRICAL is the ceiling, and it is the only reason this card needed any thought. A loss always lands in full until you are dead; a gain runs into the 12-per-die cap and can never revive a die already lost at 0, so a 6 rolled on a nearly full clock quietly becomes a 2. destinyGainTimePoints \u2014 the mirror of destinyLoseTimePoints \u2014 measures what actually landed rather than assuming the roll, floats that number on the die, and the notice reports it: 'rolls 5 but the dice can only hold 3'. Promising six and delivering three with no explanation is exactly the kind of thing that reads as a bug. Sim preset leaves precisely 3 Time Points of headroom (Day 10, Night 11) so both halves of the ceiling show up in one roll: the Day die fills to 12, the remainder spills onto the Night die, and then it runs out of room. VERIFIED LIVE vs Computer, both branches, with the Computer's clock untouched in each. Roll 2 landed in full \u2014 Day 10 \u2192 12, 23 Time Points, notice 'gains 2'. Roll 5 filled the Day die (+2), spilled onto the Night die (+1) and stopped at 24 with the notice reading 'rolls 5 but the dice can only hold 3'. No console errors. Destiny progress panel now reads 15/24, next 039 Sandstorm." },
         { date: '2026-08-30', msg: "Destiny 037 Sacrifice \u2014 implemented (auto), 14/24. 'Roll a Futory Die. You lose Time Points equal to the result.' The whole card is the roll, so the roll had to be worth watching \u2014 and it had to happen INSIDE the Destiny overlay, since the board is behind the backdrop and Looper's own die overlay would have fought this one for the screen. destinyRollDie() renders the die in the picker row using the same buildPips face and the same fast-then-easing tick as the Looper and Entrophy rolls, resolves with the face, and LEAVES THE DIE ON SCREEN under the notice that explains what it cost \u2014 so the number you are reading about is still sitting there. 'You' is literal: the revealer alone, everyone else just watches. The loss rides destinyLoseTimePoints, so a roll bigger than the active die spills onto the other one, an emptied die is permanently lost, and a roll that reaches 0 ends the game. When the clock can't pay the full roll the notice says so ('has only 2 Time Points left to give') rather than reporting a number the dice never actually took. FOUND AND FIXED WHILE TESTING, a real dev-tool trap: runSimulation resets destinyResolving as part of clearing per-turn state, which meant loading a preset while a reveal was still awaiting a choice started a SECOND reveal alongside the first, and both resolved onto the same board \u2014 two Sacrifice rolls landed on one clock and the numbers stopped adding up. runSimulation now refuses outright while a reveal is open. Anyone testing 'Each Player' cards would have hit this eventually. VERIFIED LIVE vs Computer, every branch, with the Computer's clock untouched in all of them. Roll 3 against a Day die of 3 emptied it exactly (Day lost, Night 12, 12 TP left). Roll 6 against the same Day die took all 3 and spilled the other 3 onto the Night die (12 \u2192 9). Roll 4 against a player holding 2 Time Points on a lone Day die reported 'loses 2 TP', vanished both dice, and ended the game \u2014 with the Destiny overlay closing itself behind the victory screen, the destinyNotice fix from Eternal Hour doing its job a second time. No console errors. Destiny progress panel now reads 14/24, next 038 Break of Dawn \u2014 this card's mirror." },
         { date: '2026-08-30', msg: "Destiny 036 Lethargo's Approach \u2014 implemented (auto), 13/24. 'Each Player loses 1 Time Point.' The smallest card in the set: no choices, no snapshot, no targeting \u2014 1 TP off every seat at the same moment. It exists in the code purely as a call to destinyLoseTimePoints, the helper Eternal Hour left behind, so it inherits the whole TP contract for free: Day die first, a seat whose Day die is already gone takes it on the Night die, an emptied die stays lost, and a seat on exactly 1 TP is knocked out with the game-over check firing. The notice reads out both clocks afterwards, since a card that changes everyone by the same tiny amount is otherwise easy to miss. Sim preset puts the two seats in different dice states on purpose, so one reveal shows both routes. VERIFIED LIVE vs Computer: Player 1's Day die went 12 \u2192 11 while the Computer \u2014 Day die already gone \u2014 took it on the Night die, 5 \u2192 4, and the notice read 'Player 1 23 \u00b7 The Computer 4 TP remaining'. No console errors." },
         { date: '2026-08-30', msg: "Destiny 035 Daredevil's Reward \u2014 implemented (auto), 12/24. 'All Players tied for least Time Points may show a Card from their Hand to take the same Card from the Bazaar.' The catch-up card, and the first one whose wording genuinely forked \u2014 SIMON RULED ON THREE THINGS and all three are load-bearing. (1) The taken card goes to its type's NORMAL destination, exactly where a Construction Phase buy would put it: Landmark straight into the Landmark Zone, Artifact to History, Spark played, Creature to Hand. It is a free BUY, not a free card in hand. (2) Emptying a Bazaar pile this way does NOT cost every player 1 Time Point \u2014 that rule is written for buying, and this is a take. (3) STEAM CANNOT BE SHOWN, because 'the Bazaar' is defined as the Non-Steam, Non-Destiny cards; a Steam card in hand simply has no Bazaar counterpart. That definition is now in the code as bazaarStockByName, which skips ST1-3, D, DA and AB \u2014 every future card that says 'from the Bazaar' should go through it. Two pieces of plumbing came out of it. grantCardToPlayer(pNum, card) places a card at its type destination and reports where it went \u2014 the routine the engine never had, because the Computer only ever buys Creatures and Landmarks and the human path goes through drag-and-drop. And a follow-up QUEUE on the Destiny overlay: a Spark plays the instant it lands in the Abyss, and its own targeting UI must not open behind the Destiny screen or interleave with another seat's choice, so the Spark's effect is deferred and revealDestiny flushes the queue after the overlay closes. forEachPlayerClockwise also gained an optional seat filter, so the walk visits only the tied-for-least seats and skips everyone else outright rather than showing them an empty prompt. Eligibility is checked against what the board can actually do: no Steam, the Bazaar must have that card in stock in an active set, and a Landmark you already own (or have no room for) is not offered \u2014 caught live when a second run correctly dropped Pandorama from the tiles because the first run had just built it. The shown card is SHOWN, not spent: it stays in hand. COMPUTER: it is behind on time, so it takes the biggest freebie it can use \u2014 most expensive first, Creatures and Landmarks only, since V1 it plays neither Artifacts nor Sparks. VERIFIED LIVE vs Computer, every branch. At 8 TP against 24, only Player 1 was offered and the Computer's half of the walk was skipped entirely. FireSteam did not appear among the tiles. Showing Pandorama built the Bazaar's copy straight into the Landmark Zone with L1 going 3 \u2192 2, the Pandorama in hand untouched, and NOBODY losing a Time Point. Showing Faith sent it to the Abyss with the notice 'it plays as soon as this reveal closes' and nothing else happening \u2014 then, once the overlay was gone, the Spark resolved on its own: Day die 4 \u2192 7 and a GoldSteam drawn. A tie run (both on 24) offered BOTH seats: Player 1, holding only Steam, got 'holds nothing the Bazaar can match', and the Computer chose Vulcanem over Cravus and ignored the Smoke, with C8 going 3 \u2192 2 and its own Vulcanem still in hand. No console errors. Destiny progress panel now reads 12/24 \u2014 halfway \u2014 next 036 Lethargo's Approach." },
@@ -8743,6 +8758,19 @@ document.addEventListener('DOMContentLoaded', () => {
         return lost;
     }
 
+    // The mirror of destinyLoseTimePoints. gainTimePoints caps each die at 12 and never
+    // revives a die already lost at 0, so what lands can be less than what was offered —
+    // measure it rather than assume it, and float the number the dice actually took.
+    function destinyGainTimePoints(pNum, amount) {
+        const board = document.getElementById(`player-${pNum}`);
+        const dieEl = board && board.querySelector(activeDieSel(pNum));
+        const before = totalTimePoints(pNum);
+        gainTimePoints(pNum, amount);
+        const gained = totalTimePoints(pNum) - before;
+        if (dieEl && gained > 0) floatValue(dieEl, `+${gained} TP`, 'gain');
+        return gained;
+    }
+
     // Seat names as one readable phrase: "Player 1", "Player 1 and The Computer",
     // "Player 1, Player 3 and Player 4".
     function seatList(seats) {
@@ -9065,6 +9093,25 @@ document.addEventListener('DOMContentLoaded', () => {
             : `${who} rolls ${roll} and loses ${roll} Time Points — ${totalTimePoints(revealer)} remaining.`);
     }
 
+    // 038 Break of Dawn — "Roll a Futory Die. You gain Time Points equal to the result."
+    // Sacrifice's mirror, and the same shape: the revealer alone, the whole card is the
+    // roll, and the die stays on screen under the result.
+    //
+    // The one thing that isn't symmetrical is the ceiling. A loss always lands in full until
+    // you are dead, but a gain runs into the 12-per-die cap and cannot revive a die already
+    // lost at 0 — so a 6 rolled on a nearly full clock quietly becomes a 2. destinyGainTimePoints
+    // measures what actually landed and the notice says so, rather than promising six.
+    async function resolveBreakOfDawn(card, revealer) {
+        const who = (vsComputer && revealer === AI_PLAYER) ? 'The Computer' : `Player ${revealer}`;
+        const roll = await destinyRollDie(`${who} rolls the Futory Die…`);
+        const gained = destinyGainTimePoints(revealer, roll);
+
+        if (vsComputer) aiLog(`Break of Dawn: rolls ${roll}, ${who} gains ${gained} TP`, 'draw');
+        await destinyNotice(gained < roll
+            ? `${who} rolls ${roll} but the dice can only hold ${gained} — ${totalTimePoints(revealer)} Time Points.`
+            : `${who} rolls ${roll} and gains ${roll} Time Points — ${totalTimePoints(revealer)} in total.`);
+    }
+
     const destinyEffects = {
         'Healing Tree': resolveHealingTree,
         'Freeze': resolveFreeze,
@@ -9080,6 +9127,7 @@ document.addEventListener('DOMContentLoaded', () => {
         "Daredevil's Reward": resolveDaredevilsReward,
         "Lethargo's Approach": resolveLethargosApproach,
         'Sacrifice': resolveSacrifice,
+        'Break of Dawn': resolveBreakOfDawn,
     };
 
     // ==================== COMPUTER OPPONENT ====================
