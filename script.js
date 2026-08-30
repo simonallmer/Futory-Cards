@@ -285,7 +285,7 @@ document.addEventListener('DOMContentLoaded', () => {
         };
     }
 
-    const implementedCards = ["Pandorama", "Fountain of Youth", "Laser Catalyst", "Dragura's Wasteland", "Planetarium", "Lethargo's Temple", "Clone Factory", "Aetherlab", "Entrophy", "Meridius", "Meridia", "Time Thief", "Ichor", "Vulcanem", "Cravus", "Rampadon", "Smoke", "Dark Matter", "Reflector", "Talisman", "Reversal", "Faith", "Threat", "Confiscation", "Gravitas", "Time Bender", "Meridia's Cabin", "Repo Station", "Hand of Rhone", "Atlantica", "Hyperscope", "Mines of Pyralos", "Chrona", "Razo", "Looper", "Masiota", "Aromeas", "General Wave", "Namandi", "Sea Lord", "Sleep Potion", "Lotus", "Rush", "Cell Shield", "Alchemy", "Tame Beast", "Tele Control", "Burden of Wealth", "Healing Tree", "Freeze", "Chrono Machine", "Dragon Throne", "Unstoppable Force", "Truce", "Voider", "Space Voider"];
+    const implementedCards = ["Pandorama", "Fountain of Youth", "Laser Catalyst", "Dragura's Wasteland", "Planetarium", "Lethargo's Temple", "Clone Factory", "Aetherlab", "Entrophy", "Meridius", "Meridia", "Time Thief", "Ichor", "Vulcanem", "Cravus", "Rampadon", "Smoke", "Dark Matter", "Reflector", "Talisman", "Reversal", "Faith", "Threat", "Confiscation", "Gravitas", "Time Bender", "Meridia's Cabin", "Repo Station", "Hand of Rhone", "Atlantica", "Hyperscope", "Mines of Pyralos", "Chrona", "Razo", "Looper", "Masiota", "Aromeas", "General Wave", "Namandi", "Sea Lord", "Sleep Potion", "Lotus", "Rush", "Cell Shield", "Alchemy", "Tame Beast", "Tele Control", "Burden of Wealth", "Healing Tree", "Freeze", "Chrono Machine", "Dragon Throne", "Unstoppable Force", "Truce", "Voider", "Space Voider", "Eternal Hour"];
 
     // --- Intent Classification ---
     // auto: fires on its own when condition is met
@@ -349,6 +349,7 @@ document.addEventListener('DOMContentLoaded', () => {
         'Truce': 'auto',
         'Voider': 'auto',
         'Space Voider': 'auto',
+        'Eternal Hour': 'auto',
     };
 
     // --- Simulation Presets ---
@@ -654,6 +655,23 @@ document.addEventListener('DOMContentLoaded', () => {
             p2future: ['FireSteam', 'GoldSteam', 'LaserSteam', 'Ichor'],
             p2history: ['FireSteam', 'FireSteam', 'FireSteam', 'GoldSteam', 'LaserSteam', 'Cravus'],
         },
+        'Eternal Hour': {
+            phase: 0,
+            // Deliberately NOT a tie: a fresh game is already 24/24, so the tie case can be
+            // seen for free by revealing this card on turn one. What a default board can't
+            // show is the discriminating half — that a clear leader is hit alone — so the
+            // preset puts Player 1 four ahead. Day at 8 for the Computer also proves the
+            // damage still comes off the Day die first.
+            day: 12,
+            night: 12,
+            p2day: 8,
+            p2night: 12,
+            desc: "Player 1's Future Pile is empty — the turn start reveals Eternal Hour. You are on 24 Time Points, the Computer on 20, so YOU alone should lose 4 (Day 12 → 8) and the Computer should be untouched — 'tied for most' means the leaders, not everybody. Both seats end on 20, so revealing it again would hit both. For the tie case, just reveal it at the start of a fresh game while both players are still on 24.",
+            destiny: 'Eternal Hour',
+            hand: ['FireSteam', 'GoldSteam'],
+            p1future: [],
+            p1history: ['FireSteam', 'GoldSteam'],
+        },
         'Hand of Rhone': {
             phase: 1,
             day: 9,
@@ -754,6 +772,7 @@ document.addEventListener('DOMContentLoaded', () => {
     };
 
     const devLogData = [
+        { date: '2026-08-30', msg: "Destiny 032 Eternal Hour \u2014 implemented (auto), 9/24. 'All Players tied for most Time Points lose 4.' A leader tax, and the first Destiny card that just happens TO you \u2014 nobody is asked anything. TWO READINGS TO GET RIGHT. (1) 'Tied for most' is the plain reading: whoever is on the highest total takes 4, and if several share that total they all take it. One player alone at the top is still the most, so at 2 players a clear leader is hit by themselves \u2014 the card is not conditional on there being a tie. (2) It resolves SIMULTANEOUSLY: the set of victims is snapshotted before any damage lands, so the 4 coming off the first seat can't drop them out of the tie and quietly spare the second. Iterating and re-reading totals would have produced exactly that bug. The loss runs through resolveDamageDirectly \u2014 the same path combat damage uses \u2014 so Day-die-first, a die permanently lost at 0, and the game-over check all come along for free. Two small shared helpers came out of it, both for the TP cards still to come (036 Lethargo's Approach, 037 Sacrifice): destinyLoseTimePoints, which reads the active-die selector BEFORE the hit so a die emptied by this very loss doesn't send its float to the other one, and reports what actually landed; and seatList, which names a group of seats readably ('Player 1 and The Computer'). THIS CARD CAN END A GAME, which turned up a real flaw in the Destiny plumbing: the victory screen draws OVER the Destiny overlay, so a notice waiting for a CONTINUE nobody can see left a live modal parked behind the win. destinyNotice now shows its line but returns immediately when gameWon, so the reveal walks straight out and hands the board to the victory screen. That fix is general \u2014 every lethal Destiny card gets it. Sim preset deliberately is NOT a tie: a fresh game is already 24/24, so the tie case can be seen for free by revealing this on turn one. What a default board can't show is the discriminating half \u2014 that a clear leader is hit alone \u2014 so Player 1 starts four ahead. VERIFIED LIVE vs Computer, all three branches. Leader-only: Player 1 on 24 vs the Computer's 20 \u2014 Player 1's Day die went 12 \u2192 8 and the Computer was untouched, both ending on 20. Tie (both seats at 24): both Day dice went 12 \u2192 8 and the notice read 'Player 1 and The Computer are tied on 24 Time Points \u2014 each loses 4', proving Player 1 dropping to 20 first did not spare the Computer. Lethal (Player 1 on 3 with the Day die already gone, the Computer on 2): the 4 came off the Night die, Player 1 hit 0, and COMPUTER WON appeared with the Destiny overlay closing itself behind it \u2014 no orphaned CONTINUE. Also moved the feed line ahead of the notice so the log lands with the damage rather than whenever CONTINUE is clicked. No console errors. Destiny progress panel now reads 9/24, next 033 Great Flood." },
         { date: '2026-08-30', msg: "Destiny 031 Space Voider \u2014 implemented (auto), 8/24. 'Each Player may send up to 4 Cards from their History Pile into the Abyss.' This one is the payoff for how 030 Voider was built rather than a card in its own right: the entire effect is resolveSpaceVoider calling voidFromHistory(revealer, 4, 'Space Voider'), because the limit was already a parameter and the picker's `max` cap was already reading it. Nothing else in the engine changed. The one real edit was to the Computer, which had a fixed 'Normal takes 1' \u2014 fine for a 2-card card, timid for a 4-card one. The cap now scales with the card: Hard takes the lot, Normal takes half (Math.ceil(limit / 2), so 1 of 2 and 2 of 4, leaving Voider's behaviour exactly as it was), Easy still declines. Its two real constraints are unchanged and are what keep this from being a blunder: it voids STEAM only, cheapest first, and it stops before Future + History would fall below 6 cards. Sim preset gives BOTH seats a six-card History, so 4 is a ceiling you bump into rather than 'select everything', with a LaserSteam and a Creature in each pile worth keeping. VERIFIED LIVE vs Computer. The picker fanned all six; selecting four lit them and the FIFTH click did not take (VOID 4, '4 cards out of the game for good.'); confirming left History as LaserSteam / Ichor and the Bazaar Abyss climbing to 6 IN ABYSS. Normal voided exactly 2 of its cheapest FireSteam and kept its GoldSteam, LaserSteam and Cravus; Hard voided 4 (three FireSteam plus the GoldSteam) and left LaserSteam / Cravus. The deck floor was then checked directly by trimming the Computer's Future Pile to a single card mid-reveal, while the overlay was still waiting on my choice: Hard's allowance of 4 clamped to 1, leaving its deck at exactly 6. Player 1's DECLINE left a six-card pile untouched in the same reveal. No console errors. Destiny progress panel now reads 8/24, next 032 Eternal Hour." },
         { date: '2026-08-30', msg: "Destiny 030 Voider \u2014 implemented (auto), 7/24. 'Each Player may send up to 2 Cards from their History Pile into the Abyss.' The first Destiny card that is pure deck-thinning: the Abyss is out of the game for good, so voiding a dead FireSteam permanently sharpens what you draw. Both words in 'may send up to 2' are real \u2014 0, 1 and 2 are all legal answers, DECLINE is always offered, and the walk is clockwise from the revealer like every other 'Each Player' event. THE NEW PROBLEM was that a History Pile is ONE slot holding an array, not a slot per card, so the existing destinyPickCards (which reads dataset.cardData off each DOM element and hands the elements back) had nothing to iterate. Rather than write a second near-identical picker, it split in two: destinyPickTiles is now the picker itself, over anything describable as {card, value} \u2014 card for the face it draws, value for what the caller gets back \u2014 and destinyPickCards is a four-line wrapper that maps slots into that shape, so Healing Tree's behaviour is byte-for-byte what it was. The pile passes its entries directly with the array index as the value. The picker also gained `max`: at the cap a further tile simply doesn't take, and deselecting frees the slot again, which reads better than an error and makes 'up to 2' visible in the UI instead of only in the text. Cards leave from the MIDDLE of a stack here, not off the top, so the pile's face has to be rewritten afterwards. Reversal already did that inline; that block is now writeStackPile(slot, cards, label) \u2014 the counterpart to finishSingleCardPlacement, which only ever appends \u2014 and both cards share it so the two can't drift. Removal splices from the back so earlier indices stay valid, then reports the cards in the pile's own order. The voided cards go to the Abyss through the same finishSingleCardPlacement path Mines of Pyralos uses, so the Bazaar's 'N IN ABYSS' counter and the click-to-list modal pick them up for free. COMPUTER: thinning is one of the strongest things a deck-builder can do, but only while there is still a deck left to draw from \u2014 so aiVoiderPick voids its cheapest STEAM cards only (never a Creature, Landmark or Artifact it paid for) and stops before Future + History would fall below 6. Easy declines, Normal voids 1, Hard voids 2. Also added p2history to the Dev Log sim presets \u2014 setupBoard already took a history list but only Player 1 was wired to pass one, and an 'Each Player' event that reaches into the History Pile needs both seats stocked, the same reason p2day/p2night were added for the TP events. VERIFIED LIVE vs Computer, every branch. The picker fanned all four History cards; selecting two lit them and the THIRD click did not take (prompt held at '2 cards out of the game for good.', button at VOID 2); deselecting one immediately allowed a different third card, proving the cap is a cap and not a freeze. Confirming VOID 2 moved both FireSteam out \u2014 History went FireSteam/FireSteam/GoldSteam/Ichor \u2192 GoldSteam/Ichor, its face became the Ichor art, and the Bazaar Abyss read '3 IN ABYSS'. The Computer then took the same choice in the same reveal: on Normal it voided exactly 1 FireSteam and kept its GoldSteam and Cravus; on Hard, 2. DECLINE left Player 1's pile untouched at four cards while the Computer still made its own choice, and an empty History Pile said so instead of opening an empty picker. Re-ran the Reversal sim afterwards to check the shared writeStackPile: it still pulled Ichor out of the middle of a two-card pile and left the face showing Smoke. No console errors. Destiny progress panel now reads 7/24, next 031 Space Voider \u2014 which is this card with 4 instead of 2, and voidFromHistory already takes the limit." },
         { date: '2026-08-30', msg: "Destiny 029 Truce \u2014 implemented (auto), 6/24. 'Your Creatures can't attack this turn.' The exact inverse of Unstoppable Force and deliberately built out of the same two pieces: one turn-scoped seat flag (trucePlayer = the revealer) and the same reading of 'your Creatures' \u2014 the ones sitting in that seat's OWN Creature Zone, tested off the slot's board rather than off currentPlayer. THE ONE DECISION THAT MATTERED was where to put the gate. Not in the zone-click dispatcher (Rush would walk straight past it) and not in beginAttack (that would also stop a Creature you borrowed from someone else): it sits in showAttackMenu, the single door every player-initiated attack goes through \u2014 the click on your own Creature, and Rush's instant attack, which calls it too. Three more places needed a word. triggerRush refuses BEFORE the Artifact is spent, so a Truce'd turn can't waste your Rush on a refusal. teleControlTargets drops the Truce'd seat's own Creatures from the target list, because commandeering your OWN Creature is not a way round 'your Creatures can't attack' \u2014 an opponent's Creature stays fair game, which is the same borrowing rule Unstoppable Force already set. And the Computer stands down at the top of its own attack loop with a feed line rather than a silent skip, so watching it obey reads as a rule and not as a hang. WHAT IT DOESN'T TOUCH, on purpose: blocking (the card forbids attacking, not defending \u2014 resolveCombat and initiateDefense are untouched), summoning, and building. The revealer still plays a whole normal turn; only the strike is gone. Like Unstoppable Force and unlike Freeze, nothing about the turn's shape changes, so the ban has to expire on its own: trucePlayer clears in finishTurn beside the other per-turn state, and in resetGameToStart and the Dev Log sim reset so one preset can't contaminate the next. Sim preset puts every route to an attack on one board \u2014 Cravus (instant) and Ichor (past its sickness) in the zone, Rush and Tele Control in hand, Vulcanem to prove summoning still works. The Spark is seeded into the hand rather than bought: dropping a Spark on the Abyss IS the play gesture (placeCard fires resolveSparkEffect), and with both sets active the S3 pile shows Unity's Threat on top anyway. VERIFIED LIVE, vs Computer, all six paths. Clicking Cravus and clicking Ichor each said \"Truce \u2014 your Creatures can't attack this turn.\" and left the attack menu shut. Rush refused with its own message and was still in hand afterwards. Tele Control, with two of my own Creatures standing in the zone, skipped the chooser entirely and went straight to 'Attack Which Player?' \u2014 only the Computer's Ichor was ever a target \u2014 and aiming it at Player 2 struck P2 with their own Creature, so a borrowed Creature really does still attack. Summoning Vulcanem into the middle slot worked untouched. Ending the turn, the Computer attacked me normally with BLOCK and PLAY ARTIFACT both live (the ban is the revealer's alone), and on my next turn clicking Cravus opened the attack menu with no alert \u2014 the flag dies with its turn. Then the mirror case, by handing the Computer the empty Future Pile instead: it revealed Truce, the overlay read 'The Computer's Creatures cannot attack this turn.', the feed logged 'Truce: its Creatures can't attack this turn', and its Ichor never swung \u2014 no defense screen came up for me at all. No console errors. Destiny progress panel now reads 6/24, next 030 Voider." },
@@ -8022,9 +8041,14 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
-    // A message the player has to acknowledge before the reveal moves on.
+    // A message the player has to acknowledge before the reveal moves on — unless the card
+    // just ended the game. A Destiny card CAN be lethal (Eternal Hour, Sacrifice), and the
+    // victory screen draws over this one: waiting for a CONTINUE nobody can see would leave
+    // a live modal parked behind it. When the game is won the line still shows, but the
+    // reveal walks straight out and lets the victory screen have the board.
     async function destinyNotice(text, label = 'CONTINUE') {
         setDestinyPrompt(text);
+        if (gameWon) return;
         await destinyButtons([{ label, value: true, primary: true }]);
         setDestinyPrompt('');
     }
@@ -8532,6 +8556,57 @@ document.addEventListener('DOMContentLoaded', () => {
             .map(x => x.i);
     }
 
+    // Spend Time Points off a seat the same way combat damage does — active die first,
+    // game-over check included — and float the number on the die that actually took it.
+    // The selector is read BEFORE the hit, or a die emptied by this very loss would send
+    // the float to the other one.
+    function destinyLoseTimePoints(pNum, amount) {
+        const board = document.getElementById(`player-${pNum}`);
+        const dieEl = board && board.querySelector(activeDieSel(pNum));
+        const before = totalTimePoints(pNum);
+        resolveDamageDirectly(amount, pNum);
+        const lost = before - totalTimePoints(pNum);
+        if (dieEl && lost > 0) floatValue(dieEl, `-${lost} TP`, 'damage');
+        return lost;
+    }
+
+    // Seat names as one readable phrase: "Player 1", "Player 1 and The Computer",
+    // "Player 1, Player 3 and Player 4".
+    function seatList(seats) {
+        const names = seats.map(p => (vsComputer && p === AI_PLAYER) ? 'The Computer' : `Player ${p}`);
+        if (names.length <= 1) return names[0] || '';
+        return `${names.slice(0, -1).join(', ')} and ${names[names.length - 1]}`;
+    }
+
+    // 032 Eternal Hour — "All Players tied for most Time Points lose 4." A leader tax, and
+    // the first Destiny card that hits without asking anyone anything.
+    //
+    // "Tied for most" is read the plain way: whoever is on the highest total takes 4, and if
+    // several share that total they ALL take it — one player alone at the top is still the
+    // most, so at 2 players a clear leader is hit by themselves. The set is snapshotted
+    // BEFORE any damage lands, so the four coming off the first seat can't drop them out of
+    // the tie and spare the second: it resolves simultaneously, as printed.
+    //
+    // The loss goes through resolveDamageDirectly, the same path combat damage uses, so the
+    // Day-die-first rule, a die lost at 0 and the game-over check all apply for free — this
+    // card can end a game.
+    async function resolveEternalHour(card, revealer) {
+        const seats = seatsClockwise(revealer);
+        const totals = seats.map(p => totalTimePoints(p));
+        const most = Math.max(...totals);
+        const hit = seats.filter((p, i) => totals[i] === most);
+
+        hit.forEach(p => destinyLoseTimePoints(p, 4));
+
+        const who = seatList(hit);
+        // Logged before the notice, so the feed line lands with the damage rather than
+        // whenever the player gets round to clicking CONTINUE.
+        if (vsComputer) aiLog(`Eternal Hour: ${who} lose${hit.length > 1 ? '' : 's'} 4 TP`, 'combat');
+        await destinyNotice(hit.length > 1
+            ? `${who} are tied on ${most} Time Points — each loses 4.`
+            : `${who} leads on ${most} Time Points and loses 4.`);
+    }
+
     const destinyEffects = {
         'Healing Tree': resolveHealingTree,
         'Freeze': resolveFreeze,
@@ -8541,6 +8616,7 @@ document.addEventListener('DOMContentLoaded', () => {
         'Truce': resolveTruce,
         'Voider': resolveVoider,
         'Space Voider': resolveSpaceVoider,
+        'Eternal Hour': resolveEternalHour,
     };
 
     // ==================== COMPUTER OPPONENT ====================
