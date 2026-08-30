@@ -285,7 +285,7 @@ document.addEventListener('DOMContentLoaded', () => {
         };
     }
 
-    const implementedCards = ["Pandorama", "Fountain of Youth", "Laser Catalyst", "Dragura's Wasteland", "Planetarium", "Lethargo's Temple", "Clone Factory", "Aetherlab", "Entrophy", "Meridius", "Meridia", "Time Thief", "Ichor", "Vulcanem", "Cravus", "Rampadon", "Smoke", "Dark Matter", "Reflector", "Talisman", "Reversal", "Faith", "Threat", "Confiscation", "Gravitas", "Time Bender", "Meridia's Cabin", "Repo Station", "Hand of Rhone", "Atlantica", "Hyperscope", "Mines of Pyralos", "Chrona", "Razo", "Looper", "Masiota", "Aromeas", "General Wave", "Namandi", "Sea Lord", "Sleep Potion", "Lotus", "Rush", "Cell Shield", "Alchemy", "Tame Beast", "Tele Control", "Burden of Wealth", "Healing Tree", "Freeze", "Chrono Machine", "Dragon Throne", "Unstoppable Force", "Truce", "Voider", "Space Voider", "Eternal Hour", "Great Flood", "Laser Bomb", "Daredevil's Reward", "Lethargo's Approach", "Sacrifice", "Break of Dawn", "Sandstorm", "Wormhole", "Dragura's Command", "Rula's Support", "Contermination", "Noctura's Night", "Sunken City", "Kyro's Destiny"];
+    const implementedCards = ["Pandorama", "Fountain of Youth", "Laser Catalyst", "Dragura's Wasteland", "Planetarium", "Lethargo's Temple", "Clone Factory", "Aetherlab", "Entrophy", "Meridius", "Meridia", "Time Thief", "Ichor", "Vulcanem", "Cravus", "Rampadon", "Smoke", "Dark Matter", "Reflector", "Talisman", "Reversal", "Faith", "Threat", "Confiscation", "Gravitas", "Time Bender", "Meridia's Cabin", "Repo Station", "Hand of Rhone", "Atlantica", "Hyperscope", "Mines of Pyralos", "Chrona", "Razo", "Looper", "Masiota", "Aromeas", "General Wave", "Namandi", "Sea Lord", "Sleep Potion", "Lotus", "Rush", "Cell Shield", "Alchemy", "Tame Beast", "Tele Control", "Burden of Wealth", "Healing Tree", "Freeze", "Chrono Machine", "Dragon Throne", "Unstoppable Force", "Truce", "Voider", "Space Voider", "Eternal Hour", "Great Flood", "Laser Bomb", "Daredevil's Reward", "Lethargo's Approach", "Sacrifice", "Break of Dawn", "Sandstorm", "Wormhole", "Dragura's Command", "Rula's Support", "Contermination", "Noctura's Night", "Sunken City", "Kyro's Destiny", "Meridia's Revenge"];
 
     // --- Intent Classification ---
     // auto: fires on its own when condition is met
@@ -364,6 +364,7 @@ document.addEventListener('DOMContentLoaded', () => {
         "Noctura's Night": 'auto',
         'Sunken City': 'auto',
         "Kyro's Destiny": 'auto',
+        "Meridia's Revenge": 'auto',
     };
 
     // --- Simulation Presets ---
@@ -899,6 +900,22 @@ document.addEventListener('DOMContentLoaded', () => {
             p1history: ['FireSteam', 'GoldSteam'],
             p2hand: ['Ichor', 'Cravus', 'LaserSteam'],
         },
+        "Meridia's Revenge": {
+            phase: 0,
+            // The Computer's History Pile is deliberately mixed: three Artifacts (Smoke,
+            // Reflector and a Lotus, which is an Artifact even though it lives in the
+            // Creature Zone) among Steam and a Creature, so the count has to discriminate
+            // rather than just measure the pile. Its Day die sits at 5 so the 3 damage
+            // takes it to 2 without ending the game.
+            p2day: 5,
+            p2night: 12,
+            desc: "Player 1's Future Pile is empty — the turn start reveals Meridia's Revenge. With only one opponent no question is asked: the Computer is struck for 1 damage per ARTIFACT in its History Pile. Its pile holds Smoke, Reflector and a Lotus among Steam and a Cravus, so the answer is 3 — not 6 — and its Day die should go 5 → 2. Nothing may respond; a Destiny card resolves inside its own overlay, so no Artifact window ever opens.",
+            destiny: "Meridia's Revenge",
+            hand: ['FireSteam', 'GoldSteam'],
+            p1future: [],
+            p1history: ['FireSteam', 'GoldSteam'],
+            p2history: ['FireSteam', 'Smoke', 'Cravus', 'Reflector', 'GoldSteam', 'Lotus'],
+        },
         'Hand of Rhone': {
             phase: 1,
             day: 9,
@@ -999,6 +1016,7 @@ document.addEventListener('DOMContentLoaded', () => {
     };
 
     const devLogData = [
+        { date: '2026-08-30', msg: "Destiny 048 Meridia's Revenge \u2014 implemented (auto). UNITY DESTINY IS COMPLETE: 24/24. 'Deal 1 Damage to a Target Player for each Artifact in their History Pile. Artifacts can't be used in response.' A punishment aimed squarely at the deck that leans on Artifacts \u2014 Meridia's Cabin and Meridia herself both COUNT Artifacts in History for a bonus, and this card charges you for the same pile. The count discriminates by type rather than measuring the pile, which matters because a Lotus is an Artifact even though it lives in the Creature Zone. 'Artifacts can't be used in response' is satisfied BY CONSTRUCTION rather than by a ban: a Destiny card resolves inside its own overlay and there is no response window for Talisman or anything else to open in. Written down in the code so nobody later adds one. TARGETING: opponents only, via destinyChooseOpponent \u2014 the damage scales with the TARGET's own pile, so aiming it at yourself is self-harm with nothing to gain, and at 2 players no question is asked. (Flagged for Simon: Threat, Alchemy and Tele Control all deliberately DO let you target yourself; if 'a Target Player' should be literal here too it is a one-line swap.) Damage rides destinyLoseTimePoints, so Day-die-first, lost dice and the game-over check all apply. VERIFIED LIVE vs Computer, both branches. A six-card History holding Smoke, Reflector and a Lotus among Steam and a Cravus dealt exactly 3 \u2014 not 6 \u2014 taking the Computer's Day die 5 \u2192 2 with Player 1 untouched, and the notice named the three Artifacts it counted. A pile with no Artifacts at all read 'the revenge finds nothing' and dealt zero. WITH THIS THE SET CLOSES, and the Dev Log's own progress panel now reads 'Destiny cards 24 / 24 complete'. The dev-only deck refill turned ITSELF off at the same moment, exactly as designed \u2014 destinySetComplete() is now true, so an exhausted Destiny deck no longer reshuffles the Destiny Abyss back in and the shipped rule (the deck is finite, and runs out) takes over with no flag to remember. The progress panel's explanatory note about the refill has disappeared from the UI on its own. No console errors." },
         { date: '2026-08-30', msg: "Destiny 046 Kyro's Destiny \u2014 implemented (auto), 23/24. 'Play a Spark Card of your choice from the Bazaar.' One free Spark for the revealer, played immediately \u2014 mandatory, so destinyPickOneTile. 'Of your choice from the Bazaar' is the choice the Bazaar actually offers: the top card of each Spark pile, the same four cards you could buy, with closed piles (Contermination) and empty ones left out. Playing routes through grantCardToPlayer's Spark branch, so the card lands in the Abyss and its effect is DEFERRED to the follow-up queue \u2014 a Spark that opens its own targeting UI must not do it behind the Destiny screen. V1 LIMITATION, stated rather than faked. The Computer does not play Sparks: their effects are written around a human caster and most of them open a picker nobody would drive. So when the COMPUTER reveals this, aiSparkValue ranks what it can safely resolve \u2014 Faith always (a card and 3 Time Points), Reversal only when its History Pile holds EXACTLY one card, everything else zero \u2014 and if nothing scores it plays nothing and says so in the notice. It never quietly burns a Bazaar card for no effect. That ranking is the second version: the first merely PERMITTED a Spark rather than ranking it, and the live test caught the Computer choosing Reversal on an EMPTY History \u2014 legal, resolvable, and completely pointless \u2014 while Faith sat next to it. Permitting is not the same as choosing well. VERIFIED LIVE vs Computer, both directions. Human revealer: the picker fanned Reversal / Faith / Threat / Confiscation; choosing Faith dropped S2 from 6 to 5 LEFT, put Faith in the Abyss and did NOTHING else while the overlay was open \u2014 then, once it closed, the Spark resolved on the visible board: Day 8 \u2192 11 and a card drawn off a History Pile that reshuffled to feed it. Computer revealer (its own Future Pile emptied): with the ranking in place it played FAITH, Day 6 \u2192 9, Faith to the Abyss, and no picker opened at any point. No console errors. Destiny progress panel now reads 23/24, next 048 Meridia's Revenge \u2014 the last one." },
         { date: '2026-08-30', msg: "Destiny 045 Sunken City \u2014 implemented (auto), 22/24. 'Each Player may take 1 Card from their History Pile to their Hand.' Reversal (S1) handed to the whole table at once, and a real 'may' \u2014 any seat can raise one card or walk away, clockwise from the revealer. Built entirely out of parts already in place: the pile picker from Voider (destinyPickTiles with max: 1, so a second tile simply doesn't take), writeStackPile for the pile's face afterwards, and the temporary-hand-slot pattern Reversal, Confiscation and Dragon Throne all use when a hand is already full \u2014 the card still arrives and the End Phase limit settles it. To the HAND regardless of type, which is Reversal's precedent: a Landmark dug out of History comes to hand and is built later, it does not leap into the zone. COMPUTER: raises the best card it can actually use \u2014 most expensive first, no Artifacts and no Sparks, since in V1 it plays neither and one in hand is dead weight. It declines outright when its hand is already at the limit, because a card taken over the limit is only discarded again in its own End Phase. VERIFIED LIVE vs Computer, all three branches. The picker fanned Player 1's four History cards; selecting Vulcanem and then clicking a second tile left the second one unselected (the cap holding), and confirming moved Vulcanem into hand while History dropped to three with its face correctly becoming the new top card (GoldSteam). The Computer, offered Smoke / Cravus / Faith, raised the CRAVUS and left both the Artifact and the Spark behind. A re-run with DECLINE left Player 1's four-card pile and two-card hand completely untouched. No console errors. Destiny progress panel now reads 22/24, next 046 Kyro's Destiny." },
         { date: '2026-08-30', msg: "Destiny 044 Noctura's Night \u2014 implemented (auto), 21/24. 'Each Player removes their Day Die.' The game's own endgame rule, forced early: normally the orange Day die is removed when it empties at 12 Time Points and that player is capped at 12 for the rest of the game. This does it to everyone at once, and whatever was still ON the Day die goes with it \u2014 that is what removing a die means. It costs whoever is furthest ahead the most, which is the whole point of the card. It deliberately does NOT go through destinyLoseTimePoints. That helper routes damage to the ACTIVE die, and under Time Bender the active die may be the Night one \u2014 this card names the Day die specifically, so it sets it to 0 directly. Everything downstream then works without any further wiring, because activeDieType() already falls back to the other die when the preferred one is gone: gains, damage and floats all land on the Night die from here. A player whose Day die is already gone is simply untouched. FLAGGED FOR SIMON: a player whose NIGHT die is already gone and who is living on the Day die alone is ELIMINATED by this. That is the literal reading and the game-over check fires correctly, but it makes Noctura a kill card in a way the text does not advertise. One line to guard if it should never be lethal. VERIFIED LIVE vs Computer, all three branches. Normal: Player 1 on a full 24 and the Computer on 17 both dropped to exactly 12, with both orange dice vanishing and the notice reporting the unequal cost ('Player 1 loses 12 \u00b7 The Computer loses 5'). Already-gone: a Computer whose Day die was already removed read 'had none left' and lost nothing while Player 1 still paid 12. Lethal: Player 1 living on a Day die of 3 with no Night die was wiped out \u2014 COMPUTER WON, with the Destiny overlay closing itself behind the victory screen. No console errors. Destiny progress panel now reads 21/24, next 045 Sunken City." },
@@ -9817,6 +9835,46 @@ document.addEventListener('DOMContentLoaded', () => {
         await destinyNotice(`${who} plays ${spark.name} for free — it resolves as soon as this closes.`);
     }
 
+    // 048 Meridia's Revenge — "Deal 1 Damage to a Target Player for each Artifact in their
+    // History Pile. Artifacts can't be used in response." The last Destiny card, and a
+    // punishment aimed at exactly the deck that leans on Artifacts: the more of them you
+    // have cycling, the harder it lands. Meridia's Cabin and Meridia herself both COUNT
+    // Artifacts in History for a bonus — this card charges you for the same pile.
+    //
+    // "Artifacts can't be used in response" is satisfied by construction rather than by a
+    // ban: a Destiny card resolves inside its own overlay, with no response window for
+    // Talisman or anything else to open in. Worth stating so nobody later adds one.
+    //
+    // TARGETING: destinyChooseOpponent, so opponents only — the damage scales with the
+    // TARGET's own pile, so aiming it at yourself is pure self-harm with nothing to gain.
+    // (Flagged for Simon: Threat, Alchemy and Tele Control all deliberately let you target
+    // yourself. If "a Target Player" should be literal here too, it is a one-line swap.)
+    // At 2 players there is exactly one opponent, so no question is asked.
+    async function resolveMeridiasRevenge(card, revealer) {
+        const target = await destinyChooseOpponent(revealer, "Meridia's Revenge — which player pays?");
+        if (!target) { await destinyNotice('There is no opponent to strike.'); return; }
+
+        const board = document.getElementById(`player-${target}`);
+        let history = [];
+        try { history = JSON.parse(board?.querySelector('.history-pile')?.dataset.cardData || '[]'); } catch (e) { history = []; }
+        if (!Array.isArray(history)) history = [history];
+        const artifacts = history.filter(c => c && c.type === 'Artifact');
+
+        const name = (vsComputer && target === AI_PLAYER) ? 'The Computer' : `Player ${target}`;
+        if (!artifacts.length) {
+            await destinyNotice(`${name} has no Artifacts in their History Pile — the revenge finds nothing.`);
+            return;
+        }
+
+        const dealt = destinyLoseTimePoints(target, artifacts.length);
+        if (vsComputer) aiLog(`Meridia's Revenge: ${name} takes ${dealt} damage`, 'combat');
+        await destinyNotice(
+            `${artifacts.length} Artifact${artifacts.length === 1 ? '' : 's'} in ${name}'s History Pile ` +
+            `(${artifacts.map(c => c.name).join(', ')}) — ${dealt} damage, no Artifact response. ` +
+            `${totalTimePoints(target)} Time Points remaining.`
+        );
+    }
+
     const destinyEffects = {
         'Healing Tree': resolveHealingTree,
         'Freeze': resolveFreeze,
@@ -9841,6 +9899,7 @@ document.addEventListener('DOMContentLoaded', () => {
         "Noctura's Night": resolveNocturasNight,
         'Sunken City': resolveSunkenCity,
         "Kyro's Destiny": resolveKyrosDestiny,
+        "Meridia's Revenge": resolveMeridiasRevenge,
     };
 
     // ==================== COMPUTER OPPONENT ====================
