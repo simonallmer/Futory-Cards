@@ -3717,6 +3717,18 @@ body.mobile-mode .rules-book-panel {
 }
 .destiny-picker:empty { display: none; }
 
+/* Contermination (Destiny 043): a Bazaar pile turned face down and closed for good.
+   Reads as shut rather than merely unaffordable — desaturated, no hover lift. */
+.bazaar-area .card.bazaar-closed {
+  filter: grayscale(0.6) brightness(0.55);
+  cursor: default;
+}
+.bazaar-area .card.bazaar-closed:hover { transform: none; }
+.bazaar-area .card.bazaar-closed .rarity-indicator {
+  background: rgba(120, 20, 20, 0.85);
+  color: #ffd9d9;
+}
+
 /* Futory die rolled inside the overlay (Sacrifice, Break of Dawn). Reuses the
    Entrophy pip face at the size the Looper roll shows it. */
 .destiny-die {

@@ -285,7 +285,7 @@ document.addEventListener('DOMContentLoaded', () => {
         };
     }
 
-    const implementedCards = ["Pandorama", "Fountain of Youth", "Laser Catalyst", "Dragura's Wasteland", "Planetarium", "Lethargo's Temple", "Clone Factory", "Aetherlab", "Entrophy", "Meridius", "Meridia", "Time Thief", "Ichor", "Vulcanem", "Cravus", "Rampadon", "Smoke", "Dark Matter", "Reflector", "Talisman", "Reversal", "Faith", "Threat", "Confiscation", "Gravitas", "Time Bender", "Meridia's Cabin", "Repo Station", "Hand of Rhone", "Atlantica", "Hyperscope", "Mines of Pyralos", "Chrona", "Razo", "Looper", "Masiota", "Aromeas", "General Wave", "Namandi", "Sea Lord", "Sleep Potion", "Lotus", "Rush", "Cell Shield", "Alchemy", "Tame Beast", "Tele Control", "Burden of Wealth", "Healing Tree", "Freeze", "Chrono Machine", "Dragon Throne", "Unstoppable Force", "Truce", "Voider", "Space Voider", "Eternal Hour", "Great Flood", "Laser Bomb", "Daredevil's Reward", "Lethargo's Approach", "Sacrifice", "Break of Dawn", "Sandstorm", "Wormhole", "Dragura's Command", "Rula's Support"];
+    const implementedCards = ["Pandorama", "Fountain of Youth", "Laser Catalyst", "Dragura's Wasteland", "Planetarium", "Lethargo's Temple", "Clone Factory", "Aetherlab", "Entrophy", "Meridius", "Meridia", "Time Thief", "Ichor", "Vulcanem", "Cravus", "Rampadon", "Smoke", "Dark Matter", "Reflector", "Talisman", "Reversal", "Faith", "Threat", "Confiscation", "Gravitas", "Time Bender", "Meridia's Cabin", "Repo Station", "Hand of Rhone", "Atlantica", "Hyperscope", "Mines of Pyralos", "Chrona", "Razo", "Looper", "Masiota", "Aromeas", "General Wave", "Namandi", "Sea Lord", "Sleep Potion", "Lotus", "Rush", "Cell Shield", "Alchemy", "Tame Beast", "Tele Control", "Burden of Wealth", "Healing Tree", "Freeze", "Chrono Machine", "Dragon Throne", "Unstoppable Force", "Truce", "Voider", "Space Voider", "Eternal Hour", "Great Flood", "Laser Bomb", "Daredevil's Reward", "Lethargo's Approach", "Sacrifice", "Break of Dawn", "Sandstorm", "Wormhole", "Dragura's Command", "Rula's Support", "Contermination"];
 
     // --- Intent Classification ---
     // auto: fires on its own when condition is met
@@ -360,6 +360,7 @@ document.addEventListener('DOMContentLoaded', () => {
         'Wormhole': 'auto',
         "Dragura's Command": 'auto',
         "Rula's Support": 'auto',
+        'Contermination': 'auto',
     };
 
     // --- Simulation Presets ---
@@ -840,6 +841,17 @@ document.addEventListener('DOMContentLoaded', () => {
             p2hand: ['FireSteam'],
             p2future: ['Cravus', 'GoldSteam'],
         },
+        'Contermination': {
+            phase: 0,
+            // Steam in hand so the Construction Phase can actually try to buy afterwards —
+            // the point of the test is that the closed pile refuses while its neighbours
+            // still work.
+            desc: "Player 1's Future Pile is empty — the turn start reveals Contermination. Every non-Steam Bazaar pile fans out (no Steam columns, no Destiny deck) and you MUST turn one over — one click is the answer. That pile flips to a card back reading 'N CLOSED': in the Construction Phase it should stay dark and refuse a buy, clicking it should say it is closed rather than listing its cards, and the Computer should never buy from it again. Every other pile keeps working normally, and the closed one stays closed for the rest of the game.",
+            destiny: 'Contermination',
+            hand: ['FireSteam', 'FireSteam', 'GoldSteam', 'GoldSteam'],
+            p1future: [],
+            p1history: ['FireSteam', 'GoldSteam'],
+        },
         'Hand of Rhone': {
             phase: 1,
             day: 9,
@@ -940,6 +952,7 @@ document.addEventListener('DOMContentLoaded', () => {
     };
 
     const devLogData = [
+        { date: '2026-08-30', msg: "Destiny 043 Contermination \u2014 implemented (auto), 20/24. 'Turn over a Non-Steam Pile from the Bazaar to make it inaccessible for purchases.' The only Destiny card that changes the SHOP rather than the boards, and the only one whose effect outlives its own reveal \u2014 not because a rule lingers, but because turning the pile over IS the effect. It stays turned over for the rest of the game. Nothing is destroyed: the cards are still in there, just shut away. 'Non-Steam Pile from the Bazaar' lines up exactly with Simon's definition of the Bazaar (the Non-Steam, Non-Destiny cards), so the picker offers all 24 non-Steam locations and nothing else \u2014 no Steam columns, no Destiny deck, no Abyss. The revealer chooses, the way 'You lose Time Points' makes Sacrifice the revealer's; it is mandatory, so destinyPickOneTile again. Empty piles are not offered (closing one would be no effect at all) and a pile already turned over can't be picked twice. CLOSED HAS TO MEAN CLOSED IN FIVE PLACES, which is most of the work: closedBazaarPiles (a Set of location codes, cleared with the inventory) is consulted by renderBazaar (the pile flips to a card back reading 'N CLOSED', greyed by new .bazaar-closed CSS), updateBazaarLighting (permanently 'unavailable', so it never lights up as affordable), the Bazaar click handler (refused with a message rather than opening its stack list \u2014 listing the cards would hand back exactly the information the card took away), aiConstructionCandidates (the Computer's buy list skips it), and bazaarStockByName (so Daredevil's Reward cannot reach into a closed pile either). The notice names the pile by LOCATION plus the card on top rather than pluralising a card name \u2014 with both sets active a pile holds two different cards, so '6 Cravuss' would have been wrong twice over. VERIFIED LIVE vs Computer: the picker fanned exactly 24 tiles with no Steam or Destiny among them; turning over C2 flipped it to a card back reading '6 CLOSED'. In the Construction Phase it stayed dark and clicking it said 'This pile has been turned over' instead of grabbing or listing, while its neighbour C1 bought an Ichor normally (6 \u2192 5 LEFT) \u2014 only the closed pile is affected. The Computer then played a full turn alongside it without trouble (bought FireSteam, bought and summoned Entrophy from C3, drew 2) and C2 was still shut afterwards. NOTE: that AI turn shows the closed pile does not disturb it, but it is not proof it would otherwise have chosen C2 \u2014 the exclusion itself is the same one-line isPileClosed gate that the human path proves live. No console errors. Destiny progress panel now reads 20/24, next 044 Noctura's Night." },
         { date: '2026-08-30', msg: "Destiny 042 Rula's Support \u2014 implemented (auto), 19/24. 'Each Player draws 1 Card.' Dragura's Command inverted and the gentlest card in the set: no choices, no targets, one card each. Deferred to the follow-up queue like Wormhole's draws, for the same reason \u2014 the deal animation belongs on the visible board, not behind the Destiny backdrop \u2014 and drawCards does everything else on its own. The sim preset is built so the two seats take DIFFERENT routes to the same draw: your Future Pile is empty (that is what summoned Destiny in the first place), so your draw has to fold your History back into a new deck first, while the Computer's pile is stocked and it simply takes the top card. VERIFIED LIVE vs Computer: on CONTINUE the overlay closed and both draws played out on the board \u2014 Player 1's History (GoldSteam / Meridia / LaserSteam) reshuffled with MERIDIA EXILED TO THE ABYSS rather than dealt, leaving a 2-card deck and LaserSteam in hand, while the Computer took GoldSteam off its own pile. That reshuffle also confirmed the exileToAbyss fix from Wormhole working through the ordinary draw path: Meridia now actually appears in the Abyss list. No console errors." },
         { date: '2026-08-30', msg: "Destiny 041 Dragura's Command \u2014 implemented (auto), 18/24. 'Each Player discards 1 Card from their Hand.' Mandatory and universal, clockwise from the revealer, no decline \u2014 destinyPickOneTile again, the no-confirm/no-decline picker Great Flood introduced. A seat holding a single card is not asked (there is no choice to make), and an empty hand is simply passed over. The discard goes to that player's OWN History Pile, which is where this engine discards to, so the card cycles back into their deck rather than leaving the game. HAND ONLY: Atlantica-parked cards are deliberately not offered, the same line Healing Tree and Dark Matter already draw \u2014 parked cards are a resource, not hand count. To be able to actually TEST that line rather than assert it, sim presets gained a p1parked key: it seeds cards into the Atlantica row after the Landmarks are placed (so each has a live Landmark in front of it and syncAtlanticaZone doesn't discard them on sight). Every future card that has to respect the hand/parked distinction can now be checked instead of reasoned about. COMPUTER: gives up its cheapest card, the same price-as-proxy basis it uses for Healing Tree and Great Flood. VERIFIED LIVE vs Computer: with Atlantica in play and an Ichor parked behind it, the picker fanned exactly the four HAND cards and not the Ichor; choosing Vulcanem moved it to Player 1's History (hand 4 \u2192 3, parked row untouched), and the Computer's single Cravus resolved with no question asked. No console errors." },
         { date: '2026-08-30', msg: "Destiny 040 Wormhole \u2014 implemented (auto), 17/24. 'Each Player shuffles Creature Zone, Landmark Zone, Hand, History Pile and Future Pile to a new Future Pile. Then each Player draws 3 Cards.' The great levelling: every board on the table is swept flat and everyone starts again from three cards. The biggest single board operation in the set, and almost all of it is about ORDER and CLEANLINESS. ORDER: hand and Atlantica-parked cards are collected FIRST, because clearing Atlantica discards whatever is still parked behind a Landmark into a History Pile that is about to be wiped \u2014 sweep the Landmark Zone first and those cards are lost instead of shuffled. (Parked cards going in at all is Simon's 'extension of the hand' ruling doing its work.) A Creature riding a Lotus pad contributes BOTH cards from one slot. Meridia is exiled to the Abyss rather than shuffled back \u2014 the rule the End-Phase fold and Sea Lord already apply; she never survives becoming deck again. CLEANLINESS: everything is passed through a new stripInPlayState() on the way in, so damage, summoning stamps, a face-down flip, a Chrona split, a Masiota rescue history and Hyperscope turn damage all come off. A card that goes into a deck has to come back out as printed \u2014 otherwise a Vulcanem that was on 4 HP returns to your hand still wounded, and a Landmark buried by Sandstorm gets drawn face down, which the engine has no concept of. The DRAWS are deferred to the follow-up queue (the one Daredevil's Reward introduced): the deal animation belongs on the visible board, not behind the Destiny backdrop, so the overlay announces the sweep and the three cards land in front of the players once it closes. Gravitas deliberately does NOT fire on this shuffle \u2014 it is swept into the pile by the same effect, so findLandmark can't see it, which falls out of the existing code for free and is the right reading. BUG FOUND AND FIXED ALONG THE WAY, and it was already in the game: both existing Meridia-exile sites wrote her into activeBazaar['AB'], but the Abyss is NOT a Bazaar sale pile \u2014 renderBazaar reads its cards from the slot element's own dataset. So an exiled Meridia was being removed from the deck correctly and then vanishing silently instead of appearing in the public 'Abyss \u2014 Out of Game' list. All three sites (the End-Phase fold, Sea Lord, and this card) now go through one exileToAbyss() helper that places her the same way Threat and Mines of Pyralos place theirs. Caught only because the Wormhole sim showed an empty Abyss next to a notice that said she had been exiled. VERIFIED LIVE vs Computer. Both boards \u2014 3 hand cards, 2 Landmarks including Atlantica, a damaged Vulcanem, an Ichor on a Lotus pad, and a 3-card History against the Computer's hand, Landmark, Creature, Future and History \u2014 went completely bare, and the new decks came out at exactly 10 and 7 cards (P1: 3 hand + 2 Landmarks + 3 from the two Creature slots + 2 of 3 History). Meridia was not among them and now reads '1 IN ABYSS' in the Bazaar. The drawn Vulcanem carried none of its in-play fields. On CONTINUE both players drew 3 from their own new decks (10 \u2192 7 and 7 \u2192 4) and Player 1's Pandorama came off the top and REBUILT ITSELF straight into the empty Landmark Zone \u2014 the Hyperscope rebuild rule reassembling a board that Wormhole had just flattened. No console errors. Destiny progress panel now reads 17/24, next 041 Dragura's Command." },
@@ -2957,8 +2970,18 @@ document.addEventListener('DOMContentLoaded', () => {
     let selectedSets = ['Unity'];
     let activeBazaar = {};
 
+    // Bazaar piles turned face down and closed to purchases (Destiny 043 Contermination).
+    // Location codes, e.g. 'C3'. A closed pile keeps its cards — it is shut, not emptied —
+    // and stays shut for the rest of the game, so this is cleared only on a new inventory.
+    const closedBazaarPiles = new Set();
+
+    function isPileClosed(loc) {
+        return closedBazaarPiles.has(loc);
+    }
+
     function initBazaarInventory() {
         activeBazaar = {};
+        closedBazaarPiles.clear();
         cardData.forEach(card => {
             // Destiny: only cards whose effect is actually wired up enter the live
             // deck, so a playtest never flips a blank. This filter quietly becomes a
@@ -3027,6 +3050,23 @@ document.addEventListener('DOMContentLoaded', () => {
 
             // Clean up old stack visuals (Undoing previous stack thing)
             card.querySelectorAll('.card-stack-layer').forEach(e => e.remove());
+
+            // A Conterminated pile is turned OVER: its cards are still there, but nobody
+            // may see or buy them, so it renders as a card back with a CLOSED count.
+            card.classList.toggle('bazaar-closed', isPileClosed(loc));
+            if (isPileClosed(loc)) {
+                card.classList.remove('empty-pile');
+                card.querySelectorAll('.rarity-indicator').forEach(e => e.remove());
+                card.style.backgroundImage = "url('assets/card_back.png')";
+                card.style.backgroundColor = 'transparent';
+                card.style.border = 'none';
+                card.textContent = '';
+                const indicator = document.createElement('div');
+                indicator.className = 'rarity-indicator tech-font';
+                indicator.innerHTML = `<span class="count-value">${availableCards.length}</span><span class="count-label"> CLOSED</span>`;
+                card.appendChild(indicator);
+                return;
+            }
 
             if (availableCards.length === 0) {
                 card.classList.add('empty-pile');
@@ -3162,6 +3202,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
             const loc = cardContainer.dataset.loc;
             if (!loc) return;
+            if (isPileClosed(loc)) { cardContainer.classList.add('unavailable'); return; }
             const availableCards = (activeBazaar[loc] || []).filter(c => selectedSets.includes(c.set));
             if (availableCards.length === 0) {
                 cardContainer.classList.remove('unavailable');
@@ -3244,6 +3285,12 @@ document.addEventListener('DOMContentLoaded', () => {
                     cancelGrab();
                 }
                 return;
+            }
+
+            // Turned over by Contermination: not buyable, and not readable either — the pile
+            // is face down, so listing it would hand out information the card took away.
+            if (isPileClosed(loc)) {
+                if (!devMode) { alert('This pile has been turned over — it is closed for the rest of the game.'); return; }
             }
 
             // Abyss: shared, view-only zone (removed from the game entirely). Any player can
@@ -9050,6 +9097,7 @@ document.addEventListener('DOMContentLoaded', () => {
     function bazaarStockByName(name) {
         for (const loc of Object.keys(activeBazaar)) {
             if (loc === 'D' || loc === 'DA' || loc === 'AB' || loc.startsWith('ST')) continue;
+            if (isPileClosed(loc)) continue; // turned over — nothing can be taken from it
             const found = (activeBazaar[loc] || []).find(c => c.name === name && selectedSets.includes(c.set));
             if (found) return { loc, card: found };
         }
@@ -9474,6 +9522,67 @@ document.addEventListener('DOMContentLoaded', () => {
         await destinyNotice('Every player draws 1 card once this closes.');
     }
 
+    // 043 Contermination — "Turn over a Non-Steam Pile from the Bazaar to make it
+    // inaccessible for purchases." The only Destiny card that changes the SHOP rather than
+    // the boards, and the only one whose effect outlives its reveal — the pile stays turned
+    // over for the rest of the game, because turning it over IS the effect, not a rule that
+    // lingers. Nothing is destroyed: the cards are still in there, just shut away.
+    //
+    // The revealer chooses, the way "You lose Time Points" makes Sacrifice the revealer's.
+    // "Non-Steam Pile from the Bazaar" lines up exactly with Simon's definition of the
+    // Bazaar (the Non-Steam, Non-Destiny cards), so the Steam columns, the Destiny deck,
+    // its Abyss and the shared Abyss are all out of range. Empty piles are not offered —
+    // closing one would be no effect at all — and a pile already turned over can't be
+    // picked twice.
+    //
+    // A closed pile is face down everywhere it matters: unbuyable (updateBazaarLighting),
+    // unreadable (the click is refused rather than opening its stack list, which would hand
+    // back the information the card took away), invisible to Daredevil's Reward, and skipped
+    // by the Computer's buy list.
+    async function resolveContermination(card, revealer) {
+        const entries = Object.keys(activeBazaar)
+            .filter(loc => !(loc === 'D' || loc === 'DA' || loc === 'AB' || loc.startsWith('ST')))
+            .filter(loc => !isPileClosed(loc))
+            .map(loc => {
+                const stock = (activeBazaar[loc] || []).filter(c => selectedSets.includes(c.set));
+                return stock.length ? { card: stock[stock.length - 1], value: loc, count: stock.length } : null;
+            })
+            .filter(Boolean)
+            .sort((a, b) => a.value.localeCompare(b.value));
+
+        if (!entries.length) {
+            await destinyNotice('Every Bazaar pile is already empty or closed — there is nothing left to turn over.');
+            return;
+        }
+
+        const who = (vsComputer && revealer === AI_PLAYER) ? 'The Computer' : `Player ${revealer}`;
+        const pickedLoc = (vsComputer && revealer === AI_PLAYER)
+            ? aiConterminationPick(entries)
+            : await destinyPickOneTile(entries, `Player ${revealer}: turn one Bazaar pile over. It is closed for the rest of the game.`);
+
+        const chosen = entries.find(e => e.value === pickedLoc) || entries[0];
+        closedBazaarPiles.add(chosen.value);
+        renderBazaar();
+        updateBazaarLighting();
+
+        if (vsComputer) aiLog(`Contermination: ${chosen.card.name} (${chosen.value}) closed`, 'system');
+        // Named by location plus the card on top, not by a pluralised card name: with both
+        // sets active a pile holds two different cards, so "6 Cravuss" would be wrong twice over.
+        await destinyNotice(
+            `${who} turns over the ${chosen.value} pile — ${chosen.count} card${chosen.count === 1 ? '' : 's'}, ` +
+            `${chosen.card.name} on top. Nobody can buy from it again.`
+        );
+    }
+
+    // The Computer shuts the pile it would least like aimed back at it: the most expensive
+    // Creature or Landmark on offer, since those are what actually win games. Failing that,
+    // whatever costs the most.
+    function aiConterminationPick(entries) {
+        const fighters = entries.filter(e => e.card.type === 'Creature' || e.card.type === 'Landmark');
+        const pool = fighters.length ? fighters : entries;
+        return pool.slice().sort((a, b) => cardCostValue(b.card) - cardCostValue(a.card))[0].value;
+    }
+
     const destinyEffects = {
         'Healing Tree': resolveHealingTree,
         'Freeze': resolveFreeze,
@@ -9494,6 +9603,7 @@ document.addEventListener('DOMContentLoaded', () => {
         'Wormhole': resolveWormhole,
         "Dragura's Command": resolveDraguraSCommand,
         "Rula's Support": resolveRulasSupport,
+        'Contermination': resolveContermination,
     };
 
     // ==================== COMPUTER OPPONENT ====================
@@ -9706,6 +9816,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const locs = ['L1','L2','L3','L4','L5','L6','L7','L8','C1','C2','C3','C4','C5','C6','C7','C8'];
         const list = [];
         for (const loc of locs) {
+            if (isPileClosed(loc)) continue; // Contermination: turned over, not for sale
             const card = bazaarTop(loc);
             if (!card) continue;
             if (card.type === 'Landmark' && (!hasEmptyLandmarkSlot || aiOwnsLandmark(card.name))) continue;
