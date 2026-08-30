@@ -285,7 +285,7 @@ document.addEventListener('DOMContentLoaded', () => {
         };
     }
 
-    const implementedCards = ["Pandorama", "Fountain of Youth", "Laser Catalyst", "Dragura's Wasteland", "Planetarium", "Lethargo's Temple", "Clone Factory", "Aetherlab", "Entrophy", "Meridius", "Meridia", "Time Thief", "Ichor", "Vulcanem", "Cravus", "Rampadon", "Smoke", "Dark Matter", "Reflector", "Talisman", "Reversal", "Faith", "Threat", "Confiscation", "Gravitas", "Time Bender", "Meridia's Cabin", "Repo Station", "Hand of Rhone", "Atlantica", "Hyperscope", "Mines of Pyralos", "Chrona", "Razo", "Looper", "Masiota", "Aromeas", "General Wave", "Namandi", "Sea Lord", "Sleep Potion", "Lotus", "Rush", "Cell Shield", "Alchemy", "Tame Beast", "Tele Control", "Burden of Wealth", "Healing Tree", "Freeze", "Chrono Machine", "Dragon Throne", "Unstoppable Force", "Truce", "Voider", "Space Voider", "Eternal Hour", "Great Flood", "Laser Bomb", "Daredevil's Reward", "Lethargo's Approach", "Sacrifice", "Break of Dawn", "Sandstorm", "Wormhole", "Dragura's Command", "Rula's Support", "Contermination"];
+    const implementedCards = ["Pandorama", "Fountain of Youth", "Laser Catalyst", "Dragura's Wasteland", "Planetarium", "Lethargo's Temple", "Clone Factory", "Aetherlab", "Entrophy", "Meridius", "Meridia", "Time Thief", "Ichor", "Vulcanem", "Cravus", "Rampadon", "Smoke", "Dark Matter", "Reflector", "Talisman", "Reversal", "Faith", "Threat", "Confiscation", "Gravitas", "Time Bender", "Meridia's Cabin", "Repo Station", "Hand of Rhone", "Atlantica", "Hyperscope", "Mines of Pyralos", "Chrona", "Razo", "Looper", "Masiota", "Aromeas", "General Wave", "Namandi", "Sea Lord", "Sleep Potion", "Lotus", "Rush", "Cell Shield", "Alchemy", "Tame Beast", "Tele Control", "Burden of Wealth", "Healing Tree", "Freeze", "Chrono Machine", "Dragon Throne", "Unstoppable Force", "Truce", "Voider", "Space Voider", "Eternal Hour", "Great Flood", "Laser Bomb", "Daredevil's Reward", "Lethargo's Approach", "Sacrifice", "Break of Dawn", "Sandstorm", "Wormhole", "Dragura's Command", "Rula's Support", "Contermination", "Noctura's Night"];
 
     // --- Intent Classification ---
     // auto: fires on its own when condition is met
@@ -361,6 +361,7 @@ document.addEventListener('DOMContentLoaded', () => {
         "Dragura's Command": 'auto',
         "Rula's Support": 'auto',
         'Contermination': 'auto',
+        "Noctura's Night": 'auto',
     };
 
     // --- Simulation Presets ---
@@ -852,6 +853,21 @@ document.addEventListener('DOMContentLoaded', () => {
             p1future: [],
             p1history: ['FireSteam', 'GoldSteam'],
         },
+        "Noctura's Night": {
+            phase: 0,
+            // Two different Day dice so the cost is visibly unequal: a full one for you (12
+            // Time Points gone in a stroke) against a nearly spent one for the Computer (5).
+            // The card is worst for whoever is furthest ahead.
+            day: 12,
+            night: 12,
+            p2day: 5,
+            p2night: 12,
+            desc: "Player 1's Future Pile is empty — the turn start reveals Noctura's Night. BOTH Day dice are removed at once and whatever was on them goes with them: you drop 24 → 12, the Computer 17 → 12. The orange die should vanish from both boards, and from here every gain and every hit lands on the Night die alone with 12 as the ceiling. A player whose Day die is already gone is simply untouched.",
+            destiny: "Noctura's Night",
+            hand: ['FireSteam', 'GoldSteam'],
+            p1future: [],
+            p1history: ['FireSteam', 'GoldSteam'],
+        },
         'Hand of Rhone': {
             phase: 1,
             day: 9,
@@ -952,6 +968,7 @@ document.addEventListener('DOMContentLoaded', () => {
     };
 
     const devLogData = [
+        { date: '2026-08-30', msg: "Destiny 044 Noctura's Night \u2014 implemented (auto), 21/24. 'Each Player removes their Day Die.' The game's own endgame rule, forced early: normally the orange Day die is removed when it empties at 12 Time Points and that player is capped at 12 for the rest of the game. This does it to everyone at once, and whatever was still ON the Day die goes with it \u2014 that is what removing a die means. It costs whoever is furthest ahead the most, which is the whole point of the card. It deliberately does NOT go through destinyLoseTimePoints. That helper routes damage to the ACTIVE die, and under Time Bender the active die may be the Night one \u2014 this card names the Day die specifically, so it sets it to 0 directly. Everything downstream then works without any further wiring, because activeDieType() already falls back to the other die when the preferred one is gone: gains, damage and floats all land on the Night die from here. A player whose Day die is already gone is simply untouched. FLAGGED FOR SIMON: a player whose NIGHT die is already gone and who is living on the Day die alone is ELIMINATED by this. That is the literal reading and the game-over check fires correctly, but it makes Noctura a kill card in a way the text does not advertise. One line to guard if it should never be lethal. VERIFIED LIVE vs Computer, all three branches. Normal: Player 1 on a full 24 and the Computer on 17 both dropped to exactly 12, with both orange dice vanishing and the notice reporting the unequal cost ('Player 1 loses 12 \u00b7 The Computer loses 5'). Already-gone: a Computer whose Day die was already removed read 'had none left' and lost nothing while Player 1 still paid 12. Lethal: Player 1 living on a Day die of 3 with no Night die was wiped out \u2014 COMPUTER WON, with the Destiny overlay closing itself behind the victory screen. No console errors. Destiny progress panel now reads 21/24, next 045 Sunken City." },
         { date: '2026-08-30', msg: "Destiny 043 Contermination \u2014 implemented (auto), 20/24. 'Turn over a Non-Steam Pile from the Bazaar to make it inaccessible for purchases.' The only Destiny card that changes the SHOP rather than the boards, and the only one whose effect outlives its own reveal \u2014 not because a rule lingers, but because turning the pile over IS the effect. It stays turned over for the rest of the game. Nothing is destroyed: the cards are still in there, just shut away. 'Non-Steam Pile from the Bazaar' lines up exactly with Simon's definition of the Bazaar (the Non-Steam, Non-Destiny cards), so the picker offers all 24 non-Steam locations and nothing else \u2014 no Steam columns, no Destiny deck, no Abyss. The revealer chooses, the way 'You lose Time Points' makes Sacrifice the revealer's; it is mandatory, so destinyPickOneTile again. Empty piles are not offered (closing one would be no effect at all) and a pile already turned over can't be picked twice. CLOSED HAS TO MEAN CLOSED IN FIVE PLACES, which is most of the work: closedBazaarPiles (a Set of location codes, cleared with the inventory) is consulted by renderBazaar (the pile flips to a card back reading 'N CLOSED', greyed by new .bazaar-closed CSS), updateBazaarLighting (permanently 'unavailable', so it never lights up as affordable), the Bazaar click handler (refused with a message rather than opening its stack list \u2014 listing the cards would hand back exactly the information the card took away), aiConstructionCandidates (the Computer's buy list skips it), and bazaarStockByName (so Daredevil's Reward cannot reach into a closed pile either). The notice names the pile by LOCATION plus the card on top rather than pluralising a card name \u2014 with both sets active a pile holds two different cards, so '6 Cravuss' would have been wrong twice over. VERIFIED LIVE vs Computer: the picker fanned exactly 24 tiles with no Steam or Destiny among them; turning over C2 flipped it to a card back reading '6 CLOSED'. In the Construction Phase it stayed dark and clicking it said 'This pile has been turned over' instead of grabbing or listing, while its neighbour C1 bought an Ichor normally (6 \u2192 5 LEFT) \u2014 only the closed pile is affected. The Computer then played a full turn alongside it without trouble (bought FireSteam, bought and summoned Entrophy from C3, drew 2) and C2 was still shut afterwards. NOTE: that AI turn shows the closed pile does not disturb it, but it is not proof it would otherwise have chosen C2 \u2014 the exclusion itself is the same one-line isPileClosed gate that the human path proves live. No console errors. Destiny progress panel now reads 20/24, next 044 Noctura's Night." },
         { date: '2026-08-30', msg: "Destiny 042 Rula's Support \u2014 implemented (auto), 19/24. 'Each Player draws 1 Card.' Dragura's Command inverted and the gentlest card in the set: no choices, no targets, one card each. Deferred to the follow-up queue like Wormhole's draws, for the same reason \u2014 the deal animation belongs on the visible board, not behind the Destiny backdrop \u2014 and drawCards does everything else on its own. The sim preset is built so the two seats take DIFFERENT routes to the same draw: your Future Pile is empty (that is what summoned Destiny in the first place), so your draw has to fold your History back into a new deck first, while the Computer's pile is stocked and it simply takes the top card. VERIFIED LIVE vs Computer: on CONTINUE the overlay closed and both draws played out on the board \u2014 Player 1's History (GoldSteam / Meridia / LaserSteam) reshuffled with MERIDIA EXILED TO THE ABYSS rather than dealt, leaving a 2-card deck and LaserSteam in hand, while the Computer took GoldSteam off its own pile. That reshuffle also confirmed the exileToAbyss fix from Wormhole working through the ordinary draw path: Meridia now actually appears in the Abyss list. No console errors." },
         { date: '2026-08-30', msg: "Destiny 041 Dragura's Command \u2014 implemented (auto), 18/24. 'Each Player discards 1 Card from their Hand.' Mandatory and universal, clockwise from the revealer, no decline \u2014 destinyPickOneTile again, the no-confirm/no-decline picker Great Flood introduced. A seat holding a single card is not asked (there is no choice to make), and an empty hand is simply passed over. The discard goes to that player's OWN History Pile, which is where this engine discards to, so the card cycles back into their deck rather than leaving the game. HAND ONLY: Atlantica-parked cards are deliberately not offered, the same line Healing Tree and Dark Matter already draw \u2014 parked cards are a resource, not hand count. To be able to actually TEST that line rather than assert it, sim presets gained a p1parked key: it seeds cards into the Atlantica row after the Landmarks are placed (so each has a live Landmark in front of it and syncAtlanticaZone doesn't discard them on sight). Every future card that has to respect the hand/parked distinction can now be checked instead of reasoned about. COMPUTER: gives up its cheapest card, the same price-as-proxy basis it uses for Healing Tree and Great Flood. VERIFIED LIVE vs Computer: with Atlantica in play and an Ichor parked behind it, the picker fanned exactly the four HAND cards and not the Ichor; choosing Vulcanem moved it to Player 1's History (hand 4 \u2192 3, parked row untouched), and the Computer's single Cravus resolved with no question asked. No console errors." },
@@ -9583,6 +9600,48 @@ document.addEventListener('DOMContentLoaded', () => {
         return pool.slice().sort((a, b) => cardCostValue(b.card) - cardCostValue(a.card))[0].value;
     }
 
+    // 044 Noctura's Night — "Each Player removes their Day Die." The game's own endgame rule,
+    // forced early: normally the Day die is removed when it empties at 12 Time Points and the
+    // player is capped at 12 for the rest of the game. This card does that to everyone at once,
+    // and whatever was still ON the Day die goes with it — that is what removing a die means.
+    //
+    // It is NOT a loss of N Time Points, so it deliberately does not go through
+    // destinyLoseTimePoints: that routes damage to the ACTIVE die, and under Time Bender the
+    // active die may be the Night one. This card names the Day die specifically.
+    //
+    // A player whose Day die is already gone is untouched. A player whose NIGHT die is gone and
+    // who is living on the Day die alone is eliminated by this — the literal reading, and the
+    // game-over check fires. (Flagged for Simon: if Noctura should never be able to kill, the
+    // guard is one line.)
+    async function resolveNocturasNight(card, revealer) {
+        const seats = seatsClockwise(revealer);
+        const report = [];
+
+        seats.forEach(pNum => {
+            const st = playersState[pNum];
+            if (!st) return;
+            const name = (vsComputer && pNum === AI_PLAYER) ? 'The Computer' : `Player ${pNum}`;
+            if (st.day <= 0) { report.push(`${name} had none left`); return; }
+
+            const lost = st.day;
+            st.day = 0;
+            updatePlayerDieUI(pNum, 'day');
+            const board = document.getElementById(`player-${pNum}`);
+            const dayEl = board && board.querySelector('.day-die-group');
+            if (dayEl) floatValue(dayEl, `-${lost} TP`, 'damage');
+            report.push(`${name} loses ${lost}`);
+        });
+
+        // Removing the last live die on a board ends the game.
+        if (seats.some(p => totalTimePoints(p) <= 0)) checkGameOver();
+
+        if (vsComputer) aiLog("Noctura's Night: every Day Die removed", 'combat');
+        await destinyNotice(
+            `Night falls for good — every Day Die is removed (${report.join(' · ')}). ` +
+            'Everyone now plays on the Night Die alone, capped at 12 Time Points.'
+        );
+    }
+
     const destinyEffects = {
         'Healing Tree': resolveHealingTree,
         'Freeze': resolveFreeze,
@@ -9604,6 +9663,7 @@ document.addEventListener('DOMContentLoaded', () => {
         "Dragura's Command": resolveDraguraSCommand,
         "Rula's Support": resolveRulasSupport,
         'Contermination': resolveContermination,
+        "Noctura's Night": resolveNocturasNight,
     };
 
     // ==================== COMPUTER OPPONENT ====================
