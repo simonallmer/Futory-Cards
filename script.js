@@ -285,7 +285,7 @@ document.addEventListener('DOMContentLoaded', () => {
         };
     }
 
-    const implementedCards = ["Pandorama", "Fountain of Youth", "Laser Catalyst", "Dragura's Wasteland", "Planetarium", "Lethargo's Temple", "Clone Factory", "Aetherlab", "Entrophy", "Meridius", "Meridia", "Time Thief", "Ichor", "Vulcanem", "Cravus", "Rampadon", "Smoke", "Dark Matter", "Reflector", "Talisman", "Reversal", "Faith", "Threat", "Confiscation", "Gravitas", "Time Bender", "Meridia's Cabin", "Repo Station", "Hand of Rhone", "Atlantica", "Hyperscope", "Mines of Pyralos", "Chrona", "Razo", "Looper", "Masiota", "Aromeas", "General Wave", "Namandi", "Sea Lord", "Sleep Potion", "Lotus", "Rush", "Cell Shield", "Alchemy", "Tame Beast", "Tele Control", "Burden of Wealth", "Healing Tree", "Freeze", "Chrono Machine", "Dragon Throne", "Unstoppable Force", "Truce", "Voider", "Space Voider", "Eternal Hour", "Great Flood", "Laser Bomb", "Daredevil's Reward", "Lethargo's Approach", "Sacrifice", "Break of Dawn", "Sandstorm"];
+    const implementedCards = ["Pandorama", "Fountain of Youth", "Laser Catalyst", "Dragura's Wasteland", "Planetarium", "Lethargo's Temple", "Clone Factory", "Aetherlab", "Entrophy", "Meridius", "Meridia", "Time Thief", "Ichor", "Vulcanem", "Cravus", "Rampadon", "Smoke", "Dark Matter", "Reflector", "Talisman", "Reversal", "Faith", "Threat", "Confiscation", "Gravitas", "Time Bender", "Meridia's Cabin", "Repo Station", "Hand of Rhone", "Atlantica", "Hyperscope", "Mines of Pyralos", "Chrona", "Razo", "Looper", "Masiota", "Aromeas", "General Wave", "Namandi", "Sea Lord", "Sleep Potion", "Lotus", "Rush", "Cell Shield", "Alchemy", "Tame Beast", "Tele Control", "Burden of Wealth", "Healing Tree", "Freeze", "Chrono Machine", "Dragon Throne", "Unstoppable Force", "Truce", "Voider", "Space Voider", "Eternal Hour", "Great Flood", "Laser Bomb", "Daredevil's Reward", "Lethargo's Approach", "Sacrifice", "Break of Dawn", "Sandstorm", "Wormhole"];
 
     // --- Intent Classification ---
     // auto: fires on its own when condition is met
@@ -357,6 +357,7 @@ document.addEventListener('DOMContentLoaded', () => {
         'Sacrifice': 'auto',
         'Break of Dawn': 'auto',
         'Sandstorm': 'auto',
+        'Wormhole': 'auto',
     };
 
     // --- Simulation Presets ---
@@ -785,6 +786,28 @@ document.addEventListener('DOMContentLoaded', () => {
             p1future: [],
             p1history: ['FireSteam', 'GoldSteam'],
         },
+        'Wormhole': {
+            phase: 0,
+            // One of everything the sweep has to reach: cards in hand, Landmarks (Atlantica
+            // among them, so its parked row is in play), a Creature in the zone, a Creature
+            // riding a Lotus pad (two cards from one slot), a damaged Creature, and a
+            // Meridia in the History Pile — the one card that does NOT come back.
+            desc: "Player 1's Future Pile is empty — the turn start reveals Wormhole. EVERYTHING both players own — hand, Landmark Zone, Creature Zone, History and Future — is shuffled into one new Future Pile each, and the boards go completely bare. Meridia should NOT be in there: she is exiled to the Abyss, the same rule the End-Phase reshuffle uses. The Ichor riding the Lotus pad must contribute BOTH cards. Once the overlay closes, each player draws 3 onto the empty board — and a Landmark among them rebuilds itself straight into the Landmark Zone.",
+            destiny: 'Wormhole',
+            hand: ['FireSteam', 'GoldSteam', 'Cravus'],
+            landmarks: ['Pandorama', 'Atlantica'],
+            p1creatures: [
+                { name: 'Vulcanem', damageTaken: 2 },
+                { name: 'Ichor', damageTaken: 0, onLotus: true },
+            ],
+            p1future: [],
+            p1history: ['FireSteam', 'Meridia', 'GoldSteam'],
+            p2hand: ['FireSteam', 'LaserSteam'],
+            p2landmarks: ['Clone Factory'],
+            p2creatures: [{ name: 'Meridius', damageTaken: 0 }],
+            p2future: ['FireSteam', 'GoldSteam'],
+            p2history: ['FireSteam'],
+        },
         'Hand of Rhone': {
             phase: 1,
             day: 9,
@@ -885,6 +908,7 @@ document.addEventListener('DOMContentLoaded', () => {
     };
 
     const devLogData = [
+        { date: '2026-08-30', msg: "Destiny 040 Wormhole \u2014 implemented (auto), 17/24. 'Each Player shuffles Creature Zone, Landmark Zone, Hand, History Pile and Future Pile to a new Future Pile. Then each Player draws 3 Cards.' The great levelling: every board on the table is swept flat and everyone starts again from three cards. The biggest single board operation in the set, and almost all of it is about ORDER and CLEANLINESS. ORDER: hand and Atlantica-parked cards are collected FIRST, because clearing Atlantica discards whatever is still parked behind a Landmark into a History Pile that is about to be wiped \u2014 sweep the Landmark Zone first and those cards are lost instead of shuffled. (Parked cards going in at all is Simon's 'extension of the hand' ruling doing its work.) A Creature riding a Lotus pad contributes BOTH cards from one slot. Meridia is exiled to the Abyss rather than shuffled back \u2014 the rule the End-Phase fold and Sea Lord already apply; she never survives becoming deck again. CLEANLINESS: everything is passed through a new stripInPlayState() on the way in, so damage, summoning stamps, a face-down flip, a Chrona split, a Masiota rescue history and Hyperscope turn damage all come off. A card that goes into a deck has to come back out as printed \u2014 otherwise a Vulcanem that was on 4 HP returns to your hand still wounded, and a Landmark buried by Sandstorm gets drawn face down, which the engine has no concept of. The DRAWS are deferred to the follow-up queue (the one Daredevil's Reward introduced): the deal animation belongs on the visible board, not behind the Destiny backdrop, so the overlay announces the sweep and the three cards land in front of the players once it closes. Gravitas deliberately does NOT fire on this shuffle \u2014 it is swept into the pile by the same effect, so findLandmark can't see it, which falls out of the existing code for free and is the right reading. BUG FOUND AND FIXED ALONG THE WAY, and it was already in the game: both existing Meridia-exile sites wrote her into activeBazaar['AB'], but the Abyss is NOT a Bazaar sale pile \u2014 renderBazaar reads its cards from the slot element's own dataset. So an exiled Meridia was being removed from the deck correctly and then vanishing silently instead of appearing in the public 'Abyss \u2014 Out of Game' list. All three sites (the End-Phase fold, Sea Lord, and this card) now go through one exileToAbyss() helper that places her the same way Threat and Mines of Pyralos place theirs. Caught only because the Wormhole sim showed an empty Abyss next to a notice that said she had been exiled. VERIFIED LIVE vs Computer. Both boards \u2014 3 hand cards, 2 Landmarks including Atlantica, a damaged Vulcanem, an Ichor on a Lotus pad, and a 3-card History against the Computer's hand, Landmark, Creature, Future and History \u2014 went completely bare, and the new decks came out at exactly 10 and 7 cards (P1: 3 hand + 2 Landmarks + 3 from the two Creature slots + 2 of 3 History). Meridia was not among them and now reads '1 IN ABYSS' in the Bazaar. The drawn Vulcanem carried none of its in-play fields. On CONTINUE both players drew 3 from their own new decks (10 \u2192 7 and 7 \u2192 4) and Player 1's Pandorama came off the top and REBUILT ITSELF straight into the empty Landmark Zone \u2014 the Hyperscope rebuild rule reassembling a board that Wormhole had just flattened. No console errors. Destiny progress panel now reads 17/24, next 041 Dragura's Command." },
         { date: '2026-08-30', msg: "Destiny 039 Sandstorm \u2014 implemented (auto), 16/24, and it changed a GENERAL RULE. 'All Landmarks on the Playing Field are deactivated. Once per Construction Phase a Player may reactivate 1 Landmark.' SIMON'S RULING on the second sentence: it is not a Sandstorm rule at all \u2014 it is the general reactivation rule, printed here because this is the card that makes you feel it. Reactivating is limited to ONE CARD PER TURN, in the right phase: a Landmark in your Construction Phase, a Creature in your Construction or Creature Phase. His reason is the one that matters \u2014 without it Sleep Potion (and every other way of putting a card face down) is barely an inconvenience, because you would simply flip the card straight back up. Until now the engine let you unveil your own face-down cards freely, any phase, any number, which quietly undercut the whole Duality deactivation subsystem. That is now reactivationBlockedReason() + a per-turn flag cleared in finishTurn beside the rest, and the confirm dialog says what it is spending ('your one reactivation this turn'). Sandstorm itself, therefore, sticks around for NOTHING: it flips every Landmark on the table face down, goes to the Destiny Abyss, and the players dig out under the general rule. No lingering flag, no timer, no 'while Sandstorm is in play' bookkeeping \u2014 per Simon, 'it's not a card that sticks around with longer effect'. Atlantica is exempt as always (canBeDeactivated), a Landmark already face down is left alone rather than double-deactivated (that is Sleep Potion's discard rule, not this one's), and every deactivation goes through the same refreshBoardAfterDeactivation chokepoint, so an Atlantica-parked card behind a Landmark that DOES go down is discarded exactly as for any other sleep. COMPUTER: this rule would have buried it permanently \u2014 it has no click, so it had no path to an unveil at all. aiReactivateOne() now takes its one reactivation at the top of its Construction Phase (the phase that suits both card types, so it never has to choose between digging out a Landmark and a Creature on timing), flipping up its most expensive sleeper, and it respects the Masiota same-turn lockout. VERIFIED LIVE, both modes. Vs Computer: the reveal buried 4 Landmarks across BOTH boards \u2014 Pandorama, Aetherlab, Fountain of Youth, Clone Factory \u2014 and left Atlantica standing with the notice saying why. Clicking a buried Landmark in the STEAM phase was refused ('only in your Construction Phase'); in Construction the first click unveiled Pandorama and the second was refused ('one per turn'), with Aetherlab staying down. The Computer then dug itself out on its own turn, unveiling exactly one Landmark (feed: 'Unveils Fountain of Youth') and leaving Clone Factory buried. Hot seat: Player 1 unveiled one and was refused a second, then the turn passed and PLAYER 2 got a fresh reactivation \u2014 one card, then refused \u2014 proving the per-turn reset. No console errors. Destiny progress panel now reads 16/24, next 040 Wormhole." },
         { date: '2026-08-30', msg: "Destiny 038 Break of Dawn \u2014 implemented (auto), 15/24. 'Roll a Futory Die. You gain Time Points equal to the result.' Sacrifice's mirror, same shape: the revealer alone, the whole card is the roll, the die stays on screen under the result. destinyRollDie was already there from 037, so the card itself is six lines. THE ONE THING THAT ISN'T SYMMETRICAL is the ceiling, and it is the only reason this card needed any thought. A loss always lands in full until you are dead; a gain runs into the 12-per-die cap and can never revive a die already lost at 0, so a 6 rolled on a nearly full clock quietly becomes a 2. destinyGainTimePoints \u2014 the mirror of destinyLoseTimePoints \u2014 measures what actually landed rather than assuming the roll, floats that number on the die, and the notice reports it: 'rolls 5 but the dice can only hold 3'. Promising six and delivering three with no explanation is exactly the kind of thing that reads as a bug. Sim preset leaves precisely 3 Time Points of headroom (Day 10, Night 11) so both halves of the ceiling show up in one roll: the Day die fills to 12, the remainder spills onto the Night die, and then it runs out of room. VERIFIED LIVE vs Computer, both branches, with the Computer's clock untouched in each. Roll 2 landed in full \u2014 Day 10 \u2192 12, 23 Time Points, notice 'gains 2'. Roll 5 filled the Day die (+2), spilled onto the Night die (+1) and stopped at 24 with the notice reading 'rolls 5 but the dice can only hold 3'. No console errors. Destiny progress panel now reads 15/24, next 039 Sandstorm." },
         { date: '2026-08-30', msg: "Destiny 037 Sacrifice \u2014 implemented (auto), 14/24. 'Roll a Futory Die. You lose Time Points equal to the result.' The whole card is the roll, so the roll had to be worth watching \u2014 and it had to happen INSIDE the Destiny overlay, since the board is behind the backdrop and Looper's own die overlay would have fought this one for the screen. destinyRollDie() renders the die in the picker row using the same buildPips face and the same fast-then-easing tick as the Looper and Entrophy rolls, resolves with the face, and LEAVES THE DIE ON SCREEN under the notice that explains what it cost \u2014 so the number you are reading about is still sitting there. 'You' is literal: the revealer alone, everyone else just watches. The loss rides destinyLoseTimePoints, so a roll bigger than the active die spills onto the other one, an emptied die is permanently lost, and a roll that reaches 0 ends the game. When the clock can't pay the full roll the notice says so ('has only 2 Time Points left to give') rather than reporting a number the dice never actually took. FOUND AND FIXED WHILE TESTING, a real dev-tool trap: runSimulation resets destinyResolving as part of clearing per-turn state, which meant loading a preset while a reveal was still awaiting a choice started a SECOND reveal alongside the first, and both resolved onto the same board \u2014 two Sacrifice rolls landed on one clock and the numbers stopped adding up. runSimulation now refuses outright while a reveal is open. Anyone testing 'Each Player' cards would have hit this eventually. VERIFIED LIVE vs Computer, every branch, with the Computer's clock untouched in all of them. Roll 3 against a Day die of 3 emptied it exactly (Day lost, Night 12, 12 TP left). Roll 6 against the same Day die took all 3 and spilled the other 3 onto the Night die (12 \u2192 9). Roll 4 against a player holding 2 Time Points on a lone Day die reported 'loses 2 TP', vanished both dice, and ended the game \u2014 with the Destiny overlay closing itself behind the victory screen, the destinyNotice fix from Eternal Hour doing its job a second time. No console errors. Destiny progress panel now reads 14/24, next 038 Break of Dawn \u2014 this card's mirror." },
@@ -2324,6 +2348,20 @@ document.addEventListener('DOMContentLoaded', () => {
     // its owner may hover-peek. Without the secret flag the card was seen before it flipped
     // (e.g. an opponent's Landmark), so anyone may hover-peek the front in a dimmed state.
     // Atlantica and Razo can never be deactivated (printed rule).
+    // Send cards out of the game. The Abyss is NOT a Bazaar sale pile — it keeps its cards in
+    // the slot element's own dataset (see renderBazaar's isAbyssLoc branch), so writing them
+    // into activeBazaar['AB'] puts them somewhere nothing reads: the card would vanish
+    // silently instead of appearing in the public "Abyss — Out of Game" list. Both Meridia
+    // exile sites did exactly that; they route through here now, like Threat and Mines.
+    function exileToAbyss(cards) {
+        if (!cards || !cards.length) return 0;
+        const abyssEl = document.querySelector('.card--abyss');
+        if (!abyssEl) return 0;
+        cards.forEach(c => finishSingleCardPlacement(abyssEl, c));
+        renderBazaar();
+        return cards.length;
+    }
+
     function canBeDeactivated(card) {
         return card && card.name !== 'Atlantica' && card.name !== 'Razo';
     }
@@ -3634,10 +3672,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const combined = history.concat(future);
         const meridiaCards = combined.filter(c => c.name === 'Meridia');
         const shuffleable = combined.filter(c => c.name !== 'Meridia');
-        if (meridiaCards.length) {
-            activeBazaar['AB'] = (activeBazaar['AB'] || []).concat(meridiaCards);
-            renderBazaar();
-        }
+        exileToAbyss(meridiaCards);
 
         futurePile.dataset.cardData = JSON.stringify(shuffleArray([...shuffleable]));
         historyPile.dataset.cardData = JSON.stringify([]);
@@ -7688,10 +7723,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     // she's discarded to the Abyss instead when History reshuffles.
                     const meridiaCards = currentHistory.filter(c => c.name === 'Meridia');
                     const shuffleable = currentHistory.filter(c => c.name !== 'Meridia');
-                    if (meridiaCards.length) {
-                        activeBazaar['AB'] = (activeBazaar['AB'] || []).concat(meridiaCards);
-                        renderBazaar();
-                    }
+                    exileToAbyss(meridiaCards);
 
                     currentFuture = shuffleArray([...shuffleable]);
                     historyPile.dataset.cardData = JSON.stringify([]);
@@ -9213,6 +9245,117 @@ document.addEventListener('DOMContentLoaded', () => {
         );
     }
 
+    // Put a shuffled deck back into a Future Pile, restoring the card-back face — the pile
+    // this runs on is usually EMPTY (that is what summoned Destiny in the first place), so
+    // it is wearing its "Future" label and has to be dressed as a deck again.
+    function writeFuturePile(pile, cards) {
+        if (!pile) return;
+        if (!cards.length) { clearStackSlot(pile, 'Future'); return; }
+        pile.dataset.cardData = JSON.stringify(cards);
+        pile.classList.remove('slot-empty');
+        pile.style.backgroundImage = "url('assets/card_back.png')";
+        pile.style.backgroundColor = 'transparent';
+        pile.textContent = '';
+        const label = pile.querySelector('.pile-label');
+        if (label) label.style.display = 'none';
+        updateStackIndicator(pile);
+    }
+
+    // Transient, in-play state that must NOT ride a card back into a deck: damage, summoning
+    // stamps, a face-down flip, a Chrona split, a Masiota rescue history, Hyperscope's
+    // turn damage. A card coming out of a Wormhole is a fresh copy of itself again.
+    function stripInPlayState(card) {
+        const c = { ...card };
+        ['deactivated', 'faceDownSecret', 'damageTaken', 'summonedOnTurn', 'lotusPad',
+         'masiotaRescueStamp', 'masiotaUses', 'baseStrength', 'baseResistance',
+         'hyperDamage', 'teleControlled', 'namandiResolved'].forEach(k => delete c[k]);
+        return c;
+    }
+
+    // 040 Wormhole — "Each Player shuffles Creature Zone, Landmark Zone, Hand, History Pile
+    // and Future Pile to a new Future Pile. Then each Player draws 3 Cards." The great
+    // levelling: every board is swept flat and everyone starts again from three cards.
+    //
+    // Atlantica-parked cards go too — Simon's ruling that they are "an extension of the hand"
+    // makes that automatic, and they are collected BEFORE Atlantica itself is cleared, since
+    // removing the Landmark would otherwise discard them into a History Pile that is about to
+    // be emptied. A Creature riding a Lotus pad contributes BOTH cards. Meridia is exiled to
+    // the Abyss rather than shuffled back, the same rule the End-Phase fold and Sea Lord
+    // already apply — she never survives becoming deck again.
+    //
+    // Everything is stripped of in-play state on the way in (stripInPlayState), so a damaged
+    // Creature, a face-down Landmark or a split Chrona all come back as printed.
+    //
+    // The draws are DEFERRED to the follow-up queue: the deal animation belongs on the visible
+    // board, not behind the Destiny backdrop, so the overlay announces the sweep and the three
+    // cards land in front of the players once it closes.
+    async function resolveWormhole(card, revealer) {
+        const seats = seatsClockwise(revealer);
+        const report = [];
+        let exiled = 0;
+
+        seats.forEach(pNum => {
+            const board = document.getElementById(`player-${pNum}`);
+            if (!board) return;
+
+            const collected = [];
+            const sweep = (selector) => {
+                Array.from(board.querySelectorAll(selector)).forEach(slot => {
+                    let c;
+                    try { c = JSON.parse(slot.dataset.cardData); } catch (e) { return; }
+                    if (!c || Array.isArray(c)) return;
+                    if (c.lotusPad) collected.push(stripInPlayState(c.lotusPad));
+                    collected.push(stripInPlayState(c));
+                    clearSlot(slot);
+                });
+            };
+            // Hand and parked cards first: clearing Atlantica discards whatever is still
+            // parked behind a Landmark, and that would land in a pile we are about to wipe.
+            sweep('.hand-slot:not(.slot-empty)');
+            sweep('.atlantica-slot:not(.slot-empty)');
+            sweep('.creature-zone-main .card:not(.slot-empty)');
+            sweep('.landmark-zone-main .card:not(.slot-empty)');
+            updateHandLayout(pNum);
+
+            const futurePile = board.querySelector('.future-pile');
+            const historyPile = board.querySelector('.history-pile');
+            const readPile = (pile) => {
+                if (!pile) return [];
+                try { const d = JSON.parse(pile.dataset.cardData || '[]'); return Array.isArray(d) ? d : [d]; }
+                catch (e) { return []; }
+            };
+            collected.push(...readPile(historyPile).map(stripInPlayState));
+            collected.push(...readPile(futurePile).map(stripInPlayState));
+            if (historyPile) clearStackSlot(historyPile, 'History');
+
+            const gone = collected.filter(c => c.name === 'Meridia');
+            const deck = collected.filter(c => c.name !== 'Meridia');
+            exiled += exileToAbyss(gone);
+
+            writeFuturePile(futurePile, shuffleArray(deck));
+            if (futurePile) floatValue(futurePile, `${deck.length} Cards`, 'gain');
+
+            const name = (vsComputer && pNum === AI_PLAYER) ? 'The Computer' : `Player ${pNum}`;
+            report.push(`${name} ${deck.length}`);
+        });
+
+        if (vsComputer) aiLog('Wormhole: every board folded into a new deck', 'system');
+
+        // The draw belongs on the visible board, so it waits for the overlay to close.
+        destinyFollowUps.push(async () => {
+            for (const pNum of seats) {
+                if (gameWon) return;
+                await drawCards(pNum, 3);
+            }
+        });
+
+        await destinyNotice(
+            `Every zone, hand and pile is shuffled into a new Future Pile — ${report.join(' · ')} cards. ` +
+            (exiled ? 'Meridia cannot become deck again and is exiled to the Abyss. ' : '') +
+            'Each player draws 3 once this closes.'
+        );
+    }
+
     const destinyEffects = {
         'Healing Tree': resolveHealingTree,
         'Freeze': resolveFreeze,
@@ -9230,6 +9373,7 @@ document.addEventListener('DOMContentLoaded', () => {
         'Sacrifice': resolveSacrifice,
         'Break of Dawn': resolveBreakOfDawn,
         'Sandstorm': resolveSandstorm,
+        'Wormhole': resolveWormhole,
     };
 
     // ==================== COMPUTER OPPONENT ====================
