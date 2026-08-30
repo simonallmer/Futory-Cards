@@ -285,7 +285,7 @@ document.addEventListener('DOMContentLoaded', () => {
         };
     }
 
-    const implementedCards = ["Pandorama", "Fountain of Youth", "Laser Catalyst", "Dragura's Wasteland", "Planetarium", "Lethargo's Temple", "Clone Factory", "Aetherlab", "Entrophy", "Meridius", "Meridia", "Time Thief", "Ichor", "Vulcanem", "Cravus", "Rampadon", "Smoke", "Dark Matter", "Reflector", "Talisman", "Reversal", "Faith", "Threat", "Confiscation", "Gravitas", "Time Bender", "Meridia's Cabin", "Repo Station", "Hand of Rhone", "Atlantica", "Hyperscope", "Mines of Pyralos", "Chrona", "Razo", "Looper", "Masiota", "Aromeas", "General Wave", "Namandi", "Sea Lord", "Sleep Potion", "Lotus", "Rush", "Cell Shield", "Alchemy", "Tame Beast", "Tele Control", "Burden of Wealth", "Healing Tree", "Freeze", "Chrono Machine", "Dragon Throne", "Unstoppable Force", "Truce", "Voider", "Space Voider", "Eternal Hour", "Great Flood", "Laser Bomb", "Daredevil's Reward", "Lethargo's Approach", "Sacrifice", "Break of Dawn", "Sandstorm", "Wormhole", "Dragura's Command", "Rula's Support", "Contermination", "Noctura's Night"];
+    const implementedCards = ["Pandorama", "Fountain of Youth", "Laser Catalyst", "Dragura's Wasteland", "Planetarium", "Lethargo's Temple", "Clone Factory", "Aetherlab", "Entrophy", "Meridius", "Meridia", "Time Thief", "Ichor", "Vulcanem", "Cravus", "Rampadon", "Smoke", "Dark Matter", "Reflector", "Talisman", "Reversal", "Faith", "Threat", "Confiscation", "Gravitas", "Time Bender", "Meridia's Cabin", "Repo Station", "Hand of Rhone", "Atlantica", "Hyperscope", "Mines of Pyralos", "Chrona", "Razo", "Looper", "Masiota", "Aromeas", "General Wave", "Namandi", "Sea Lord", "Sleep Potion", "Lotus", "Rush", "Cell Shield", "Alchemy", "Tame Beast", "Tele Control", "Burden of Wealth", "Healing Tree", "Freeze", "Chrono Machine", "Dragon Throne", "Unstoppable Force", "Truce", "Voider", "Space Voider", "Eternal Hour", "Great Flood", "Laser Bomb", "Daredevil's Reward", "Lethargo's Approach", "Sacrifice", "Break of Dawn", "Sandstorm", "Wormhole", "Dragura's Command", "Rula's Support", "Contermination", "Noctura's Night", "Sunken City"];
 
     // --- Intent Classification ---
     // auto: fires on its own when condition is met
@@ -362,6 +362,7 @@ document.addEventListener('DOMContentLoaded', () => {
         "Rula's Support": 'auto',
         'Contermination': 'auto',
         "Noctura's Night": 'auto',
+        'Sunken City': 'auto',
     };
 
     // --- Simulation Presets ---
@@ -868,6 +869,20 @@ document.addEventListener('DOMContentLoaded', () => {
             p1future: [],
             p1history: ['FireSteam', 'GoldSteam'],
         },
+        'Sunken City': {
+            phase: 0,
+            // A mixed History for you so the choice is real (a Vulcanem worth raising, a
+            // Smoke, and two Steam), and one for the Computer that is all Artifacts and
+            // Sparks except a single Cravus — so its "usable only" rule is visible in what
+            // it picks. Your hand is nearly full, which is where a taken card lands anyway.
+            desc: "Player 1's Future Pile is empty — the turn start reveals Sunken City. Your History Pile fans out and you MAY take one card back into your hand — or DECLINE, which is always legal. The card leaves the pile (its face becomes whatever is now on top) and arrives in your hand whatever its type: a Landmark comes to hand, it does not leap into the zone. The Computer then makes its own choice: it should raise the Cravus and ignore the Smoke and Faith, because in V1 it plays neither Artifacts nor Sparks.",
+            destiny: 'Sunken City',
+            hand: ['FireSteam', 'GoldSteam'],
+            p1future: [],
+            p1history: ['FireSteam', 'Vulcanem', 'Smoke', 'GoldSteam'],
+            p2hand: ['FireSteam'],
+            p2history: ['Smoke', 'Cravus', 'Faith'],
+        },
         'Hand of Rhone': {
             phase: 1,
             day: 9,
@@ -968,6 +983,7 @@ document.addEventListener('DOMContentLoaded', () => {
     };
 
     const devLogData = [
+        { date: '2026-08-30', msg: "Destiny 045 Sunken City \u2014 implemented (auto), 22/24. 'Each Player may take 1 Card from their History Pile to their Hand.' Reversal (S1) handed to the whole table at once, and a real 'may' \u2014 any seat can raise one card or walk away, clockwise from the revealer. Built entirely out of parts already in place: the pile picker from Voider (destinyPickTiles with max: 1, so a second tile simply doesn't take), writeStackPile for the pile's face afterwards, and the temporary-hand-slot pattern Reversal, Confiscation and Dragon Throne all use when a hand is already full \u2014 the card still arrives and the End Phase limit settles it. To the HAND regardless of type, which is Reversal's precedent: a Landmark dug out of History comes to hand and is built later, it does not leap into the zone. COMPUTER: raises the best card it can actually use \u2014 most expensive first, no Artifacts and no Sparks, since in V1 it plays neither and one in hand is dead weight. It declines outright when its hand is already at the limit, because a card taken over the limit is only discarded again in its own End Phase. VERIFIED LIVE vs Computer, all three branches. The picker fanned Player 1's four History cards; selecting Vulcanem and then clicking a second tile left the second one unselected (the cap holding), and confirming moved Vulcanem into hand while History dropped to three with its face correctly becoming the new top card (GoldSteam). The Computer, offered Smoke / Cravus / Faith, raised the CRAVUS and left both the Artifact and the Spark behind. A re-run with DECLINE left Player 1's four-card pile and two-card hand completely untouched. No console errors. Destiny progress panel now reads 22/24, next 046 Kyro's Destiny." },
         { date: '2026-08-30', msg: "Destiny 044 Noctura's Night \u2014 implemented (auto), 21/24. 'Each Player removes their Day Die.' The game's own endgame rule, forced early: normally the orange Day die is removed when it empties at 12 Time Points and that player is capped at 12 for the rest of the game. This does it to everyone at once, and whatever was still ON the Day die goes with it \u2014 that is what removing a die means. It costs whoever is furthest ahead the most, which is the whole point of the card. It deliberately does NOT go through destinyLoseTimePoints. That helper routes damage to the ACTIVE die, and under Time Bender the active die may be the Night one \u2014 this card names the Day die specifically, so it sets it to 0 directly. Everything downstream then works without any further wiring, because activeDieType() already falls back to the other die when the preferred one is gone: gains, damage and floats all land on the Night die from here. A player whose Day die is already gone is simply untouched. FLAGGED FOR SIMON: a player whose NIGHT die is already gone and who is living on the Day die alone is ELIMINATED by this. That is the literal reading and the game-over check fires correctly, but it makes Noctura a kill card in a way the text does not advertise. One line to guard if it should never be lethal. VERIFIED LIVE vs Computer, all three branches. Normal: Player 1 on a full 24 and the Computer on 17 both dropped to exactly 12, with both orange dice vanishing and the notice reporting the unequal cost ('Player 1 loses 12 \u00b7 The Computer loses 5'). Already-gone: a Computer whose Day die was already removed read 'had none left' and lost nothing while Player 1 still paid 12. Lethal: Player 1 living on a Day die of 3 with no Night die was wiped out \u2014 COMPUTER WON, with the Destiny overlay closing itself behind the victory screen. No console errors. Destiny progress panel now reads 21/24, next 045 Sunken City." },
         { date: '2026-08-30', msg: "Destiny 043 Contermination \u2014 implemented (auto), 20/24. 'Turn over a Non-Steam Pile from the Bazaar to make it inaccessible for purchases.' The only Destiny card that changes the SHOP rather than the boards, and the only one whose effect outlives its own reveal \u2014 not because a rule lingers, but because turning the pile over IS the effect. It stays turned over for the rest of the game. Nothing is destroyed: the cards are still in there, just shut away. 'Non-Steam Pile from the Bazaar' lines up exactly with Simon's definition of the Bazaar (the Non-Steam, Non-Destiny cards), so the picker offers all 24 non-Steam locations and nothing else \u2014 no Steam columns, no Destiny deck, no Abyss. The revealer chooses, the way 'You lose Time Points' makes Sacrifice the revealer's; it is mandatory, so destinyPickOneTile again. Empty piles are not offered (closing one would be no effect at all) and a pile already turned over can't be picked twice. CLOSED HAS TO MEAN CLOSED IN FIVE PLACES, which is most of the work: closedBazaarPiles (a Set of location codes, cleared with the inventory) is consulted by renderBazaar (the pile flips to a card back reading 'N CLOSED', greyed by new .bazaar-closed CSS), updateBazaarLighting (permanently 'unavailable', so it never lights up as affordable), the Bazaar click handler (refused with a message rather than opening its stack list \u2014 listing the cards would hand back exactly the information the card took away), aiConstructionCandidates (the Computer's buy list skips it), and bazaarStockByName (so Daredevil's Reward cannot reach into a closed pile either). The notice names the pile by LOCATION plus the card on top rather than pluralising a card name \u2014 with both sets active a pile holds two different cards, so '6 Cravuss' would have been wrong twice over. VERIFIED LIVE vs Computer: the picker fanned exactly 24 tiles with no Steam or Destiny among them; turning over C2 flipped it to a card back reading '6 CLOSED'. In the Construction Phase it stayed dark and clicking it said 'This pile has been turned over' instead of grabbing or listing, while its neighbour C1 bought an Ichor normally (6 \u2192 5 LEFT) \u2014 only the closed pile is affected. The Computer then played a full turn alongside it without trouble (bought FireSteam, bought and summoned Entrophy from C3, drew 2) and C2 was still shut afterwards. NOTE: that AI turn shows the closed pile does not disturb it, but it is not proof it would otherwise have chosen C2 \u2014 the exclusion itself is the same one-line isPileClosed gate that the human path proves live. No console errors. Destiny progress panel now reads 20/24, next 044 Noctura's Night." },
         { date: '2026-08-30', msg: "Destiny 042 Rula's Support \u2014 implemented (auto), 19/24. 'Each Player draws 1 Card.' Dragura's Command inverted and the gentlest card in the set: no choices, no targets, one card each. Deferred to the follow-up queue like Wormhole's draws, for the same reason \u2014 the deal animation belongs on the visible board, not behind the Destiny backdrop \u2014 and drawCards does everything else on its own. The sim preset is built so the two seats take DIFFERENT routes to the same draw: your Future Pile is empty (that is what summoned Destiny in the first place), so your draw has to fold your History back into a new deck first, while the Computer's pile is stocked and it simply takes the top card. VERIFIED LIVE vs Computer: on CONTINUE the overlay closed and both draws played out on the board \u2014 Player 1's History (GoldSteam / Meridia / LaserSteam) reshuffled with MERIDIA EXILED TO THE ABYSS rather than dealt, leaving a 2-card deck and LaserSteam in hand, while the Computer took GoldSteam off its own pile. That reshuffle also confirmed the exileToAbyss fix from Wormhole working through the ordinary draw path: Meridia now actually appears in the Abyss list. No console errors." },
@@ -9642,6 +9658,79 @@ document.addEventListener('DOMContentLoaded', () => {
         );
     }
 
+    // 045 Sunken City — "Each Player may take 1 Card from their History Pile to their Hand."
+    // Reversal (S1) handed to the whole table at once, and a real "may": any seat can take
+    // one, or walk away. Clockwise from the revealer like every other "Each Player" event.
+    //
+    // To the HAND regardless of type, which is Reversal's precedent — a Landmark dug out of
+    // History arrives in hand and is built later, it does not leap straight into the zone.
+    // If the hand is already full the card still arrives, on a temporary slot, and the End
+    // Phase limit settles it, exactly as Confiscation and Dragon Throne do.
+    async function resolveSunkenCity(card, revealer) {
+        await forEachPlayerClockwise(revealer, async (pNum) => {
+            const board = document.getElementById(`player-${pNum}`);
+            if (!board) return;
+            const isAI = vsComputer && pNum === AI_PLAYER;
+            const seatName = isAI ? 'The Computer' : `Player ${pNum}`;
+
+            const pile = board.querySelector('.history-pile');
+            let history = [];
+            try { history = JSON.parse(pile && pile.dataset.cardData || '[]'); } catch (e) { history = []; }
+            if (!Array.isArray(history)) history = [history];
+            if (history.length === 0) {
+                await destinyNotice(`${seatName}'s History Pile is empty — nothing to raise.`);
+                return;
+            }
+
+            const entries = history.map((c, i) => ({ card: c, value: i }));
+            const picked = isAI
+                ? aiSunkenCityPick(board, history)
+                : await destinyPickTiles(entries, {
+                    max: 1,
+                    live: (n) => n === 0
+                        ? `Player ${pNum}: take one card back from your History Pile — or decline.`
+                        : 'Confirm to raise it into your hand.',
+                    confirmLabel: (n) => n === 0 ? 'TAKE NOTHING' : 'RAISE IT',
+                    declineLabel: 'DECLINE',
+                });
+
+            const idx = Array.isArray(picked) ? picked[0] : picked;
+            if (idx === undefined || idx === null) {
+                if (isAI) aiLog('Sunken City: leaves its History Pile alone', 'info');
+                await destinyNotice(`${seatName} takes nothing.`);
+                return;
+            }
+
+            const [taken] = history.splice(idx, 1);
+            writeStackPile(pile, history, 'History');
+
+            let slot = board.querySelector('.hand-slot.slot-empty');
+            if (!slot) {
+                slot = createSlot('hand');
+                slot.classList.add('temporary-slot');
+                board.querySelector('.hand-slots').appendChild(slot);
+            }
+            finishSingleCardPlacement(slot, taken);
+            updateHandLayout(pNum);
+            floatValue(slot, `+ ${taken.name}`, 'gain');
+
+            if (isAI) aiLog(`Sunken City: raises ${taken.name}`, 'draw');
+            await destinyNotice(`${seatName} raises ${taken.name} out of their History Pile.`);
+        });
+    }
+
+    // The Computer digs out the best card it can actually use: no Artifacts or Sparks (V1 —
+    // it plays neither), most expensive first. It declines when its hand is already at the
+    // limit, since a card taken over the limit is only discarded again in its End Phase.
+    function aiSunkenCityPick(board, history) {
+        if (aiHandCards().length >= getMaxHand(board)) return null;
+        const usable = history
+            .map((c, i) => ({ c, i }))
+            .filter(x => x.c.type !== 'Artifact' && x.c.type !== 'Spark');
+        if (!usable.length) return null;
+        return usable.sort((a, b) => cardCostValue(b.c) - cardCostValue(a.c))[0].i;
+    }
+
     const destinyEffects = {
         'Healing Tree': resolveHealingTree,
         'Freeze': resolveFreeze,
@@ -9664,6 +9753,7 @@ document.addEventListener('DOMContentLoaded', () => {
         "Rula's Support": resolveRulasSupport,
         'Contermination': resolveContermination,
         "Noctura's Night": resolveNocturasNight,
+        'Sunken City': resolveSunkenCity,
     };
 
     // ==================== COMPUTER OPPONENT ====================
