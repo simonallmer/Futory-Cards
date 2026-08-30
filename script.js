@@ -285,7 +285,7 @@ document.addEventListener('DOMContentLoaded', () => {
         };
     }
 
-    const implementedCards = ["Pandorama", "Fountain of Youth", "Laser Catalyst", "Dragura's Wasteland", "Planetarium", "Lethargo's Temple", "Clone Factory", "Aetherlab", "Entrophy", "Meridius", "Meridia", "Time Thief", "Ichor", "Vulcanem", "Cravus", "Rampadon", "Smoke", "Dark Matter", "Reflector", "Talisman", "Reversal", "Faith", "Threat", "Confiscation", "Gravitas", "Time Bender", "Meridia's Cabin", "Repo Station", "Hand of Rhone", "Atlantica", "Hyperscope", "Mines of Pyralos", "Chrona", "Razo", "Looper", "Masiota", "Aromeas", "General Wave", "Namandi", "Sea Lord", "Sleep Potion", "Lotus", "Rush", "Cell Shield", "Alchemy", "Tame Beast", "Tele Control", "Burden of Wealth", "Healing Tree", "Freeze", "Chrono Machine", "Dragon Throne", "Unstoppable Force", "Truce", "Voider", "Space Voider", "Eternal Hour", "Great Flood"];
+    const implementedCards = ["Pandorama", "Fountain of Youth", "Laser Catalyst", "Dragura's Wasteland", "Planetarium", "Lethargo's Temple", "Clone Factory", "Aetherlab", "Entrophy", "Meridius", "Meridia", "Time Thief", "Ichor", "Vulcanem", "Cravus", "Rampadon", "Smoke", "Dark Matter", "Reflector", "Talisman", "Reversal", "Faith", "Threat", "Confiscation", "Gravitas", "Time Bender", "Meridia's Cabin", "Repo Station", "Hand of Rhone", "Atlantica", "Hyperscope", "Mines of Pyralos", "Chrona", "Razo", "Looper", "Masiota", "Aromeas", "General Wave", "Namandi", "Sea Lord", "Sleep Potion", "Lotus", "Rush", "Cell Shield", "Alchemy", "Tame Beast", "Tele Control", "Burden of Wealth", "Healing Tree", "Freeze", "Chrono Machine", "Dragon Throne", "Unstoppable Force", "Truce", "Voider", "Space Voider", "Eternal Hour", "Great Flood", "Laser Bomb"];
 
     // --- Intent Classification ---
     // auto: fires on its own when condition is met
@@ -351,6 +351,7 @@ document.addEventListener('DOMContentLoaded', () => {
         'Space Voider': 'auto',
         'Eternal Hour': 'auto',
         'Great Flood': 'auto',
+        'Laser Bomb': 'auto',
     };
 
     // --- Simulation Presets ---
@@ -687,6 +688,25 @@ document.addEventListener('DOMContentLoaded', () => {
             p1future: [],
             p1history: ['FireSteam', 'GoldSteam'],
         },
+        'Laser Bomb': {
+            phase: 0,
+            // Four Creatures across both zones, each testing a different corner: a plain one,
+            // a damaged one, a Lotus-borne one (the pad must SURVIVE, empty), and the
+            // Computer's, to prove the sweep is not one-sided. Lotus itself is laid in the
+            // zone as a bare pad too — an Artifact, so the bomb must leave it alone.
+            desc: "Player 1's Future Pile is empty — the turn start reveals Laser Bomb. Every Creature on BOTH boards should vanish into the Abyss at once — yours (Cravus, a damaged Vulcanem, and the Ichor riding a Lotus pad) and the Computer's Meridius — with the Bazaar's Abyss count jumping by 4. They go to the ABYSS, not History, so nobody's deck gets them back. The 🪷 Lotus pad the Ichor was sitting on must still be there afterwards, empty and reusable, and so must the bare Lotus pad in the outer slot: a Lotus is an Artifact, not a Creature.",
+            destiny: 'Laser Bomb',
+            hand: ['FireSteam', 'GoldSteam'],
+            p1creatures: [
+                { name: 'Cravus', damageTaken: 0 },
+                { name: 'Vulcanem', damageTaken: 2 },
+                { name: 'Ichor', damageTaken: 0, onLotus: true },
+                { name: 'Lotus', damageTaken: 0 },
+            ],
+            p1future: [],
+            p1history: ['FireSteam', 'GoldSteam'],
+            p2creatures: [{ name: 'Meridius', damageTaken: 0 }],
+        },
         'Hand of Rhone': {
             phase: 1,
             day: 9,
@@ -787,6 +807,7 @@ document.addEventListener('DOMContentLoaded', () => {
     };
 
     const devLogData = [
+        { date: '2026-08-30', msg: "Destiny 034 Laser Bomb \u2014 implemented (auto), 11/24. 'Send all Creatures from the Creature Zone into the Abyss.' The board wipe: no choices, no exceptions, both sides at once, and \u2014 the part that actually matters \u2014 to the ABYSS. Every other way a Creature leaves the zone routes it to its owner's History, where it cycles back into their deck; these are gone from the game, which makes this the hardest reset in the set. TWO EDGES. A deactivated, face-down Creature is still a Creature and still goes \u2014 being asleep is not cover. And a Lotus pad is NOT a Creature: it is an Artifact lying in the Creature Zone, and the card names Creatures only, so a bare pad is left alone and a Creature RIDING a pad is taken while the pad is re-seated behind it, empty and reusable \u2014 the same move finishAttacker makes for a Creature that merely attacked. QUESTION FOR SIMON, flagged in the code: the other reading is that a Laser Bomb 'defeats' the Creature, in which case the Lotus should discharge with it to History. One line to switch if that's the intent. Sim presets gained an onLotus flag on a creature spec (seats it on a Lotus pad exactly the way summonCreatureToZone does, marker and all), which is what made that interaction testable at all \u2014 and will be reusable for every later card that has to say something about pads. VERIFIED LIVE vs Computer. Four Creatures across both boards \u2014 Cravus, a damaged Vulcanem, an Ichor on a \ud83e\udeb7 pad, and the Computer's Meridius \u2014 all four vanished in one reveal and the Bazaar Abyss went 0 \u2192 4 IN ABYSS, with both Creature Zones empty and neither History Pile touched. The pad the Ichor was sitting on was still there afterwards, empty with the marker stripped, and so was the bare Lotus laid in the outer slot. Re-run with an empty field: 'No Creature is in play \u2014 the bomb falls on an empty field', a lone Lotus pad still standing and nothing added to the Abyss. No console errors. Destiny progress panel now reads 11/24, next 035 Daredevil's Reward." },
         { date: '2026-08-30', msg: "Destiny 033 Great Flood \u2014 implemented (auto), 10/24. 'Each Player must send one of their Landmarks into the Abyss.' The first MANDATORY Destiny card \u2014 no 'may', no decline \u2014 which needed a picker the overlay didn't have: destinyPickOneTile is a face-up row with no confirm step and no decline button, where clicking a tile IS the answer. Every earlier picker was built around a 'may'. THREE RULINGS. (1) 'One of their Landmarks' = any card in the Landmark Zone, a deactivated face-down one included \u2014 otherwise a Sandstorm'd board walks away untouched, and the choice belongs to its owner anyway so nothing is hidden from the person making it. (2) Into the ABYSS as printed, which is deliberately NOT the Hyperscope/Alchemy route: a destroyed or discarded Landmark goes to its owner's History and rebuilds itself on a later draw, while this one is gone for good, same as Threat's printed wording. (3) A seat with exactly one Landmark is not asked \u2014 there is no choice to make \u2014 and a seat with none is simply passed by, the only escape the card allows. Removal goes through clearSlot, the shared teardown chokepoint, so an Atlantica parked card and a Hand of Rhone charge clean up with it. COMPUTER: gives up its cheapest Landmark by Steam price. It doesn't buy the Landmarks whose worth is in their effect rather than their cost, so price is a fair proxy for least missed. Sim preset stacks three Landmarks on your side (Atlantica among them, so the parked-card teardown rides along if you pick it) against exactly one for the Computer, so a single reveal shows both the picker and the auto-resolve. VERIFIED LIVE vs Computer. The row fanned Pandorama / Atlantica / Aetherlab with NO buttons under it \u2014 one click on Atlantica was the whole answer: it left the Landmark Zone, landed in the Abyss (1 IN ABYSS), and the zone kept Pandorama and Aetherlab. The Computer's single Fountain of Youth resolved without a question and the Abyss went to 2. Re-run with the Landmarks swapped: an empty zone gave 'Player 1 owns no Landmarks \u2014 the Flood passes them by', and the Computer, offered Laser Catalyst / Pandorama / Aetherlab, gave up Pandorama \u2014 the cheapest \u2014 and kept the other two. No console errors. Destiny progress panel now reads 10/24, next 034 Laser Bomb." },
         { date: '2026-08-30', msg: "Destiny 032 Eternal Hour \u2014 implemented (auto), 9/24. 'All Players tied for most Time Points lose 4.' A leader tax, and the first Destiny card that just happens TO you \u2014 nobody is asked anything. TWO READINGS TO GET RIGHT. (1) 'Tied for most' is the plain reading: whoever is on the highest total takes 4, and if several share that total they all take it. One player alone at the top is still the most, so at 2 players a clear leader is hit by themselves \u2014 the card is not conditional on there being a tie. (2) It resolves SIMULTANEOUSLY: the set of victims is snapshotted before any damage lands, so the 4 coming off the first seat can't drop them out of the tie and quietly spare the second. Iterating and re-reading totals would have produced exactly that bug. The loss runs through resolveDamageDirectly \u2014 the same path combat damage uses \u2014 so Day-die-first, a die permanently lost at 0, and the game-over check all come along for free. Two small shared helpers came out of it, both for the TP cards still to come (036 Lethargo's Approach, 037 Sacrifice): destinyLoseTimePoints, which reads the active-die selector BEFORE the hit so a die emptied by this very loss doesn't send its float to the other one, and reports what actually landed; and seatList, which names a group of seats readably ('Player 1 and The Computer'). THIS CARD CAN END A GAME, which turned up a real flaw in the Destiny plumbing: the victory screen draws OVER the Destiny overlay, so a notice waiting for a CONTINUE nobody can see left a live modal parked behind the win. destinyNotice now shows its line but returns immediately when gameWon, so the reveal walks straight out and hands the board to the victory screen. That fix is general \u2014 every lethal Destiny card gets it. Sim preset deliberately is NOT a tie: a fresh game is already 24/24, so the tie case can be seen for free by revealing this on turn one. What a default board can't show is the discriminating half \u2014 that a clear leader is hit alone \u2014 so Player 1 starts four ahead. VERIFIED LIVE vs Computer, all three branches. Leader-only: Player 1 on 24 vs the Computer's 20 \u2014 Player 1's Day die went 12 \u2192 8 and the Computer was untouched, both ending on 20. Tie (both seats at 24): both Day dice went 12 \u2192 8 and the notice read 'Player 1 and The Computer are tied on 24 Time Points \u2014 each loses 4', proving Player 1 dropping to 20 first did not spare the Computer. Lethal (Player 1 on 3 with the Day die already gone, the Computer on 2): the 4 came off the Night die, Player 1 hit 0, and COMPUTER WON appeared with the Destiny overlay closing itself behind it \u2014 no orphaned CONTINUE. Also moved the feed line ahead of the notice so the log lands with the damage rather than whenever CONTINUE is clicked. No console errors. Destiny progress panel now reads 9/24, next 033 Great Flood." },
         { date: '2026-08-30', msg: "Destiny 031 Space Voider \u2014 implemented (auto), 8/24. 'Each Player may send up to 4 Cards from their History Pile into the Abyss.' This one is the payoff for how 030 Voider was built rather than a card in its own right: the entire effect is resolveSpaceVoider calling voidFromHistory(revealer, 4, 'Space Voider'), because the limit was already a parameter and the picker's `max` cap was already reading it. Nothing else in the engine changed. The one real edit was to the Computer, which had a fixed 'Normal takes 1' \u2014 fine for a 2-card card, timid for a 4-card one. The cap now scales with the card: Hard takes the lot, Normal takes half (Math.ceil(limit / 2), so 1 of 2 and 2 of 4, leaving Voider's behaviour exactly as it was), Easy still declines. Its two real constraints are unchanged and are what keep this from being a blunder: it voids STEAM only, cheapest first, and it stops before Future + History would fall below 6 cards. Sim preset gives BOTH seats a six-card History, so 4 is a ceiling you bump into rather than 'select everything', with a LaserSteam and a Creature in each pile worth keeping. VERIFIED LIVE vs Computer. The picker fanned all six; selecting four lit them and the FIFTH click did not take (VOID 4, '4 cards out of the game for good.'); confirming left History as LaserSteam / Ichor and the Bazaar Abyss climbing to 6 IN ABYSS. Normal voided exactly 2 of its cheapest FireSteam and kept its GoldSteam, LaserSteam and Cravus; Hard voided 4 (three FireSteam plus the GoldSteam) and left LaserSteam / Cravus. The deck floor was then checked directly by trimming the Computer's Future Pile to a single card mid-reveal, while the overlay was still waiting on my choice: Hard's allowance of 4 clamped to 1, leaving its deck at exactly 6. Player 1's DECLINE left a six-card pile untouched in the same reveal. No console errors. Destiny progress panel now reads 8/24, next 032 Eternal Hour." },
@@ -1055,6 +1076,13 @@ document.addEventListener('DOMContentLoaded', () => {
                             const pStr = parseInt(found.strength ?? found.health);
                             const pRes = parseInt(found.resistance ?? found.health);
                             const c = { ...found, baseStrength: Number.isNaN(pStr) ? 1 : pStr, baseResistance: Number.isNaN(pRes) ? 1 : pRes, damageTaken: spec.damageTaken || 0, summonedOnTurn: summonTurn };
+                            // onLotus: seat this Creature on a Lotus pad (Duality A2), the way
+                            // summonCreatureToZone does — the Lotus rides on card.lotusPad and
+                            // shows the 🪷 marker. Lets a preset set up the pad interactions.
+                            if (spec.onLotus) {
+                                const lotus = cardData.find(c2 => c2.name === 'Lotus');
+                                if (lotus) c.lotusPad = { ...lotus };
+                            }
                             finishSingleCardPlacement(cSlots[i], c);
                             updateCreatureVisuals(cSlots[i]);
                         }
@@ -8709,6 +8737,56 @@ document.addEventListener('DOMContentLoaded', () => {
         return entries.slice().sort((a, b) => cardCostValue(a.card) - cardCostValue(b.card))[0].value;
     }
 
+    // 034 Laser Bomb — "Send all Creatures from the Creature Zone into the Abyss." The
+    // board-wipe. No choices, no exceptions, both sides at once — and to the Abyss, so
+    // unlike every other way a Creature leaves the zone these do not cycle back through
+    // History into anyone's deck. They are gone.
+    //
+    // "All Creatures" is literal: a deactivated, face-down Creature is still a Creature and
+    // still goes. A Lotus pad is NOT — it is an Artifact lying in the Creature Zone, and the
+    // card names Creatures only, so a Creature riding a pad is taken and the empty pad is
+    // re-seated behind it, reusable, exactly as finishAttacker does for a spent attacker.
+    // (Flagged for Simon: the alternative reading is that a Laser Bomb "defeats" the
+    // Creature and the Lotus should discharge with it. One line if he wants that.)
+    async function resolveLaserBomb(card, revealer) {
+        const abyssEl = document.querySelector('.card--abyss');
+        const taken = [];
+
+        seatsClockwise(revealer).forEach(pNum => {
+            const board = document.getElementById(`player-${pNum}`);
+            if (!board) return;
+            board.querySelectorAll('.creature-zone-main .card:not(.slot-empty)').forEach(slot => {
+                let c;
+                try { c = JSON.parse(slot.dataset.cardData); } catch (e) { return; }
+                if (!c || c.type !== 'Creature') return; // a bare Lotus pad stays put
+
+                if (c.lotusPad) {
+                    const lotus = c.lotusPad;
+                    c = { ...c };
+                    delete c.lotusPad;
+                    clearSlot(slot);
+                    finishSingleCardPlacement(slot, lotus); // pad survives, marker stripped
+                    refreshBoardAfterDeactivation(slot);
+                } else {
+                    clearSlot(slot);
+                }
+                if (abyssEl) finishSingleCardPlacement(abyssEl, c);
+                taken.push({ pNum, name: c.name });
+            });
+        });
+
+        if (taken.length === 0) {
+            await destinyNotice('No Creature is in play — the bomb falls on an empty field.');
+            return;
+        }
+
+        renderBazaar();
+        if (abyssEl) floatValue(abyssEl, `+${taken.length} Destroyed`, 'damage');
+        const names = taken.map(t => t.name).join(', ');
+        if (vsComputer) aiLog(`Laser Bomb: ${names} destroyed`, 'combat');
+        await destinyNotice(`${names} ${taken.length === 1 ? 'is' : 'are'} sent into the Abyss — every Creature Zone is cleared.`);
+    }
+
     const destinyEffects = {
         'Healing Tree': resolveHealingTree,
         'Freeze': resolveFreeze,
@@ -8720,6 +8798,7 @@ document.addEventListener('DOMContentLoaded', () => {
         'Space Voider': resolveSpaceVoider,
         'Eternal Hour': resolveEternalHour,
         'Great Flood': resolveGreatFlood,
+        'Laser Bomb': resolveLaserBomb,
     };
 
     // ==================== COMPUTER OPPONENT ====================
