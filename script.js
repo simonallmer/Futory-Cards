@@ -285,7 +285,7 @@ document.addEventListener('DOMContentLoaded', () => {
         };
     }
 
-    const implementedCards = ["Pandorama", "Fountain of Youth", "Laser Catalyst", "Dragura's Wasteland", "Planetarium", "Lethargo's Temple", "Clone Factory", "Aetherlab", "Entrophy", "Meridius", "Meridia", "Time Thief", "Ichor", "Vulcanem", "Cravus", "Rampadon", "Smoke", "Dark Matter", "Reflector", "Talisman", "Reversal", "Faith", "Threat", "Confiscation", "Gravitas", "Time Bender", "Meridia's Cabin", "Repo Station", "Hand of Rhone", "Atlantica", "Hyperscope", "Mines of Pyralos", "Chrona", "Razo", "Looper", "Masiota", "Aromeas", "General Wave", "Namandi", "Sea Lord", "Sleep Potion", "Lotus", "Rush", "Cell Shield", "Alchemy", "Tame Beast", "Tele Control", "Burden of Wealth", "Healing Tree", "Freeze", "Chrono Machine", "Dragon Throne", "Unstoppable Force", "Truce", "Voider", "Space Voider", "Eternal Hour", "Great Flood", "Laser Bomb", "Daredevil's Reward", "Lethargo's Approach", "Sacrifice", "Break of Dawn", "Sandstorm", "Wormhole", "Dragura's Command", "Rula's Support", "Contermination", "Noctura's Night", "Sunken City"];
+    const implementedCards = ["Pandorama", "Fountain of Youth", "Laser Catalyst", "Dragura's Wasteland", "Planetarium", "Lethargo's Temple", "Clone Factory", "Aetherlab", "Entrophy", "Meridius", "Meridia", "Time Thief", "Ichor", "Vulcanem", "Cravus", "Rampadon", "Smoke", "Dark Matter", "Reflector", "Talisman", "Reversal", "Faith", "Threat", "Confiscation", "Gravitas", "Time Bender", "Meridia's Cabin", "Repo Station", "Hand of Rhone", "Atlantica", "Hyperscope", "Mines of Pyralos", "Chrona", "Razo", "Looper", "Masiota", "Aromeas", "General Wave", "Namandi", "Sea Lord", "Sleep Potion", "Lotus", "Rush", "Cell Shield", "Alchemy", "Tame Beast", "Tele Control", "Burden of Wealth", "Healing Tree", "Freeze", "Chrono Machine", "Dragon Throne", "Unstoppable Force", "Truce", "Voider", "Space Voider", "Eternal Hour", "Great Flood", "Laser Bomb", "Daredevil's Reward", "Lethargo's Approach", "Sacrifice", "Break of Dawn", "Sandstorm", "Wormhole", "Dragura's Command", "Rula's Support", "Contermination", "Noctura's Night", "Sunken City", "Kyro's Destiny"];
 
     // --- Intent Classification ---
     // auto: fires on its own when condition is met
@@ -363,6 +363,7 @@ document.addEventListener('DOMContentLoaded', () => {
         'Contermination': 'auto',
         "Noctura's Night": 'auto',
         'Sunken City': 'auto',
+        "Kyro's Destiny": 'auto',
     };
 
     // --- Simulation Presets ---
@@ -883,6 +884,21 @@ document.addEventListener('DOMContentLoaded', () => {
             p2hand: ['FireSteam'],
             p2history: ['Smoke', 'Cravus', 'Faith'],
         },
+        "Kyro's Destiny": {
+            phase: 0,
+            // Day at 8 so Faith's +3 Time Points is visible rather than silently capped, and
+            // the Computer holds cards worth taking so Confiscation has something to show if
+            // you pick it instead. The point is that whichever Spark you choose, it resolves
+            // ON THE BOARD after the overlay closes — not behind it.
+            day: 8,
+            night: 12,
+            desc: "Player 1's Future Pile is empty — the turn start reveals Kyro's Destiny. The top card of each Spark pile fans out and you MUST play one, free — one click is the answer. It leaves the Bazaar (that pile drops by one), lands in the Abyss, and its effect fires only once the Destiny screen closes: pick Faith and you should see a card drawn and Day 8 → 11; pick Confiscation and its opponent-hand picker should open on the visible board.",
+            destiny: "Kyro's Destiny",
+            hand: ['FireSteam'],
+            p1future: [],
+            p1history: ['FireSteam', 'GoldSteam'],
+            p2hand: ['Ichor', 'Cravus', 'LaserSteam'],
+        },
         'Hand of Rhone': {
             phase: 1,
             day: 9,
@@ -983,6 +999,7 @@ document.addEventListener('DOMContentLoaded', () => {
     };
 
     const devLogData = [
+        { date: '2026-08-30', msg: "Destiny 046 Kyro's Destiny \u2014 implemented (auto), 23/24. 'Play a Spark Card of your choice from the Bazaar.' One free Spark for the revealer, played immediately \u2014 mandatory, so destinyPickOneTile. 'Of your choice from the Bazaar' is the choice the Bazaar actually offers: the top card of each Spark pile, the same four cards you could buy, with closed piles (Contermination) and empty ones left out. Playing routes through grantCardToPlayer's Spark branch, so the card lands in the Abyss and its effect is DEFERRED to the follow-up queue \u2014 a Spark that opens its own targeting UI must not do it behind the Destiny screen. V1 LIMITATION, stated rather than faked. The Computer does not play Sparks: their effects are written around a human caster and most of them open a picker nobody would drive. So when the COMPUTER reveals this, aiSparkValue ranks what it can safely resolve \u2014 Faith always (a card and 3 Time Points), Reversal only when its History Pile holds EXACTLY one card, everything else zero \u2014 and if nothing scores it plays nothing and says so in the notice. It never quietly burns a Bazaar card for no effect. That ranking is the second version: the first merely PERMITTED a Spark rather than ranking it, and the live test caught the Computer choosing Reversal on an EMPTY History \u2014 legal, resolvable, and completely pointless \u2014 while Faith sat next to it. Permitting is not the same as choosing well. VERIFIED LIVE vs Computer, both directions. Human revealer: the picker fanned Reversal / Faith / Threat / Confiscation; choosing Faith dropped S2 from 6 to 5 LEFT, put Faith in the Abyss and did NOTHING else while the overlay was open \u2014 then, once it closed, the Spark resolved on the visible board: Day 8 \u2192 11 and a card drawn off a History Pile that reshuffled to feed it. Computer revealer (its own Future Pile emptied): with the ranking in place it played FAITH, Day 6 \u2192 9, Faith to the Abyss, and no picker opened at any point. No console errors. Destiny progress panel now reads 23/24, next 048 Meridia's Revenge \u2014 the last one." },
         { date: '2026-08-30', msg: "Destiny 045 Sunken City \u2014 implemented (auto), 22/24. 'Each Player may take 1 Card from their History Pile to their Hand.' Reversal (S1) handed to the whole table at once, and a real 'may' \u2014 any seat can raise one card or walk away, clockwise from the revealer. Built entirely out of parts already in place: the pile picker from Voider (destinyPickTiles with max: 1, so a second tile simply doesn't take), writeStackPile for the pile's face afterwards, and the temporary-hand-slot pattern Reversal, Confiscation and Dragon Throne all use when a hand is already full \u2014 the card still arrives and the End Phase limit settles it. To the HAND regardless of type, which is Reversal's precedent: a Landmark dug out of History comes to hand and is built later, it does not leap into the zone. COMPUTER: raises the best card it can actually use \u2014 most expensive first, no Artifacts and no Sparks, since in V1 it plays neither and one in hand is dead weight. It declines outright when its hand is already at the limit, because a card taken over the limit is only discarded again in its own End Phase. VERIFIED LIVE vs Computer, all three branches. The picker fanned Player 1's four History cards; selecting Vulcanem and then clicking a second tile left the second one unselected (the cap holding), and confirming moved Vulcanem into hand while History dropped to three with its face correctly becoming the new top card (GoldSteam). The Computer, offered Smoke / Cravus / Faith, raised the CRAVUS and left both the Artifact and the Spark behind. A re-run with DECLINE left Player 1's four-card pile and two-card hand completely untouched. No console errors. Destiny progress panel now reads 22/24, next 046 Kyro's Destiny." },
         { date: '2026-08-30', msg: "Destiny 044 Noctura's Night \u2014 implemented (auto), 21/24. 'Each Player removes their Day Die.' The game's own endgame rule, forced early: normally the orange Day die is removed when it empties at 12 Time Points and that player is capped at 12 for the rest of the game. This does it to everyone at once, and whatever was still ON the Day die goes with it \u2014 that is what removing a die means. It costs whoever is furthest ahead the most, which is the whole point of the card. It deliberately does NOT go through destinyLoseTimePoints. That helper routes damage to the ACTIVE die, and under Time Bender the active die may be the Night one \u2014 this card names the Day die specifically, so it sets it to 0 directly. Everything downstream then works without any further wiring, because activeDieType() already falls back to the other die when the preferred one is gone: gains, damage and floats all land on the Night die from here. A player whose Day die is already gone is simply untouched. FLAGGED FOR SIMON: a player whose NIGHT die is already gone and who is living on the Day die alone is ELIMINATED by this. That is the literal reading and the game-over check fires correctly, but it makes Noctura a kill card in a way the text does not advertise. One line to guard if it should never be lethal. VERIFIED LIVE vs Computer, all three branches. Normal: Player 1 on a full 24 and the Computer on 17 both dropped to exactly 12, with both orange dice vanishing and the notice reporting the unequal cost ('Player 1 loses 12 \u00b7 The Computer loses 5'). Already-gone: a Computer whose Day die was already removed read 'had none left' and lost nothing while Player 1 still paid 12. Lethal: Player 1 living on a Day die of 3 with no Night die was wiped out \u2014 COMPUTER WON, with the Destiny overlay closing itself behind the victory screen. No console errors. Destiny progress panel now reads 21/24, next 045 Sunken City." },
         { date: '2026-08-30', msg: "Destiny 043 Contermination \u2014 implemented (auto), 20/24. 'Turn over a Non-Steam Pile from the Bazaar to make it inaccessible for purchases.' The only Destiny card that changes the SHOP rather than the boards, and the only one whose effect outlives its own reveal \u2014 not because a rule lingers, but because turning the pile over IS the effect. It stays turned over for the rest of the game. Nothing is destroyed: the cards are still in there, just shut away. 'Non-Steam Pile from the Bazaar' lines up exactly with Simon's definition of the Bazaar (the Non-Steam, Non-Destiny cards), so the picker offers all 24 non-Steam locations and nothing else \u2014 no Steam columns, no Destiny deck, no Abyss. The revealer chooses, the way 'You lose Time Points' makes Sacrifice the revealer's; it is mandatory, so destinyPickOneTile again. Empty piles are not offered (closing one would be no effect at all) and a pile already turned over can't be picked twice. CLOSED HAS TO MEAN CLOSED IN FIVE PLACES, which is most of the work: closedBazaarPiles (a Set of location codes, cleared with the inventory) is consulted by renderBazaar (the pile flips to a card back reading 'N CLOSED', greyed by new .bazaar-closed CSS), updateBazaarLighting (permanently 'unavailable', so it never lights up as affordable), the Bazaar click handler (refused with a message rather than opening its stack list \u2014 listing the cards would hand back exactly the information the card took away), aiConstructionCandidates (the Computer's buy list skips it), and bazaarStockByName (so Daredevil's Reward cannot reach into a closed pile either). The notice names the pile by LOCATION plus the card on top rather than pluralising a card name \u2014 with both sets active a pile holds two different cards, so '6 Cravuss' would have been wrong twice over. VERIFIED LIVE vs Computer: the picker fanned exactly 24 tiles with no Steam or Destiny among them; turning over C2 flipped it to a card back reading '6 CLOSED'. In the Construction Phase it stayed dark and clicking it said 'This pile has been turned over' instead of grabbing or listing, while its neighbour C1 bought an Ichor normally (6 \u2192 5 LEFT) \u2014 only the closed pile is affected. The Computer then played a full turn alongside it without trouble (bought FireSteam, bought and summoned Entrophy from C3, drew 2) and C2 was still shut afterwards. NOTE: that AI turn shows the closed pile does not disturb it, but it is not proof it would otherwise have chosen C2 \u2014 the exclusion itself is the same one-line isPileClosed gate that the human path proves live. No console errors. Destiny progress panel now reads 20/24, next 044 Noctura's Night." },
@@ -9731,6 +9748,75 @@ document.addEventListener('DOMContentLoaded', () => {
         return usable.sort((a, b) => cardCostValue(b.c) - cardCostValue(a.c))[0].i;
     }
 
+    // 046 Kyro's Destiny — "Play a Spark Card of your choice from the Bazaar." The revealer
+    // gets one free Spark, played immediately. Mandatory, so destinyPickOneTile again.
+    //
+    // "Of your choice from the Bazaar" is the choice the Bazaar actually offers: the top card
+    // of each Spark pile, the same cards you could buy. Closed piles (Contermination) and
+    // empty ones are not offered. Playing goes through grantCardToPlayer's Spark branch, so
+    // the card lands in the Abyss and its effect is deferred to the follow-up queue — a Spark
+    // that opens its own targeting UI must not do it behind the Destiny screen.
+    //
+    // V1 LIMITATION, stated plainly rather than faked: the Computer does not play Sparks —
+    // their effects are written around a human caster and several open pickers nobody would
+    // drive. So when the COMPUTER reveals this, it plays only a Spark that resolves with no
+    // prompt at all (Faith always; Reversal when its History holds at most one card), and
+    // otherwise plays nothing and says so. It never quietly burns a Bazaar card for nothing.
+    // Rank, not just permit: a Spark the Computer CAN resolve is still a waste if it does
+    // nothing. Faith always pays (a card and 3 Time Points). Reversal only pays when the
+    // History Pile holds exactly one card — at zero it resolves to nothing, and at two or
+    // more it would open a picker nobody drives. 0 = it should not be chosen.
+    function aiSparkValue(name, pNum) {
+        if (name === 'Faith') return 2;
+        if (name === 'Reversal') {
+            const pile = document.getElementById(`player-${pNum}`)?.querySelector('.history-pile');
+            let hist = [];
+            try { hist = JSON.parse(pile && pile.dataset.cardData || '[]'); } catch (e) { hist = []; }
+            return (Array.isArray(hist) ? hist.length : 1) === 1 ? 1 : 0;
+        }
+        return 0;
+    }
+
+    async function resolveKyrosDestiny(card, revealer) {
+        const entries = ['S1', 'S2', 'S3', 'S4']
+            .filter(loc => !isPileClosed(loc))
+            .map(loc => {
+                const stock = (activeBazaar[loc] || []).filter(c => selectedSets.includes(c.set));
+                return stock.length ? { card: stock[stock.length - 1], value: loc } : null;
+            })
+            .filter(Boolean);
+
+        const who = (vsComputer && revealer === AI_PLAYER) ? 'The Computer' : `Player ${revealer}`;
+        if (!entries.length) {
+            await destinyNotice('No Spark is available in the Bazaar — every pile is empty or closed.');
+            return;
+        }
+
+        let pickedLoc;
+        if (vsComputer && revealer === AI_PLAYER) {
+            const usable = entries
+                .map(e => ({ e, v: aiSparkValue(e.card.name, revealer) }))
+                .filter(x => x.v > 0)
+                .sort((a, b) => b.v - a.v);
+            if (!usable.length) {
+                aiLog("Kyro's Destiny: no Spark it can use (V1)", 'info');
+                await destinyNotice(`${who} cannot use any of the available Sparks — nothing is played.`);
+                return;
+            }
+            pickedLoc = usable[0].e.value;
+        } else {
+            pickedLoc = await destinyPickOneTile(entries, `Player ${revealer}: play one Spark from the Bazaar, free.`);
+        }
+
+        const chosen = entries.find(e => e.value === pickedLoc) || entries[0];
+        const spark = { ...chosen.card };
+        removeTopFromBazaar(chosen.value, spark);
+        grantCardToPlayer(revealer, spark); // Spark branch: to the Abyss, effect queued
+
+        if (vsComputer) aiLog(`Kyro's Destiny: plays ${spark.name}`, 'play');
+        await destinyNotice(`${who} plays ${spark.name} for free — it resolves as soon as this closes.`);
+    }
+
     const destinyEffects = {
         'Healing Tree': resolveHealingTree,
         'Freeze': resolveFreeze,
@@ -9754,6 +9840,7 @@ document.addEventListener('DOMContentLoaded', () => {
         'Contermination': resolveContermination,
         "Noctura's Night": resolveNocturasNight,
         'Sunken City': resolveSunkenCity,
+        "Kyro's Destiny": resolveKyrosDestiny,
     };
 
     // ==================== COMPUTER OPPONENT ====================
